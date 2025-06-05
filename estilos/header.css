@@ -1,0 +1,355 @@
+/* Importar fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
+/* Variables de color para tema clínica/hospital */
+:root {
+    /* Colores primarios */
+    --primary: #1976d2;
+    --primary-light: #63a4ff;
+    --primary-dark: #004ba0;
+    
+    /* Colores secundarios */
+    --secondary: #26a69a;
+    --secondary-light: #64d8cb;
+    --secondary-dark: #00766c;
+    
+    /* Colores de alerta */
+    --success: #2e7d32;
+    --success-light: #60ad5e;
+    --success-dark: #005005;
+    
+    --warning: #ff9800;
+    --warning-light: #ffc947;
+    --warning-dark: #c66900;
+    
+    --danger: #d32f2f;
+    --danger-light: #ff6659;
+    --danger-dark: #9a0007;
+    
+    --info: #0288d1;
+    --info-light: #5eb8ff;
+    --info-dark: #005b9f;
+    
+    /* Colores neutros */
+    --white: #ffffff;
+    --gray-50: #fafafa;
+    --gray-100: #f5f5f5;
+    --gray-200: #eeeeee;
+    --gray-300: #e0e0e0;
+    --gray-400: #bdbdbd;
+    --gray-500: #9e9e9e;
+    --gray-600: #757575;
+    --gray-700: #616161;
+    --gray-800: #424242;
+    --gray-900: #212121;
+    --black: #000000;
+    
+    /* Sombras y efectos */
+    --shadow-sm: 0 .125rem .25rem rgba(0, 0, 0, .075);
+    --shadow-md: 0 .5rem 1rem rgba(0, 0, 0, .15);
+    --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, .175);
+    --transition-speed: 0.3s;
+    
+    /* Tamaños */
+    --navbar-height: 60px;
+}
+
+/* Estilos del Navbar */
+.navbar {
+    height: var(--navbar-height);
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    padding: 0 1rem;
+    box-shadow: var(--shadow-md);
+}
+
+/* Logo y nombre */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    color: var(--white) !important;
+    text-decoration: none;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.logo-icon {
+    font-size: 20px;
+    color: var(--white);
+}
+
+.brand-text {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    font-size: 1.4rem;
+    color: var(--white);
+    letter-spacing: 0.5px;
+}
+
+/* Elementos de navegación */
+.navbar .nav-link {
+    color: rgba(255, 255, 255, 0.85) !important;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.navbar .nav-link:hover {
+    color: var(--white) !important;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Hora y ubicación */
+.time-display, .location-display {
+    color: var(--white) !important;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 0.35rem 0.8rem !important;
+}
+
+.time-display i, .location-display i {
+    margin-right: 5px;
+    font-size: 0.9rem;
+}
+
+.location-flag {
+    width: 16px;
+    height: 12px;
+    border-radius: 2px;
+    margin-left: 5px;
+}
+
+/* Notificaciones */
+.notification-icon {
+    position: relative;
+    font-size: 1.1rem;
+    color: var(--white) !important;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin-right: 0.5rem;
+}
+
+.notification-icon:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--danger);
+    color: var(--white);
+    font-size: 0.7rem;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+}
+
+.notification-dropdown {
+    width: 300px;
+    border-radius: 8px;
+    border: none;
+    box-shadow: var(--shadow-lg);
+    padding: 0;
+    overflow: hidden;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.notification-item:hover {
+    background-color: var(--gray-100);
+    border-left-color: var(--primary);
+}
+
+.notification-icon-wrapper {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-size: 1rem;
+}
+
+.success-icon {
+    background-color: rgba(46, 125, 50, 0.1);
+    color: var(--success);
+}
+
+.warning-icon {
+    background-color: rgba(255, 152, 0, 0.1);
+    color: var(--warning);
+}
+
+.info-icon {
+    background-color: rgba(2, 136, 209, 0.1);
+    color: var(--info);
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-weight: 500;
+    color: var(--gray-800);
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+}
+
+.notification-time {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+}
+
+.view-all {
+    color: var(--primary);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+/* Usuario */
+.user-dropdown {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    transition: all 0.2s ease;
+}
+
+.user-dropdown:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--white);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.user-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--white);
+    line-height: 1.2;
+}
+
+.user-role {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.2;
+}
+
+.user-dropdown-menu {
+    min-width: 200px;
+    border-radius: 8px;
+    border: none;
+    box-shadow: var(--shadow-md);
+    padding: 0.5rem 0;
+}
+
+.dropdown-item {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: var(--gray-100);
+}
+
+.dropdown-item i {
+    font-size: 0.9rem;
+    width: 20px;
+    text-align: center;
+    margin-right: 8px;
+}
+
+.logout-item {
+    color: var(--danger);
+}
+
+.logout-item:hover {
+    background-color: rgba(211, 47, 47, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .user-dropdown {
+        padding: 0.4rem;
+    }
+    
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar {
+        padding: 0 0.5rem;
+    }
+    
+    .brand-text {
+        font-size: 1.2rem;
+    }
+    
+    .notification-icon, .user-avatar {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+/* Overlay para sidebar en móviles */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    display: none;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
