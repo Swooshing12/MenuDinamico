@@ -1,226 +1,307 @@
 <?php
-session_start();
-require_once __DIR__ . "/../../config/config.php";
-require_once __DIR__ . "/../../modelos/Roles.php";
-require_once __DIR__ . "/../../modelos/Menus.php";
-require_once __DIR__ . "/../../modelos/Submenus.php";
-require_once __DIR__ . "/../../modelos/Permisos.php";
-
-if (!isset($_SESSION['id_rol'])) {
-    header('Location: ' . BASE_URL . '/login.php');
-    exit();
-}
-
-$id_rol = $_SESSION['id_rol'];
-$rolesModel = new Roles();
-$menusModel = new Menus();
-$submenusModel = new Submenus();
-$permisosModel = new Permisos();
-
-// Obtener el id_submenu directamente sin encriptación
-$id_submenu = isset($_GET['submenu_id']) ? (int)$_GET['submenu_id'] : null;
-
-if (!$id_submenu) {
-    // Si no hay submenu_id, tratar de obtenerlo de la URL actual
-    $current_url = $_SERVER['REQUEST_URI'];
-    $path_parts = explode('/', $current_url);
-    $script_name = end($path_parts);
-    
-    // Intentar encontrar el submenu correspondiente a esta URL
-    $submenus = $submenusModel->obtenerTodos();
-    foreach ($submenus as $submenu) {
-        if (strpos($submenu['url_submenu'], $script_name) !== false) {
-            $id_submenu = $submenu['id_submenu'];
-            break;
-        }
-    }
-    
-    if (!$id_submenu) {
-        // Si aún no se encuentra, intentar buscar por el nombre del archivo
-        $script_file = basename($script_name, '.php');
-        foreach ($submenus as $submenu) {
-            if (strpos(basename($submenu['url_submenu'], '.php'), $script_file) !== false) {
-                $id_submenu = $submenu['id_submenu'];
-                break;
-            }
-        }
-        
-        if (!$id_submenu) {
-            // Por último, si es gestionroles.php, podemos establecer un valor predeterminado
-            if ($script_name === 'gestionroles.php') {
-                // ID de "Gestión Roles" en tu sistema
-                $id_submenu = 16; // Ajusta este valor según tu base de datos
-            } else {
-                die("Error: No se pudo determinar el ID del submenú para esta página.");
-            }
-        }
-    }
-}
-
-// Verificar permisos para el rol y submenú actual
-$permisos = $permisosModel->obtenerPermisos($id_rol, $id_submenu);
-
-// Si no tiene permiso para acceder, redirigir a una página de error o al dashboard
-if (!$permisos || empty($permisos)) {
-    header('Location: ' . BASE_URL . '/vistas/error_permisos.php');
-    exit();
-}
-
-// Incluir el header después de verificar permisos
-require_once __DIR__ . "/../../navbars/header.php";
-include __DIR__ . "/../../navbars/sidebar.php";
-
-
-$menus = $menusModel->obtenerTodos();
-$submenusPorMenu = [];
-foreach ($menus as $menu) {
-    $submenusPorMenu[$menu['id_menu']] = $submenusModel->obtenerPorMenu($menu['id_menu']);
-}
-
-$mensajeError = "";
-$rolCreado = false;
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Verificar que el usuario tiene permiso para crear
-    if (!$permisos['puede_crear']) {
-        $mensajeError = "No tienes permiso para crear roles.";
-    } else {
-        $nombre_rol = trim($_POST['nombre_rol']);
-        if ($rolesModel->existeRolPorNombre($nombre_rol)) {
-            $mensajeError = "Ya existe un rol con ese nombre.";
-        } else {
-            $id_rol_nuevo = $rolesModel->crearRol($nombre_rol);
-            if ($id_rol_nuevo && isset($_POST['permisos'])) {
-                foreach ($_POST['permisos'] as $id_submenu => $acciones) {
-                    $rolesModel->asociarSubmenu($id_rol_nuevo, $id_submenu);
-                    $id_roles_submenus = $rolesModel->obtenerIdRolesSubmenus($id_rol_nuevo, $id_submenu);
-                    $rolesModel->crearPermisos($id_roles_submenus, [
-                        'puede_crear' => in_array('crear', $acciones),
-                        'puede_editar' => in_array('editar', $acciones),
-                        'puede_eliminar' => in_array('eliminar', $acciones),
-                    ]);
-                }
-            }
-            $rolCreado = true;
-        }
-    }
+// Si no se han cargado los datos, usar el controlador
+if (!isset($roles)) {
+    require_once __DIR__ . '/../../controladores/RolesControlador/RolesController.php';
+    $controller = new RolesController();
+    $controller->index();
+    return;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Gestión de Roles</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Bootstrap 5.3.6 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Iconos Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="../../estilos/header.css">
-<style>
-  .submenu-checkboxes { margin-left: 30px; margin-bottom: 15px; }
-  .acciones-permisos { margin-left: 60px; margin-bottom: 10px; display: flex; gap: 10px; }
-
-  .submenu-checkboxes .form-check-label {
-    color:rgb(105, 153, 224);
-    font-weight: 500;
-  }
-
-  .acciones-permisos .form-check-label {
-    color:rgb(255, 7, 27);
-    font-weight: 500;
-  }
-</style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediSys - Gestión de Roles</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../estilos/gestionroles.css">
 </head>
 <body>
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="bi bi-shield-lock-fill text-success"></i> Crear Nuevo Rol</h2>
-        <!-- <a href="listarroles.php" class="btn btn-outline-primary">
-            <i class="bi bi-gear-fill me-1"></i> Gestión Roles
-        </a> -->
+<?php include __DIR__ . "/../../navbars/header.php"; ?>
+<?php include __DIR__ . "/../../navbars/sidebar.php"; ?>
+
+<div class="main-content">
+  <div class="container-fluid p-4">
+    <!-- Título y botón crear -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="page-title"><i class="bi bi-shield-lock-fill me-2"></i>Gestión de Roles</h2>
+      <?php if ($permisos['puede_crear']): ?>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#crearRolModal">
+          <i class="bi bi-plus-circle-fill me-1"></i> Crear Rol
+        </button>
+      <?php endif; ?>
+    </div>
+    
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+      <div class="col-md-4">
+        <div class="card stat-card">
+          <div class="card-body d-flex align-items-center">
+            <i class="bi bi-shield-lock-fill fs-1 me-3 text-primary"></i>
+            <div>
+              <h5 class="card-title mb-0" id="totalRoles">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+                </div>
+              </h5>
+              <p class="card-text text-muted">Total de Roles</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stat-card">
+          <div class="card-body d-flex align-items-center">
+            <i class="bi bi-people-fill fs-1 me-3 text-success"></i>
+            <div>
+              <h5 class="card-title mb-0" id="rolesActivos">
+                <div class="spinner-border spinner-border-sm text-success" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+                </div>
+              </h5>
+              <p class="card-text text-muted">Roles con Usuarios</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card stat-card">
+          <div class="card-body d-flex align-items-center">
+            <i class="bi bi-gear-fill fs-1 me-3 text-info"></i>
+            <div>
+              <h5 class="card-title mb-0" id="permisosAsignados">
+                <div class="spinner-border spinner-border-sm text-info" role="status">
+                  <span class="visually-hidden">Cargando...</span>
+                </div>
+              </h5>
+              <p class="card-text text-muted">Permisos Configurados</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <form method="POST" id="formCrearRol">
-        <div class="mb-3">
-            <label for="nombre_rol" class="form-label">Nombre del Rol</label>
-            <input type="text" class="form-control border border-primary" id="nombre_rol" name="nombre_rol" required>
+    <!-- Tabla de roles con buscador y paginación -->
+    <div class="card">
+      <div class="card-body">
+        <!-- Buscador -->
+        <div class="row mb-3">
+          <div class="col-md-8 col-lg-6 mx-auto">
+            <div class="search-container">
+              <div class="search-wrapper" id="searchWrapper">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" id="buscarRol" class="form-control" 
+                       placeholder="Buscar rol por nombre..." 
+                       autocomplete="off">
+                <button class="btn" type="button" id="limpiarBusqueda" title="Limpiar búsqueda">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+                <div class="search-results-badge" id="searchResultsBadge"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="table-responsive table-container">
+          <table class="table table-striped table-hover align-middle shadow-sm" id="tablaRoles">
+            <thead>
+              <tr>
+                <th><i class="bi bi-hash me-1"></i> ID</th>
+                <th><i class="bi bi-shield-lock me-1"></i> Nombre del Rol</th>
+                <th><i class="bi bi-people me-1"></i> Usuarios Asignados</th>
+                <th><i class="bi bi-gear me-1"></i> Permisos</th>
+                <th><i class="bi bi-calendar me-1"></i> Fecha Creación</th>
+                <th><i class="bi bi-tools me-1"></i> Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="roles-container">
+              <!-- El contenido se cargará dinámicamente -->
+            </tbody>
+          </table>
         </div>
 
-        <h4><i class="bi bi-list-check text-secondary"></i> Asignar Menús y Submenús</h4>
-        <?php foreach ($menus as $menu): ?>
-            <div class="form-check mt-3">
-                <input class="form-check-input menu-toggle" type="checkbox" data-menu-id="<?= $menu['id_menu'] ?>">
-                <label class="form-check-label fw-bold text-success">
-                    <i class="bi bi-folder-fill me-1"></i> <?= $menu['nombre_menu'] ?>
-                </label>
-            </div>
-
-            <div class="submenu-checkboxes d-none" id="submenus-menu-<?= $menu['id_menu'] ?>">
-                <?php foreach ($submenusPorMenu[$menu['id_menu']] as $submenu): ?>
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input submenu-toggle" name="submenus[]" data-submenu-id="<?= $submenu['id_submenu'] ?>" value="<?= $submenu['id_submenu'] ?>">
-                        <label class="form-check-label">
-                            <i class="bi bi-diagram-3 me-1"></i> <?= $submenu['nombre_submenu'] ?>
-                        </label>
-                    </div>
-
-                    <div class="acciones-permisos d-none" id="acciones-submenu-<?= $submenu['id_submenu'] ?>">
-                        <?php foreach (["crear", "editar", "eliminar"] as $accion): ?>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="permisos[<?= $submenu['id_submenu'] ?>][]" value="<?= $accion ?>">
-                                <label class="form-check-label">
-                                    <i class="bi bi-pencil me-1"></i> <?= ucfirst($accion) ?>
-                                </label>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endforeach; ?>
-
-        <button type="submit" class="btn btn-success mt-4"><i class="bi bi-save2-fill me-1"></i> Guardar Rol</button>
-    </form>
+        <!-- Paginación y conteo de registros -->
+        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+          <span id="contadorRoles" class="badge bg-primary px-3 py-2">
+            <i class="bi bi-shield-lock-fill me-1"></i> Cargando roles...
+          </span>
+          
+          <nav aria-label="Paginación de roles">
+            <ul id="paginacionRoles" class="pagination pagination-sm mb-0">
+              <!-- La paginación se generará dinámicamente -->
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
+<!-- Modal Crear Rol -->
+<div class="modal fade" id="crearRolModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <form class="modal-content" id="formCrearRol">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Crear Nuevo Rol</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <!-- Nombre del Rol -->
+          <div class="col-12">
+            <label for="nombre_rol" class="form-label">
+              <i class="bi bi-shield-lock me-1"></i> Nombre del Rol
+            </label>
+            <input id="nombre_rol" name="nombre_rol" type="text" class="form-control" required 
+                   placeholder="Ej: Administrador, Doctor, Enfermero, etc.">
+          </div>
+          
+          <!-- Asignación de Permisos -->
+          <div class="col-12">
+            <hr>
+            <h5 class="mb-3"><i class="bi bi-list-check me-2 text-secondary"></i>Asignar Menús y Permisos</h5>
+            
+            <div id="permisos-container">
+              <!-- Los menús y submenús se cargarán dinámicamente aquí -->
+              <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="visually-hidden">Cargando permisos...</span>
+                </div>
+                <p class="mt-2 text-muted">Cargando estructura de permisos...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-save me-1"></i> Crear Rol
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Editar Rol -->
+<div class="modal fade" id="editarRolModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <form class="modal-content" id="formEditarRol">
+      <input type="hidden" name="id_rol" id="edit_id">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-1"></i> Editar Rol</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <!-- Nombre del Rol -->
+          <div class="col-12">
+            <label for="edit_nombre_rol" class="form-label">
+              <i class="bi bi-shield-lock me-1"></i> Nombre del Rol
+            </label>
+            <input id="edit_nombre_rol" name="nombre_rol" type="text" class="form-control" required>
+          </div>
+          
+          <!-- Edición de Permisos -->
+          <div class="col-12">
+            <hr>
+            <h5 class="mb-3"><i class="bi bi-list-check me-2 text-secondary"></i>Modificar Permisos</h5>
+            
+            <div id="edit-permisos-container">
+              <!-- Los permisos actuales se cargarán aquí -->
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        <button type="submit" class="btn btn-warning">
+          <i class="bi bi-save me-1"></i> Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Eliminar Rol -->
+<div class="modal fade" id="eliminarRolModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" id="formEliminarRol">
+      <input type="hidden" name="id_rol" id="delete_id">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-trash me-1"></i> Eliminar Rol</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <strong>¿Estás seguro?</strong>
+        </div>
+        <p class="mb-2">¿Deseas eliminar el rol <strong id="delete_nombre_rol"></strong>?</p>
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle-fill me-2"></i>
+          <small>Esta acción no se puede deshacer. Todos los usuarios con este rol perderán sus permisos.</small>
+        </div>
+        <div class="alert alert-danger" id="usuarios-asignados-warning" style="display: none;">
+          <i class="bi bi-exclamation-circle-fill me-2"></i>
+          <small>Este rol tiene <span id="cantidad-usuarios"></span> usuario(s) asignado(s). Reasígnelos antes de eliminar.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-trash me-1"></i> Eliminar Rol
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Ver Permisos -->
+<div class="modal fade" id="verPermisosModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title"><i class="bi bi-eye me-1"></i> Permisos del Rol</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="permisos-detalle-container">
+          <!-- Los permisos detallados se mostrarán aquí -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i> Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- Script personalizado -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    <?php if (!empty($mensajeError)): ?>
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: '<?= $mensajeError ?>'
-        });
-    <?php elseif ($rolCreado): ?>
-        Swal.fire({
-            icon: 'success',
-            title: 'Rol creado',
-            text: 'El rol fue creado exitosamente',
-            confirmButtonText: 'OK'
-        }).then(() => {
-            window.location.href = '<?= BASE_URL ?>/vistas/gestion/gestionroles.php';
-        });
-    <?php endif; ?>
+// Pasar datos esenciales a JavaScript
+window.gestionRoles = {
+    submenuId: <?= $id_submenu ?>,
+    permisos: <?= json_encode($permisos) ?>
+};
 
-    document.querySelectorAll('.menu-toggle').forEach(menuCheckbox => {
-        menuCheckbox.addEventListener('change', function () {
-            const id = this.getAttribute('data-menu-id');
-            document.getElementById('submenus-menu-' + id).classList.toggle('d-none', !this.checked);
-        });
-    });
-
-    document.querySelectorAll('.submenu-toggle').forEach(submenuCheckbox => {
-        submenuCheckbox.addEventListener('change', function () {
-            const id = this.getAttribute('data-submenu-id');
-            document.getElementById('acciones-submenu-' + id).classList.toggle('d-none', !this.checked);
-        });
-    });
-});
+// También crear objeto con menús para JavaScript
+window.menus = <?= json_encode($menus) ?>;
+window.submenus = <?= json_encode($submenus) ?>;
 </script>
+<script src="../../js/gestionroles.js"></script>
 
 </body>
 </html>
