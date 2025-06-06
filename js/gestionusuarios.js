@@ -128,34 +128,42 @@ function configurarBusqueda() {
                     console.log(`Países cargados: ${paises.length}`);
                 }
 
-                ['nacionalidadSelect', 'edit_nacionalidadSelect'].forEach(id => {
-                    const $sel = $(`#${id}`);
-                    if ($sel.length) {
-                        $sel.find('option:not(:first)').remove();
-                        
-                        paises.forEach(p => {
-                            $sel.append(new Option(`${p.gentilicio} (${p.name})`, p.gentilicio))
-                                .find(`option[value="${p.gentilicio}"]`)
-                                .attr('data-flag', p.flag);
-                        });
-                        
-                        try {
-                            $sel.select2({
-                                theme: 'bootstrap-5',
-                                placeholder: 'Seleccione nacionalidad',
-                                dropdownParent: $sel.closest('.modal'),
-                                templateResult: formatCountry,
-                                templateSelection: formatCountry,
-                                minimumResultsForSearch: 0,
-                                width: '100%',
-                                language: 'es'
-                            });
-                        } catch (error) {
-                            console.error('Error inicializando Select2:', error);
-                            $sel.removeClass('select2');
-                        }
-                    }
+                // 🔥 CONFIGURAR SELECTS DE NACIONALIDAD (CREAR Y EDITAR)
+['nacionalidadSelect', 'edit_nacionalidadSelect'].forEach(id => {
+    const $sel = $(`#${id}`);
+    if ($sel.length) {
+        $sel.find('option:not(:first)').remove();
+        
+        paises.forEach(p => {
+            $sel.append(new Option(`${p.gentilicio} (${p.name})`, p.gentilicio))
+                .find(`option[value="${p.gentilicio}"]`)
+                .attr('data-flag', p.flag);
+        });
+        
+        try {
+            // 🔥 NO usar Select2 en el modal de crear para evitar conflictos
+            if (id === 'nacionalidadSelect') {
+                // Para crear usuario: select normal sin Select2
+                console.log('✅ Select de nacionalidad (crear) configurado sin Select2');
+            } else {
+                // Para editar usuario: usar Select2
+                $sel.select2({
+                    theme: 'bootstrap-5',
+                    placeholder: 'Seleccione nacionalidad',
+                    dropdownParent: $sel.closest('.modal'),
+                    templateResult: formatCountry,
+                    templateSelection: formatCountry,
+                    minimumResultsForSearch: 0,
+                    width: '100%',
+                    language: 'es'
                 });
+            }
+        } catch (error) {
+            console.error('Error inicializando Select2:', error);
+            $sel.removeClass('select2');
+        }
+    }
+});
             })
             .catch(e => {
                 console.error('Error cargando países:', e);
@@ -517,52 +525,113 @@ function generarPaginacion(paginaActual, totalPaginas) {
         `);
     }
     
-    // Buscar datos por cédula
-    function buscarPorCedula() {
-        const cedula = $('#cedula').val().trim();
-        if (!cedula) {
-            return Swal.fire('Error', 'Por favor, ingresa una cédula', 'error');
-        }
-        
-        fetch(`../../controladores/obtenerDatos.php?cedula=${cedula}`)
-            .then(r => {
-                if (!r.ok) throw new Error(`Error HTTP: ${r.status}`);
-                return r.json();
-            })
-            .then(json => {
-                if (config.debug) {
-                    console.log('Respuesta de búsqueda por cédula:', json);
-                }
-                
-                if (json.estado !== 'OK' || !json.resultado?.length) {
-                    return Swal.fire('Error', 'No se encontraron datos para la cédula ingresada.', 'error');
-                }
-                
-                const c = json.resultado[0];
-                const palabras = c.nombre.split(' ');
-                
-                $('#apellidos').val(palabras.slice(0, 2).join(' '));
-                $('#nombres').val(palabras.slice(2).join(' '));
-                $('#cedula').val(c.cedula).prop('readonly', true);
-                
-                if (c.condicionCiudadano.toUpperCase() === 'CIUDADANO') {
-                    $('#nacionalidadHidden').val('Ecuadorean');
-                    $('#nacionalidadSelect').val('Ecuadorean').trigger('change').prop('disabled', true);
-                    
-                    if (config.debug) {
-                        console.log('Nacionalidad seleccionada:', $('#nacionalidadSelect').val());
-                        console.log('Valor en campo oculto:', $('#nacionalidadHidden').val());
-                    }
-                }
-                                
-                Swal.fire('Éxito', 'Datos encontrados y actualizados.', 'success');
-            })
-            .catch(err => {
-                console.error('Error buscando cédula:', err);
-                Swal.fire('Error', 'No se pudieron obtener los datos. Intente nuevamente.', 'error');
-            });
+    // BUSCAR esta función en gestionusuarios.js y REEMPLAZARLA:
+function buscarPorCedula() {
+    const cedula = $('#cedula').val().trim();
+    if (!cedula) {
+        return Swal.fire('Error', 'Por favor, ingresa una cédula', 'error');
     }
     
+    // Mostrar loading en el botón
+    const btnBuscar = $('#btnBuscarCedula');
+    const textoOriginal = btnBuscar.html();
+    btnBuscar.html('<i class="bi bi-arrow-clockwise spin"></i>').prop('disabled', true);
+    
+    fetch(`../../controladores/obtenerDatos.php?cedula=${cedula}`)
+        .then(r => {
+            if (!r.ok) throw new Error(`Error HTTP: ${r.status}`);
+            return r.json();
+        })
+        .then(json => {
+            // Restaurar botón
+            btnBuscar.html(textoOriginal).prop('disabled', false);
+            
+            if (config.debug) {
+                console.log('Respuesta de búsqueda por cédula:', json);
+            }
+            
+            if (json.estado !== 'OK' || !json.resultado?.length) {
+                return Swal.fire('Error', 'No se encontraron datos para la cédula ingresada.', 'error');
+            }
+            
+            const c = json.resultado[0];
+            const palabras = c.nombre.split(' ');
+            
+            // 🔥 LLENAR Y BLOQUEAR CAMPOS
+            // Apellidos (primeras 2 palabras)
+            $('#apellidos').val(palabras.slice(0, 2).join(' ')).prop('readonly', true);
+            
+            // Nombres (palabras restantes)
+            $('#nombres').val(palabras.slice(2).join(' ')).prop('readonly', true);
+            
+            // Cédula (bloquear para que no se modifique)
+            $('#cedula').prop('readonly', true);
+            
+            // 🔥 NACIONALIDAD: Si es ciudadano ecuatoriano
+            if (c.condicionCiudadano.toUpperCase() === 'CIUDADANO') {
+                // Seleccionar "Ecuadorean" en el select y bloquearlo
+                $('#nacionalidadSelect').val('Ecuadorean').prop('disabled', true);
+                
+                if (config.debug) {
+                    console.log('Nacionalidad seleccionada automáticamente: Ecuadorean');
+                }
+            }
+            
+            // 🔥 CAMBIAR ESTILOS VISUALES PARA INDICAR QUE ESTÁN BLOQUEADOS
+            $('#cedula, #nombres, #apellidos').addClass('bg-light text-muted');
+            $('#nacionalidadSelect').addClass('bg-light text-muted');
+            
+            // 🔥 MOSTRAR MENSAJE DE ÉXITO
+            Swal.fire({
+                icon: 'success',
+                title: 'Datos encontrados',
+                text: 'Los datos han sido completados automáticamente desde el registro civil.',
+                timer: 2500,
+                showConfirmButton: false
+            });
+            
+            // 🔥 AGREGAR BOTÓN PARA RESETEAR (opcional)
+            if (!$('#btnResetearDatos').length) {
+                $('#btnBuscarCedula').after(`
+                    <button type="button" class="btn btn-outline-warning btn-sm ms-1" id="btnResetearDatos" title="Limpiar datos">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                `);
+                
+                // Evento para resetear
+                $('#btnResetearDatos').on('click', function() {
+                    resetearCamposBusqueda();
+                });
+            }
+            
+        })
+        .catch(err => {
+            // Restaurar botón en caso de error
+            btnBuscar.html(textoOriginal).prop('disabled', false);
+            
+            console.error('Error buscando cédula:', err);
+            Swal.fire('Error', 'No se pudieron obtener los datos. Intente nuevamente.', 'error');
+        });
+}
+
+// 🔥 NUEVA FUNCIÓN PARA RESETEAR CAMPOS
+function resetearCamposBusqueda() {
+    // Desbloquear y limpiar campos
+    $('#cedula, #nombres, #apellidos').prop('readonly', false).removeClass('bg-light text-muted').val('');
+    $('#nacionalidadSelect').prop('disabled', false).removeClass('bg-light text-muted').val('');
+    
+    // Quitar botón de reseteo
+    $('#btnResetearDatos').remove();
+    
+    // Mensaje
+    Swal.fire({
+        icon: 'info',
+        title: 'Campos desbloqueados',
+        text: 'Ahora puedes ingresar los datos manualmente.',
+        timer: 2000,
+        showConfirmButton: false
+    });
+}
     // Crear usuario
     function crearUsuario(e) {
         e.preventDefault();
@@ -883,66 +952,71 @@ function generarPaginacion(paginaActual, totalPaginas) {
            });
    }
    
-   // Validar formulario
-   function validarFormulario(formId) {
-       const form = document.getElementById(formId);
-       if (!form) return false;
-       
-       const requiredFields = form.querySelectorAll('[required]');
-       let isValid = true;
-       
-       requiredFields.forEach(field => {
-           if (!field.value.trim()) {
-               field.classList.add('is-invalid');
-               isValid = false;
-           } else {
-               field.classList.remove('is-invalid');
-           }
-       });
-       
-       // Validación especial para contraseña en edición
-       if (formId === 'formEditarUsuario') {
-           const passwordField = form.querySelector('#edit_password');
-           if (passwordField && passwordField.value.length > 0 && passwordField.value.length < 6) {
-               passwordField.classList.add('is-invalid');
-               isValid = false;
-           }
-       }
-       
-       if (!isValid) {
-           Swal.fire({
-               icon: 'error',
-               title: 'Error de validación',
-               text: 'Por favor, completa todos los campos requeridos correctamente',
-               timer: 3000,
-               showConfirmButton: false
-           });
-       }
-       
-       return isValid;
-   }
+   // En la función validarFormulario, REMOVER la validación de contraseña para crear:
+function validarFormulario(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return false;
+    
+    const requiredFields = form.querySelectorAll('[required]');
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        if (!field.value.trim()) {
+            field.classList.add('is-invalid');
+            isValid = false;
+        } else {
+            field.classList.remove('is-invalid');
+        }
+    });
+    
+    // 🔥 SOLO validar contraseña en EDICIÓN, NO en creación
+    if (formId === 'formEditarUsuario') {
+        const passwordField = form.querySelector('#edit_password');
+        if (passwordField && passwordField.value.length > 0 && passwordField.value.length < 6) {
+            passwordField.classList.add('is-invalid');
+            isValid = false;
+        }
+    }
+    
+    if (!isValid) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de validación',
+            text: 'Por favor, completa todos los campos requeridos correctamente',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    }
+    
+    return isValid;
+}
    
-   // Limpiar formularios
-   function limpiarFormulario(formId) {
-       const form = document.getElementById(formId);
-       if (form) {
-           form.reset();
-           
-           // Limpiar select2
-           try {
-               $(form).find('.select2-hidden-accessible').val(null).trigger('change');
-           } catch (error) {
-               console.error('Error limpiando campos Select2:', error);
-           }
-           
-           // Habilitar campos deshabilitados
-           $(form).find('input, select').prop('disabled', false).prop('readonly', false);
-           
-           // Limpiar clases de validación
-           $(form).find('.is-invalid').removeClass('is-invalid');
-       }
-   }
-   
+   // BUSCAR y REEMPLAZAR la función limpiarFormulario:
+function limpiarFormulario(formId) {
+    const form = document.getElementById(formId);
+    if (form) {
+        form.reset();
+        
+        // 🔥 LIMPIAR SOLO SELECT2 EN EDICIÓN
+        if (formId === 'formEditarUsuario') {
+            try {
+                $(form).find('.select2-hidden-accessible').val(null).trigger('change');
+            } catch (error) {
+                console.error('Error limpiando campos Select2:', error);
+            }
+        }
+        
+        // 🔥 DESBLOQUEAR TODOS LOS CAMPOS
+        $(form).find('input, select').prop('disabled', false).prop('readonly', false);
+        $(form).find('input, select').removeClass('bg-light text-muted');
+        
+        // 🔥 LIMPIAR CLASES DE VALIDACIÓN
+        $(form).find('.is-invalid').removeClass('is-invalid');
+        
+        // 🔥 QUITAR BOTÓN DE RESETEO SI EXISTE
+        $('#btnResetearDatos').remove();
+    }
+}
    // Función de escape HTML para prevenir XSS
    function escapeHtml(text) {
        if (!text) return '';

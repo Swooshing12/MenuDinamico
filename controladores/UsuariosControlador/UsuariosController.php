@@ -3,12 +3,14 @@ require_once __DIR__ . "/../../modelos/Usuario.php";
 require_once __DIR__ . "/../../modelos/Roles.php";
 require_once __DIR__ . "/../../modelos/Permisos.php";
 require_once __DIR__ . "/../../modelos/Submenus.php";
+require_once __DIR__ . "/../../config/MailService.php"; // 🔥 NUEVO
 
 class UsuariosController {
     private $usuarioModel;
     private $rolesModel;
     private $permisosModel;
     private $submenusModel;
+    private $mailService; // 🔥 NUEVO
     private $debug = false; // Desactivar debug en producción
     
     public function __construct() {
@@ -20,6 +22,8 @@ class UsuariosController {
         $this->rolesModel = new Roles();
         $this->permisosModel = new Permisos();
         $this->submenusModel = new Submenus();
+        $this->mailService = new MailService(); // 🔥 NUEVO
+
     }
     
     public function manejarSolicitud() {
@@ -202,7 +206,7 @@ class UsuariosController {
         $this->verificarPermisos('crear');
         
         // Validar datos requeridos
-        $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'password', 'rol'];
+        $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'rol']; // 🔥 QUITAR 'password'
         $camposFaltantes = [];
         
         foreach ($camposRequeridos as $campo) {
@@ -220,7 +224,7 @@ class UsuariosController {
             return;
         }
         
-        // Validaciones básicas
+        // Validaciones básicas (mantener las existentes)
         if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
             $this->responderJSON([
                 'success' => false,
@@ -235,15 +239,6 @@ class UsuariosController {
                 'success' => false,
                 'message' => 'Formato de correo electrónico no válido',
                 'campo_error' => 'correo'
-            ]);
-            return;
-        }
-        
-        if (strlen($_POST['password']) < 6) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'La contraseña debe tener al menos 6 caracteres',
-                'campo_error' => 'password'
             ]);
             return;
         }
@@ -271,7 +266,10 @@ class UsuariosController {
                 return;
             }
             
-            // Crear usuario
+            // 🔥 GENERAR CONTRASEÑA TEMPORAL
+            $passwordTemporal = MailService::generarPasswordTemporal(12);
+            
+            // Crear usuario con contraseña temporal
             $resultado = $this->usuarioModel->crearUsuario(
                 (int)$_POST['cedula'],
                 trim($_POST['username']),
@@ -280,15 +278,33 @@ class UsuariosController {
                 $_POST['sexo'],
                 trim($_POST['nacionalidad']),
                 trim($_POST['correo']),
-                $_POST['password'],
+                $passwordTemporal, // 🔥 USAR CONTRASEÑA TEMPORAL
                 (int)$_POST['rol']
             );
             
             if ($resultado) {
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => 'Usuario creado exitosamente'
-                ]);
+                // 🔥 ENVIAR CORREO CON CONTRASEÑA TEMPORAL
+                $nombreCompleto = trim($_POST['nombres']) . ' ' . trim($_POST['apellidos']);
+                $envioExitoso = $this->mailService->enviarPasswordTemporal(
+                    trim($_POST['correo']),
+                    $nombreCompleto,
+                    trim($_POST['username']),
+                    $passwordTemporal
+                );
+                
+                if ($envioExitoso) {
+                    $this->responderJSON([
+                        'success' => true,
+                        'message' => 'Usuario creado exitosamente. Se ha enviado un correo con las credenciales de acceso.',
+                        'email_enviado' => true
+                    ]);
+                } else {
+                    $this->responderJSON([
+                        'success' => true,
+                        'message' => 'Usuario creado exitosamente, pero hubo un problema enviando el correo. Contacta al administrador.',
+                        'email_enviado' => false
+                    ]);
+                }
             } else {
                 $this->responderJSON([
                     'success' => false,

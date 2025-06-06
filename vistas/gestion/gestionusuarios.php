@@ -172,12 +172,13 @@ if (!isset($usuarios)) {
           <!-- Cédula -->
           <div class="col-md-4">
             <label for="cedula" class="form-label"><i class="bi bi-fingerprint me-1"></i> Cédula</label>
-            <div class="input-group">
+           <!-- BUSCAR este botón y verificar que tenga el ID correcto: -->
+          <div class="input-group">
               <input id="cedula" name="cedula" type="text" class="form-control" required>
               <button type="button" class="btn btn-outline-secondary" id="btnBuscarCedula">
-                <i class="bi bi-search"></i>
+                  <i class="bi bi-search"></i>
               </button>
-            </div>
+          </div>
           </div>
           <!-- Nombres / Apellidos -->
           <div class="col-md-4">
@@ -199,15 +200,15 @@ if (!isset($usuarios)) {
             </select>
           </div>
           <div class="col-md-8">
-            <label for="nacionalidadSelect" class="form-label"><i class="bi bi-globe2 me-1"></i> Nacionalidad</label>
-            <div class="input-group">
-              <span class="input-group-text has-icon"><i class="bi bi-globe2"></i></span>
-              <input type="hidden" id="nacionalidadHidden" name="nacionalidad" value="">
-              <select id="nacionalidadSelect" class="form-select text-dark bg-light" required>
-                <option value="">Seleccione nacionalidad</option>
-              </select>
-            </div>
-          </div>
+    <label for="nacionalidadSelect" class="form-label"><i class="bi bi-globe2 me-1"></i> Nacionalidad</label>
+    <div class="input-group">
+        <span class="input-group-text has-icon"><i class="bi bi-globe2"></i></span>
+        <!-- 🔥 CAMBIAR: El select ahora tiene name="nacionalidad" y required -->
+        <select id="nacionalidadSelect" name="nacionalidad" class="form-select text-dark bg-light" required>
+            <option value="">Seleccione nacionalidad</option>
+        </select>
+    </div>
+</div>
           <!-- Usuario / Correo -->
           <div class="col-md-6">
             <label for="username" class="form-label"><i class="bi bi-person-badge me-1"></i> Usuario</label>
@@ -218,10 +219,12 @@ if (!isset($usuarios)) {
             <input id="correo" type="email" name="correo" class="form-control" required>
           </div>
           <!-- Contraseña / Rol -->
-          <div class="col-md-6">
-            <label for="password" class="form-label"><i class="bi bi-key-fill me-1"></i> Contraseña</label>
-            <input id="password" type="password" name="password" class="form-control" required>
-          </div>
+          <div class="col-12">
+    <div class="alert alert-info">
+        <i class="bi bi-envelope-check me-2"></i>
+        <strong>📧 Contraseña Automática:</strong> Se generará una contraseña temporal y se enviará automáticamente al correo del usuario.
+    </div>
+</div>
           <div class="col-md-6">
             <label for="rol" class="form-label"><i class="bi bi-shield-lock me-1"></i> Rol</label>
             <select id="rol" name="rol" class="form-select" required>
