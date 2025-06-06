@@ -304,6 +304,25 @@ public function obtenerUsuariosPaginados($estado = null, $offset = 0, $limit = 1
         error_log("SQL que falló: $sql");
         throw $e;
     }
+
+    
+}
+/**
+ * 🔹 Contar usuarios por rol específico
+ */
+public function contarUsuariosPorRol($id_rol) {
+    $query = "SELECT COUNT(*) as total FROM usuarios WHERE id_rol = :id_rol";
+    
+    try {
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id_rol', $id_rol, PDO::PARAM_INT);
+        $stmt->execute();
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$resultado['total'];
+    } catch (PDOException $e) {
+        error_log("Error contando usuarios por rol: " . $e->getMessage());
+        return 0;
+    }
 }
     
 }
