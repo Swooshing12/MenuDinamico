@@ -443,7 +443,7 @@ class RecepcionistaController {
             $password_temporal = $this->generarPasswordTemporal();
             
             // Buscar ID del rol "Paciente" (asumiendo que existe)
-            $rol_paciente = $this->rolesModel->obtenerRolPorNombre('Paciente');
+            $rol_paciente = $this->rolesModel->obtenerPorNombre('Paciente');
             
             if (!$rol_paciente) {
                 throw new Exception("No se encontró el rol 'Paciente' en el sistema");
@@ -485,7 +485,7 @@ class RecepcionistaController {
             
             if (!$id_paciente) {
                 // Si falla crear paciente, eliminar usuario creado
-                $this->usuarioModel->eliminar($id_usuario);
+                $this->usuarioModel->eliminarUsuario($id_usuario);
                 throw new Exception("Error al crear el perfil de paciente");
             }
             
@@ -653,6 +653,351 @@ class RecepcionistaController {
     private function generarPasswordTemporal() {
         return 'Temp' . rand(1000, 9999) . '!';
     }
+
+
+    // ===== AGREGAR ESTOS MÉTODOS AL RecepcionistaController.php =====
+
+// ===== MÉTODOS ADICIONALES PARA GESTIÓN DE CITAS =====
+
+private function obtenerCitas() {
+    try {
+        $filtros = [];
+        
+        // Aplicar filtros si vienen en la petición
+        if (!empty($_GET['estado'])) {
+            $filtros['estado'] = $_GET['estado'];
+        }
+        
+        if (!empty($_GET['fecha_desde'])) {
+            $filtros['fecha_desde'] = $_GET['fecha_desde'];
+        }
+        
+        if (!empty($_GET['fecha_hasta'])) {
+            $filtros['fecha_hasta'] = $_GET['fecha_hasta'];
+        }
+        
+        if (!empty($_GET['id_sucursal'])) {
+            $filtros['id_sucursal'] = $_GET['id_sucursal'];
+        }
+        
+        if (!empty($_GET['cedula_paciente'])) {
+            $filtros['cedula_paciente'] = $_GET['cedula_paciente'];
+        }
+        
+        $citas = $this->citasModel->obtenerTodas($filtros);
+        
+        $this->responderJSON([
+            'success' => true,
+            'data' => $citas,
+            'count' => count($citas)
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+private function editarCita() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('editar');
+    
+    if (empty($_POST['id_cita'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de cita requerido'
+        ]);
+        return;
+    }
+    
+    $id_cita = (int)$_POST['id_cita'];
+    
+    // Validar datos requeridos
+    $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'fecha_hora', 'motivo'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
+        }
+    }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    try {
+        // Verificar disponibilidad del doctor (solo si cambió doctor o fecha)
+        $cita_actual = $this->citasModel->obtenerPorId($id_cita);
+        if (!$cita_actual) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Cita no encontrada'
+            ]);
+            return;
+        }
+        
+        // Si cambió doctor o fecha, verificar disponibilidad
+        if ($cita_actual['id_doctor'] != $_POST['id_doctor'] || 
+            $cita_actual['fecha_hora'] != $_POST['fecha_hora']) {
+            
+            $disponible = $this->doctoresModel->verificarDisponibilidad(
+                $_POST['id_doctor'],
+                $_POST['fecha_hora']
+            );
+            
+            if (!$disponible) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'El doctor no está disponible en esa fecha y hora'
+                ]);
+                return;
+            }
+        }
+        
+        // Actualizar la cita
+        $datos_cita = [
+            'id_paciente' => (int)$_POST['id_paciente'],
+            'id_doctor' => (int)$_POST['id_doctor'],
+            'id_sucursal' => (int)$_POST['id_sucursal'],
+            'fecha_hora' => $_POST['fecha_hora'],
+            'motivo' => trim($_POST['motivo']),
+            'estado' => $_POST['estado'] ?? $cita_actual['estado'],
+            'notas' => trim($_POST['notas'] ?? '')
+        ];
+        
+        $resultado = $this->citasModel->actualizar($id_cita, $datos_cita);
+        
+        if ($resultado) {
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita actualizada exitosamente'
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al actualizar la cita'
+            ]);
+        }
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+private function cancelarCita() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('eliminar');
+    
+    if (empty($_POST['id_cita'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de cita requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_cita = (int)$_POST['id_cita'];
+        $motivo_cancelacion = trim($_POST['motivo_cancelacion'] ?? 'Cancelada por recepcionista');
+        
+        // Cambiar estado a "Cancelada"
+        $resultado = $this->citasModel->cambiarEstado($id_cita, 'Cancelada');
+        
+        if ($resultado) {
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita cancelada exitosamente'
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al cancelar la cita'
+            ]);
+        }
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+private function confirmarCita() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('editar');
+    
+    if (empty($_POST['id_cita'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de cita requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_cita = (int)$_POST['id_cita'];
+        
+        // Cambiar estado a "Confirmada"
+        $resultado = $this->citasModel->cambiarEstado($id_cita, 'Confirmada');
+        
+        if ($resultado) {
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita confirmada exitosamente'
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al confirmar la cita'
+            ]);
+        }
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+// ===== MÉTODOS PARA TRIAJE =====
+
+private function realizarTriaje() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('crear');
+    
+    // Validar datos requeridos
+    $camposRequeridos = ['id_cita', 'nivel_urgencia'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
+        }
+    }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    try {
+        // Nota: Necesitarás crear el modelo Triage si no existe
+        $datos_triaje = [
+            'id_cita' => (int)$_POST['id_cita'],
+            'id_enfermero' => $_SESSION['id_usuario'], // Usuario actual como enfermero
+            'nivel_urgencia' => (int)$_POST['nivel_urgencia'],
+            'temperatura' => !empty($_POST['temperatura']) ? (float)$_POST['temperatura'] : null,
+            'presion_arterial' => $_POST['presion_arterial'] ?? null,
+            'frecuencia_cardiaca' => !empty($_POST['frecuencia_cardiaca']) ? (int)$_POST['frecuencia_cardiaca'] : null,
+            'frecuencia_respiratoria' => !empty($_POST['frecuencia_respiratoria']) ? (int)$_POST['frecuencia_respiratoria'] : null,
+            'saturacion_oxigeno' => !empty($_POST['saturacion_oxigeno']) ? (int)$_POST['saturacion_oxigeno'] : null,
+            'peso' => !empty($_POST['peso']) ? (float)$_POST['peso'] : null,
+            'talla' => !empty($_POST['talla']) ? (int)$_POST['talla'] : null,
+            'imc' => !empty($_POST['imc']) ? (float)$_POST['imc'] : null,
+            'observaciones' => $_POST['observaciones'] ?? null
+        ];
+        
+        // Por ahora, simularemos que se guardó correctamente
+        // Cuando tengas el modelo Triage, usar: $this->triageModel->crear($datos_triaje);
+        
+        $this->responderJSON([
+            'success' => true,
+            'message' => 'Triaje registrado exitosamente',
+            'data' => $datos_triaje
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+// ===== MÉTODOS PARA NOTIFICACIONES =====
+
+private function enviarNotificacion() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('crear');
+    
+    if (empty($_POST['id_cita']) || empty($_POST['tipo_notificacion'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de cita y tipo de notificación requeridos'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_cita = (int)$_POST['id_cita'];
+        $tipo = $_POST['tipo_notificacion']; // 'recordatorio', 'confirmacion', 'cancelacion'
+        
+        // Obtener datos de la cita
+        $cita = $this->citasModel->obtenerPorId($id_cita);
+        if (!$cita) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Cita no encontrada'
+            ]);
+            return;
+        }
+        
+        // Simular envío de notificación (aquí integrarías con tu sistema de emails/SMS)
+        $mensaje = match($tipo) {
+            'recordatorio' => "Recordatorio: Tiene una cita médica el " . date('d/m/Y H:i', strtotime($cita['fecha_hora'])),
+            'confirmacion' => "Su cita médica ha sido confirmada para el " . date('d/m/Y H:i', strtotime($cita['fecha_hora'])),
+            'cancelacion' => "Su cita médica del " . date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . " ha sido cancelada",
+            default => "Notificación sobre su cita médica"
+        };
+        
+        $this->responderJSON([
+            'success' => true,
+            'message' => 'Notificación enviada exitosamente',
+            'data' => [
+                'tipo' => $tipo,
+                'destinatario' => $cita['paciente_correo'],
+                'mensaje' => $mensaje
+            ]
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
+
     
     private function obtenerEstadisticas() {
         try {

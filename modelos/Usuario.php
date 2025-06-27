@@ -323,6 +323,92 @@ public function contarUsuariosPorRol($id_rol) {
         error_log("Error contando usuarios por rol: " . $e->getMessage());
         return 0;
     }
+
+    
 }
+public function crear(array $datos): int {
+    try {
+        $query = "INSERT INTO usuarios 
+            (cedula, username, nombres, apellidos, sexo, nacionalidad, correo, password, id_rol, id_estado)
+          VALUES
+            (:cedula, :username, :nombres, :apellidos, :sexo, :nacionalidad, :correo, :password, :id_rol, :id_estado)";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':cedula' => $datos['cedula'],
+            ':username' => $datos['username'],
+            ':nombres' => $datos['nombres'],
+            ':apellidos' => $datos['apellidos'],
+            ':sexo' => $datos['sexo'],
+            ':nacionalidad' => $datos['nacionalidad'],
+            ':correo' => $datos['correo'],
+            ':password' => $datos['password'],
+            ':id_rol' => $datos['id_rol'],
+            ':id_estado' => $datos['id_estado']
+        ]);
+        
+        return $this->conn->lastInsertId();
+    } catch (PDOException $e) {
+        error_log("Error creando usuario: " . $e->getMessage());
+        throw new Exception("Error al crear el usuario");
+    }
+}
+
+/**
+ * 🔹 Verificar si existe usuario por cédula
+ */
+public function existeUsuarioPorCedula(int $cedula): bool {
+    try {
+        $query = "SELECT COUNT(*) as total FROM usuarios WHERE cedula = :cedula";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':cedula' => $cedula]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$resultado['total'] > 0;
+    } catch (PDOException $e) {
+        error_log("Error verificando cédula: " . $e->getMessage());
+        throw new Exception("Error al verificar cédula");
+    }
+}
+
+/**
+ * 🔹 Verificar si existe usuario por correo
+ */
+public function existeUsuarioPorCorreo(string $correo): bool {
+    try {
+        $query = "SELECT COUNT(*) as total FROM usuarios WHERE correo = :correo";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':correo' => $correo]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$resultado['total'] > 0;
+    } catch (PDOException $e) {
+        error_log("Error verificando correo: " . $e->getMessage());
+        throw new Exception("Error al verificar correo");
+    }
+}
+
+/**
+ * 🔹 Verificar si existe usuario por username
+ */
+public function existeUsuarioPorUsername(string $username): bool {
+    try {
+        $query = "SELECT COUNT(*) as total FROM usuarios WHERE username = :username";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':username' => $username]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$resultado['total'] > 0;
+    } catch (PDOException $e) {
+        error_log("Error verificando username: " . $e->getMessage());
+        throw new Exception("Error al verificar username");
+    }
+}
+
+
+
+
+
+
     
 }
