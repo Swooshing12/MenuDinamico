@@ -1171,6 +1171,54 @@ function cargarBorrador() {
    }
 }
 
+// ⭐ FUNCIÓN DE DEBUG ESPECÍFICA PARA DOCTORES
+function debugDoctoresPorEspecialidad() {
+    console.log('🧪 DEBUG: Testeando carga de doctores por especialidad...');
+    
+    // Test con valores específicos de tu BD
+    const testSucursal = 1; // Cambia por un ID que sepas que existe
+    const testEspecialidad = 1; // Cambia por un ID que sepas que existe
+    
+    console.log(`📋 Test con: Sucursal ${testSucursal}, Especialidad ${testEspecialidad}`);
+    
+    $.ajax({
+        url: config.baseUrl,
+        type: 'GET',
+        data: {
+            action: 'obtenerDoctoresPorEspecialidad',
+            id_especialidad: testEspecialidad,
+            id_sucursal: testSucursal,
+            submenu_id: config.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('✅ Response obtenerDoctoresPorEspecialidad:', response);
+            if (response.success && response.data) {
+                console.log(`📊 Doctores encontrados: ${response.data.length}`);
+                if (response.data.length > 0) {
+                    console.log('👨‍⚕️ Primer doctor:', response.data[0]);
+                }
+            } else {
+                console.warn('⚠️ No hay doctores o error en respuesta');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error cargando doctores:', error);
+            console.error('📄 Response Text:', xhr.responseText);
+        }
+    });
+}
+
+// Agrega esto al final de $(document).ready:
+$(document).ready(function() {
+    // ... código existente ...
+    
+    // ⭐ AGREGAR ESTO AL FINAL:
+    setTimeout(() => {
+        debugDoctoresPorEspecialidad();
+    }, 3000);
+});
+
 function limpiarBorrador() {
    localStorage.removeItem('borrador_cita');
    console.log('🗑️ Borrador eliminado');

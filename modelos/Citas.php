@@ -13,10 +13,13 @@ class Citas {
     /**
      * Crear una nueva cita
      */
+    /**
+     * Crear una nueva cita
+     */
     public function crear($datos) {
         try {
-            $query = "INSERT INTO citas (id_paciente, id_doctor, id_sucursal, fecha_hora, motivo, estado, notas) 
-                      VALUES (:id_paciente, :id_doctor, :id_sucursal, :fecha_hora, :motivo, :estado, :notas)";
+            $query = "INSERT INTO citas (id_paciente, id_doctor, id_sucursal, fecha_hora, motivo, tipo_cita, estado, notas) 
+                      VALUES (:id_paciente, :id_doctor, :id_sucursal, :fecha_hora, :motivo, :tipo_cita, :estado, :notas)";
             
             $stmt = $this->conn->prepare($query);
             $stmt->execute([
@@ -25,6 +28,7 @@ class Citas {
                 ':id_sucursal' => $datos['id_sucursal'],
                 ':fecha_hora' => $datos['fecha_hora'],
                 ':motivo' => $datos['motivo'],
+                ':tipo_cita' => $datos['tipo_cita'] ?? 'presencial',
                 ':estado' => $datos['estado'] ?? 'Pendiente',
                 ':notas' => $datos['notas'] ?? null
             ]);
@@ -33,6 +37,40 @@ class Citas {
         } catch (PDOException $e) {
             error_log("Error creando cita: " . $e->getMessage());
             throw new Exception("Error al crear la cita");
+        }
+    }
+    
+    /**
+     * Actualizar una cita
+     */
+    public function actualizar($id_cita, $datos) {
+        try {
+            $query = "UPDATE citas SET 
+                        id_paciente = :id_paciente,
+                        id_doctor = :id_doctor,
+                        id_sucursal = :id_sucursal,
+                        fecha_hora = :fecha_hora,
+                        motivo = :motivo,
+                        tipo_cita = :tipo_cita,
+                        estado = :estado,
+                        notas = :notas
+                      WHERE id_cita = :id_cita";
+            
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute([
+                ':id_cita' => $id_cita,
+                ':id_paciente' => $datos['id_paciente'],
+                ':id_doctor' => $datos['id_doctor'],
+                ':id_sucursal' => $datos['id_sucursal'],
+                ':fecha_hora' => $datos['fecha_hora'],
+                ':motivo' => $datos['motivo'],
+                ':tipo_cita' => $datos['tipo_cita'] ?? 'presencial',
+                ':estado' => $datos['estado'],
+                ':notas' => $datos['notas'] ?? null
+            ]);
+        } catch (PDOException $e) {
+            error_log("Error actualizando cita: " . $e->getMessage());
+            throw new Exception("Error al actualizar la cita");
         }
     }
     
@@ -67,37 +105,6 @@ class Citas {
         }
     }
     
-    /**
-     * Actualizar una cita
-     */
-    public function actualizar($id_cita, $datos) {
-        try {
-            $query = "UPDATE citas SET 
-                        id_paciente = :id_paciente,
-                        id_doctor = :id_doctor,
-                        id_sucursal = :id_sucursal,
-                        fecha_hora = :fecha_hora,
-                        motivo = :motivo,
-                        estado = :estado,
-                        notas = :notas
-                      WHERE id_cita = :id_cita";
-            
-            $stmt = $this->conn->prepare($query);
-            return $stmt->execute([
-                ':id_cita' => $id_cita,
-                ':id_paciente' => $datos['id_paciente'],
-                ':id_doctor' => $datos['id_doctor'],
-                ':id_sucursal' => $datos['id_sucursal'],
-                ':fecha_hora' => $datos['fecha_hora'],
-                ':motivo' => $datos['motivo'],
-                ':estado' => $datos['estado'],
-                ':notas' => $datos['notas'] ?? null
-            ]);
-        } catch (PDOException $e) {
-            error_log("Error actualizando cita: " . $e->getMessage());
-            throw new Exception("Error al actualizar la cita");
-        }
-    }
     
     /**
      * Cambiar estado de una cita

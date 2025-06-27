@@ -656,5 +656,8 @@ class Doctores {
             throw new Exception("Error al obtener doctores más activos");
         }
     }
+
+    
 }
+
 ?>
