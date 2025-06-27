@@ -96,6 +96,7 @@ class Roles {
         }
     }
 
+    
     // ===== MÉTODOS DE VERIFICACIÓN =====
 
     /**

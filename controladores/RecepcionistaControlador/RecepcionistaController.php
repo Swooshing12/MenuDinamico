@@ -508,85 +508,181 @@ class RecepcionistaController {
     }
     
     private function registrarPaciente() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
-            return;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('crear');
+    
+    // Validar datos requeridos
+    $camposRequeridos = ['cedula', 'nombres', 'apellidos', 'fecha_nacimiento', 'genero', 'telefono', 'direccion'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
         }
-        
-        $this->verificarPermisos('crear');
-        
-        // Validar datos requeridos
-        $camposRequeridos = ['cedula', 'nombres', 'apellidos', 'fecha_nacimiento', 'genero', 'telefono', 'direccion'];
-        $camposFaltantes = [];
-        
-        foreach ($camposRequeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                $camposFaltantes[] = $campo;
-            }
-        }
-        
-        if (!empty($camposFaltantes)) {
+    }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    // Validaciones básicas
+    if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'La cédula debe tener al menos 10 dígitos numéricos'
+        ]);
+        return;
+    }
+    
+    // Validar correo si se proporciona
+    if (!empty($_POST['correo']) && !filter_var($_POST['correo'], FILTER_VALIDATE_EMAIL)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Formato de correo electrónico no válido'
+        ]);
+        return;
+    }
+    
+    try {
+        // Verificar si ya existe un usuario con esa cédula
+        $usuarioExistente = $this->usuarioModel->obtenerPorCedula((int)$_POST['cedula']);
+        if ($usuarioExistente) {
             $this->responderJSON([
                 'success' => false,
-                'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+                'message' => 'Ya existe un usuario registrado con esa cédula'
             ]);
             return;
         }
         
-        try {
-            // Verificar si ya existe un paciente con esa cédula
-            $pacienteExistente = $this->pacientesModel->buscarPorCedula($_POST['cedula']);
-            if ($pacienteExistente) {
+        // Verificar si el correo ya existe (si se proporciona)
+        if (!empty($_POST['correo'])) {
+            $correoExistente = $this->usuarioModel->obtenerPorCorreo(trim($_POST['correo']));
+            if ($correoExistente) {
                 $this->responderJSON([
                     'success' => false,
-                    'message' => 'Ya existe un paciente registrado con esa cédula'
+                    'message' => 'El correo electrónico ya está registrado'
                 ]);
                 return;
             }
-            
-            // Preparar datos del paciente
-            $datos_paciente = [
-                'cedula' => trim($_POST['cedula']),
-                'nombres' => trim($_POST['nombres']),
-                'apellidos' => trim($_POST['apellidos']),
-                'fecha_nacimiento' => $_POST['fecha_nacimiento'],
-                'genero' => $_POST['genero'],
-                'telefono' => trim($_POST['telefono']),
-                'correo' => !empty($_POST['correo']) ? trim($_POST['correo']) : null,
-                'direccion' => trim($_POST['direccion']),
-                'tipo_sangre' => !empty($_POST['tipo_sangre']) ? $_POST['tipo_sangre'] : null,
-                'alergias' => !empty($_POST['alergias']) ? trim($_POST['alergias']) : null,
-                'contacto_emergencia' => !empty($_POST['contacto_emergencia']) ? trim($_POST['contacto_emergencia']) : null,
-                'telefono_emergencia' => !empty($_POST['telefono_emergencia']) ? trim($_POST['telefono_emergencia']) : null
-            ];
-            
-            $id_paciente = $this->pacientesModel->crear($datos_paciente);
-            
-            if ($id_paciente) {
-                // Obtener los datos completos del paciente recién creado
-                $paciente_completo = $this->pacientesModel->obtenerPorId($id_paciente);
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => 'Paciente registrado exitosamente',
-                    'data' => [
-                        'id_paciente' => $id_paciente,
-                        'paciente' => $paciente_completo
-                    ]
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al registrar el paciente'
-                ]);
-            }
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
         }
+        
+        // PASO 1: Crear el USUARIO usando tu método existente
+        $username = $this->generarUsername($_POST['nombres'], $_POST['apellidos']);
+        $passwordTemporal = $this->generarPasswordTemporal();
+        
+        // Buscar ID del rol "Paciente"
+        $rolPaciente = $this->rolesModel->obtenerPorNombre('Paciente');
+        if (!$rolPaciente) {
+            throw new Exception("No se encontró el rol 'Paciente' en el sistema");
+        }
+        
+        $resultado = $this->usuarioModel->crearUsuario(
+            (int)$_POST['cedula'],
+            $username,
+            trim($_POST['nombres']),
+            trim($_POST['apellidos']),
+            $_POST['genero'],
+            'Ecuatoriana', // Nacionalidad por defecto
+            !empty($_POST['correo']) ? trim($_POST['correo']) : null,
+            $passwordTemporal,
+            $rolPaciente['id_rol']
+        );
+        
+        if (!$resultado) {
+            throw new Exception("Error al crear el usuario");
+        }
+        
+        // Obtener el ID del usuario recién creado
+        $usuarioCreado = $this->usuarioModel->obtenerPorUsername($username);
+        if (!$usuarioCreado) {
+            throw new Exception("Error al obtener el usuario creado");
+        }
+        
+        $id_usuario = $usuarioCreado['id_usuario'];
+        
+        // PASO 2: Crear el PACIENTE usando el id_usuario
+        $datos_paciente = [
+            'id_usuario' => $id_usuario,
+            'fecha_nacimiento' => $_POST['fecha_nacimiento'],
+            'tipo_sangre' => !empty($_POST['tipo_sangre']) ? $_POST['tipo_sangre'] : null,
+            'alergias' => !empty($_POST['alergias']) ? trim($_POST['alergias']) : null,
+            'antecedentes_medicos' => !empty($_POST['antecedentes_medicos']) ? trim($_POST['antecedentes_medicos']) : null,
+            'contacto_emergencia' => !empty($_POST['contacto_emergencia']) ? trim($_POST['contacto_emergencia']) : null,
+            'telefono_emergencia' => !empty($_POST['telefono_emergencia']) ? trim($_POST['telefono_emergencia']) : null,
+            'numero_seguro' => !empty($_POST['numero_seguro']) ? trim($_POST['numero_seguro']) : null
+        ];
+        
+        $id_paciente = $this->pacientesModel->crear($datos_paciente);
+        
+        if (!$id_paciente) {
+            throw new Exception("Error al crear el paciente");
+        }
+        
+        // PASO 3: Enviar correo con credenciales (si tiene correo)
+        $envioExitoso = false;
+        if (!empty($_POST['correo'])) {
+            try {
+                // Usar tu MailService existente
+                require_once __DIR__ . '/../../config/MailService.php';
+                $mailService = new MailService();
+                
+                $nombreCompleto = trim($_POST['nombres']) . ' ' . trim($_POST['apellidos']);
+                $envioExitoso = $mailService->enviarPasswordTemporal(
+                    trim($_POST['correo']),
+                    $nombreCompleto,
+                    $username,
+                    $passwordTemporal
+                );
+            } catch (Exception $e) {
+                // Si falla el envío de correo, continuar pero marcar como no enviado
+                error_log("Error enviando correo: " . $e->getMessage());
+                $envioExitoso = false;
+            }
+        }
+        
+        // Obtener los datos completos del paciente
+        $paciente_completo = $this->pacientesModel->obtenerPorId($id_paciente);
+        
+        // Preparar mensaje de respuesta
+        $mensaje = 'Paciente registrado exitosamente';
+        if (!empty($_POST['correo'])) {
+            if ($envioExitoso) {
+                $mensaje .= '. Se ha enviado un correo con las credenciales de acceso.';
+            } else {
+                $mensaje .= ', pero hubo un problema enviando el correo. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
+            }
+        } else {
+            $mensaje .= '. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
+        }
+        
+        $this->responderJSON([
+            'success' => true,
+            'message' => $mensaje,
+            'data' => [
+                'id_paciente' => $id_paciente,
+                'id_usuario' => $id_usuario,
+                'username' => $username,
+                'password_temporal' => $passwordTemporal,
+                'email_enviado' => $envioExitoso,
+                'paciente' => $paciente_completo
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
     }
+}
     
     private function obtenerDatosCedula() {
         if (empty($_GET['cedula'])) {
@@ -601,7 +697,7 @@ class RecepcionistaController {
         
         try {
             // Llamar al archivo obtenerDatos.php
-            $url = "http://localhost/MenuDinamico/obtenerDatos.php?cedula=" . urlencode($cedula);
+            $url = "http://localhost/MenuDinamico/controladores/obtenerDatos.php?cedula=" . urlencode($cedula);
             $response = file_get_contents($url);
             
             if ($response === false) {
@@ -647,21 +743,24 @@ class RecepcionistaController {
     }
     
     // ===== MÉTODOS PARA DATOS DE FORMULARIOS =====
-    private function obtenerDoctores() {
-        try {
-            $doctores = $this->doctoresModel->obtenerTodos();
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $doctores
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
+   private function obtenerDoctores() {
+    try {
+        // Usar el método obtenerTodos con filtro de estado activo
+        $filtros = ['estado' => 1]; // Solo doctores activos
+        $doctores = $this->doctoresModel->obtenerTodos($filtros);
+        
+        $this->responderJSON([
+            'success' => true,
+            'data' => $doctores,
+            'count' => count($doctores)
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
     }
+}
     
     private function obtenerEspecialidadesPorSucursal() {
         if (empty($_GET['id_sucursal'])) {

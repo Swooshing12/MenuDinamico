@@ -243,6 +243,11 @@ function inicializarEventos() {
     $('#btnAnterior').click(() => calendario.prev());
     $('#btnSiguiente').click(() => calendario.next());
     
+    // ⭐ AGREGAR ESTA LÍNEA:
+    $('#btnNuevaCita').click(function() {
+        $('#modalNuevaCita').modal('show');
+    });
+    
     // Filtros
     $('#btnAplicarFiltros').click(aplicarFiltros);
     $('#filtroSucursal, #filtroEspecialidad, #filtroEstado, #filtroDoctor').change(aplicarFiltros);
@@ -980,8 +985,25 @@ function limpiarFormularioNuevaCita() {
 }
 
 function limpiarFormularioRegistrarPaciente() {
-   $('#formRegistrarPaciente')[0].reset();
-   console.log('🧹 Formulario de registrar paciente limpiado');
+    $('#formRegistrarPaciente')[0].reset();
+    
+    // Limpiar campos específicos
+    $('#cedulaNuevoPaciente').val('');
+    $('#nombresNuevoPaciente').val('');
+    $('#apellidosNuevoPaciente').val('');
+    $('#fechaNacimientoNuevo').val('');
+    $('#generoNuevo').val('');
+    $('#telefonoNuevo').val('');
+    $('#correoNuevoPaciente').val('');
+    $('#direccionNuevo').val('');
+    $('#tipoSangreNuevo').val('');
+    $('#alergiasNuevo').val('');
+    $('#contactoEmergenciaNuevo').val('');
+    $('#telefonoEmergenciaNuevo').val('');
+    $('#numeroSeguroNuevo').val('');
+    $('#antecedentesMedicosNuevo').val('');
+    
+    console.log('🧹 Formulario de registrar paciente limpiado');
 }
 
 // ===== UTILIDADES DE UI =====

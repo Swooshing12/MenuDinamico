@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../config/database.php";
 
 class Usuario {
-    private $conn;
+    public $conn;
 
     public $id_usuario;
     public $cedula;
@@ -404,7 +404,16 @@ public function existeUsuarioPorUsername(string $username): bool {
         throw new Exception("Error al verificar username");
     }
 }
-
+/**
+ * 🔹 Obtener usuario por cédula
+ */
+public function obtenerPorCedula(int $cedula): ?array {
+    $query = "SELECT * FROM usuarios WHERE cedula = :cedula LIMIT 1";
+    $stmt  = $this->conn->prepare($query);
+    $stmt->bindParam(":cedula", $cedula, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
 
 
 

@@ -450,8 +450,150 @@ if (!isset($sucursales)) {
     </div>
 </div>
 
-<!-- Modal Registrar Paciente (incluir aquí el modal completo) -->
-<!-- ... (el modal de registrar paciente que ya tenías) ... -->
+<!-- Modal Registrar Paciente -->
+<div class="modal fade" id="modalRegistrarPaciente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <form class="modal-content" id="formRegistrarPaciente">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-1"></i>Registrar Nuevo Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Datos Básicos -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">📋 Datos Básicos</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Cédula</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="cedulaNuevoPaciente" name="cedula" required>
+                                    <button type="button" class="btn btn-outline-secondary" id="btnObtenerDatosCedula">
+                                        <i class="bi bi-download me-1"></i>Obtener Datos
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tipo de Sangre</label>
+                                <select class="form-select" id="tipoSangreNuevo" name="tipo_sangre">
+                                    <option value="">Seleccione...</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nombres</label>
+                                <input type="text" class="form-control" id="nombresNuevoPaciente" name="nombres" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Apellidos</label>
+                                <input type="text" class="form-control" id="apellidosNuevoPaciente" name="apellidos" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" id="fechaNacimientoNuevo" name="fecha_nacimiento" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Género</label>
+                                <select class="form-select" id="generoNuevo" name="genero" required>
+                                    <option value="">Seleccione...</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="F">Femenino</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datos de Contacto -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">📞 Datos de Contacto</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono Principal</label>
+                                <input type="tel" class="form-control" id="telefonoNuevo" name="telefono" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="correoNuevoPaciente" name="correo">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Dirección</label>
+                                <input type="text" class="form-control" id="direccionNuevo" name="direccion" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contacto de Emergencia -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">🚨 Contacto de Emergencia</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre del Contacto</label>
+                                <input type="text" class="form-control" id="contactoEmergenciaNuevo" name="contacto_emergencia" 
+                                       placeholder="Ej: María González (Madre)">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono de Emergencia</label>
+                                <input type="tel" class="form-control" id="telefonoEmergenciaNuevo" name="telefono_emergencia" 
+                                       placeholder="Ej: 0991234567">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Información Médica -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">⚕️ Información Médica</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Número de Seguro</label>
+                                <input type="text" class="form-control" id="numeroSeguroNuevo" name="numero_seguro" 
+                                       placeholder="Ej: IESS, Seguro Privado">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Alergias</label>
+                                <textarea class="form-control" id="alergiasNuevo" name="alergias" rows="2" 
+                                          placeholder="Alergias conocidas (opcional)"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Antecedentes Médicos</label>
+                                <textarea class="form-control" id="antecedentesMedicosNuevo" name="antecedentes_medicos" rows="3" 
+                                          placeholder="Enfermedades previas, cirugías, tratamientos actuales, etc. (opcional)"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Cancelar
+                </button>
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-save me-1"></i>Registrar Paciente
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

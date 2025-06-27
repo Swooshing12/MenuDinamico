@@ -20,7 +20,7 @@ class MailService {
             $this->mail->Host       = 'smtp.gmail.com';
             $this->mail->SMTPAuth   = true;
             $this->mail->Username   = 'swooshing14@gmail.com'; // 🔥 CAMBIAR POR TU CORREO
-            $this->mail->Password   = 'TU_CLAVE';    // 🔥 USAR CONTRASEÑA DE APLICACIÓN
+            $this->mail->Password   = 'tu_clave';    // 🔥 USAR CONTRASEÑA DE APLICACIÓN
             $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $this->mail->Port       = 587;
             
