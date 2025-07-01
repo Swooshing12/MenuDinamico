@@ -117,7 +117,7 @@ class RecepcionistaController {
                 case 'obtenerEstadisticasPorTipo':
                     $this->obtenerEstadisticasPorTipo();
                     break;
-                 // === HORARIOS DOCTOR ===
+                       // === HORARIOS DOCTOR ===
                     case 'obtenerHorariosDoctor':
                     $this->obtenerHorariosDoctor();
                     break;
@@ -190,127 +190,139 @@ class RecepcionistaController {
     
     // ===== MÉTODOS PARA GESTIÓN DE CITAS =====
     private function registrarCita() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
-            return;
-        }
-        
-        $this->verificarPermisos('crear');
-        
-        // Validar datos requeridos básicos
-        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'id_tipo_cita', 'fecha', 'hora', 'motivo'];
-        $camposFaltantes = [];
-        
-        foreach ($camposRequeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                $camposFaltantes[] = $campo;
-            }
-        }
-        
-        if (!empty($camposFaltantes)) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
-            ]);
-            return;
-        }
-        
-        // Validar tipo de cita
-        if (!$this->citasModel->validarTipoCita($_POST['id_tipo_cita'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Tipo de cita no válido o inactivo'
-            ]);
-            return;
-        }
-        
-        // Validaciones adicionales para citas virtuales
-        if ($_POST['id_tipo_cita'] == 2) { // Cita virtual
-            if (empty($_POST['plataforma_virtual'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'La plataforma virtual es requerida para citas virtuales'
-                ]);
-                return;
-            }
-        }
-        
-        try {
-            // Combinar fecha y hora
-            $fecha_hora = $_POST['fecha'] . ' ' . $_POST['hora'];
-            
-            // Verificar disponibilidad del doctor
-            $disponible = $this->citasModel->verificarDisponibilidad(
-                $_POST['id_doctor'],
-                $fecha_hora
-            );
-            
-            if (!$disponible) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'El doctor no está disponible en esa fecha y hora'
-                ]);
-                return;
-            }
-            
-            // Preparar datos de la cita
-            $datos_cita = [
-                'id_paciente' => (int)$_POST['id_paciente'],
-                'id_doctor' => (int)$_POST['id_doctor'],
-                'id_sucursal' => (int)$_POST['id_sucursal'],
-                'id_tipo_cita' => (int)$_POST['id_tipo_cita'],
-                'fecha_hora' => $fecha_hora,
-                'motivo' => trim($_POST['motivo']),
-                'tipo_cita' => $_POST['id_tipo_cita'] == 1 ? 'presencial' : 'virtual',
-                'estado' => 'Pendiente',
-                'notas' => trim($_POST['notas'] ?? ''),
-                'enlace_virtual' => null,
-                'sala_virtual' => null
-            ];
-            
-            // Agregar campos específicos para citas virtuales
-            if ($_POST['id_tipo_cita'] == 2) {
-                $datos_cita['enlace_virtual'] = !empty($_POST['enlace_virtual']) ? trim($_POST['enlace_virtual']) : null;
-                $datos_cita['sala_virtual'] = !empty($_POST['sala_virtual']) ? trim($_POST['sala_virtual']) : null;
-                
-                // Si no se proporcionó enlace, generar uno automático según la plataforma
-                if (empty($datos_cita['enlace_virtual'])) {
-                    $datos_cita['enlace_virtual'] = $this->generarEnlaceVirtual($_POST['plataforma_virtual']);
-                }
-            }
-            
-            $id_cita = $this->citasModel->crear($datos_cita);
-            
-            if ($id_cita) {
-                // Obtener datos completos de la cita creada
-                $cita_completa = $this->citasModel->obtenerPorId($id_cita);
-                
-                // Enviar notificación si está habilitada
-                if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
-                    $this->enviarNotificacionCita($id_cita, 'confirmacion');
-                }
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => 'Cita registrada exitosamente',
-                    'data' => [
-                        'id_cita' => $id_cita,
-                        'cita' => $cita_completa
-                    ]
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al registrar la cita'
-                ]);
-            }
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
+    }
+    
+    $this->verificarPermisos('crear');
+    
+    // Validar datos requeridos básicos
+    $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'id_tipo_cita', 'fecha', 'hora', 'motivo'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
         }
     }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    // Validar tipo de cita
+    if (!$this->citasModel->validarTipoCita($_POST['id_tipo_cita'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Tipo de cita no válido o inactivo'
+        ]);
+        return;
+    }
+    
+    // Validaciones adicionales para citas virtuales
+    if ($_POST['id_tipo_cita'] == 2) { // Cita virtual
+        if (empty($_POST['plataforma_virtual'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'La plataforma virtual es requerida para citas virtuales'
+            ]);
+            return;
+        }
+    }
+    
+    try {
+        // ✅ CONVERTIR FORMATO DE FECHA CORRECTAMENTE
+        $fecha_original = $_POST['fecha']; // 03/07/2025
+        $hora = $_POST['hora']; // 09:00:00
+        
+        // Convertir de DD/MM/YYYY a YYYY-MM-DD
+        $fecha_partes = explode('/', $fecha_original);
+        if (count($fecha_partes) === 3) {
+            $fecha_mysql = $fecha_partes[2] . '-' . $fecha_partes[1] . '-' . $fecha_partes[0]; // 2025-07-03
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Formato de fecha inválido. Use DD/MM/YYYY'
+            ]);
+            return;
+        }
+        
+        // Combinar fecha y hora en formato MySQL
+        $fecha_hora = $fecha_mysql . ' ' . $hora; // 2025-07-03 09:00:00
+        
+        // Verificar disponibilidad del doctor
+        $disponible = $this->citasModel->verificarDisponibilidad(
+            $_POST['id_doctor'],
+            $fecha_hora
+        );
+        
+        if (!$disponible) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'El doctor no está disponible en esa fecha y hora'
+            ]);
+            return;
+        }
+        
+        // Preparar datos de la cita
+        $datos_cita = [
+            'id_paciente' => (int)$_POST['id_paciente'],
+            'id_doctor' => (int)$_POST['id_doctor'],
+            'id_sucursal' => (int)$_POST['id_sucursal'],
+            'id_tipo_cita' => (int)$_POST['id_tipo_cita'],
+            'fecha_hora' => $fecha_hora,
+            'motivo' => trim($_POST['motivo']),
+            'tipo_cita' => $_POST['id_tipo_cita'] == 1 ? 'presencial' : 'virtual',
+            'estado' => 'Pendiente',
+            'notas' => trim($_POST['notas'] ?? ''),
+            'prioridad' => $_POST['prioridad'] ?? 'normal'
+        ];
+        
+        // Agregar campos para citas virtuales
+        if ($_POST['id_tipo_cita'] == 2) {
+            $plataforma = $_POST['plataforma_virtual'] ?? 'zoom';
+            $enlace_virtual = $this->generarEnlaceVirtual($plataforma);
+            
+            $datos_cita['enlace_virtual'] = $enlace_virtual;
+            $datos_cita['sala_virtual'] = $_POST['sala_virtual'] ?? 'Sala-' . uniqid();
+        }
+        
+        // Registrar la cita
+        $id_cita = $this->citasModel->crear($datos_cita);
+        
+        if ($id_cita) {
+            // Enviar notificación si se solicitó
+            if (isset($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] === 'true') {
+                // Aquí puedes implementar el envío de notificaciones
+                // $this->enviarNotificacionCita($id_cita);
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita registrada exitosamente',
+                'data' => [
+                    'id_cita' => $id_cita,
+                    'fecha_hora' => $fecha_hora
+                ]
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al registrar la cita'
+            ]);
+        }
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function obtenerCitas() {
         try {
@@ -1123,66 +1135,80 @@ class RecepcionistaController {
    }
    
    private function enviarNotificacionCita($id_cita, $tipo) {
-       try {
-           // Obtener datos de la cita
-           $cita = $this->citasModel->obtenerPorId($id_cita);
-           if (!$cita) {
-               return [
-                   'success' => false,
-                   'message' => 'Cita no encontrada'
-               ];
-           }
-           
-           // Generar mensaje según el tipo
-           $mensaje = match($tipo) {
-               'recordatorio' => "Recordatorio: Tiene una cita médica programada para el " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
-                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'],
-               'confirmacion' => "Su cita médica ha sido confirmada para el " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
-                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'],
-               'cancelacion' => "Su cita médica del " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
-                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'] . 
-                   " ha sido cancelada",
-               'enlace_virtual' => "Su cita virtual está programada para el " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
-                   ". Enlace de acceso: " . ($cita['enlace_virtual'] ?? 'Se enviará próximamente'),
-               default => "Notificación sobre su cita médica"
-           };
-           
-           // Agregar información adicional para citas virtuales
-           if ($cita['id_tipo_cita'] == 2 && $tipo !== 'cancelacion') {
-               $mensaje .= "\n\nTipo: Cita Virtual";
-               if ($cita['enlace_virtual']) {
-                   $mensaje .= "\nEnlace: " . $cita['enlace_virtual'];
-               }
-               if ($cita['sala_virtual']) {
-                   $mensaje .= "\nID de Sala: " . $cita['sala_virtual'];
-               }
-           } else if ($cita['id_tipo_cita'] == 1 && $tipo !== 'cancelacion') {
-               $mensaje .= "\n\nTipo: Cita Presencial";
-               $mensaje .= "\nUbicación: " . $cita['nombre_sucursal'];
-               $mensaje .= "\nDirección: " . $cita['sucursal_direccion'];
-           }
-           
-           return [
-               'success' => true,
-               'message' => 'Notificación preparada exitosamente',
-               'data' => [
-                   'tipo' => $tipo,
-                   'destinatario' => $cita['paciente_correo'],
-                   'mensaje' => $mensaje,
-                   'cita_tipo' => $cita['tipo_cita_nombre']
-               ]
-           ];
-       } catch (Exception $e) {
-           return [
-               'success' => false,
-               'message' => 'Error preparando notificación: ' . $e->getMessage()
-           ];
-       }
-   }
+    try {
+        // Obtener datos completos de la cita
+        $cita = $this->citasModel->obtenerPorIdCompleto($id_cita);
+        if (!$cita) {
+            error_log("❌ Cita no encontrada para ID: $id_cita");
+            return [
+                'success' => false,
+                'message' => 'Cita no encontrada'
+            ];
+        }
+        
+        // Verificar que el paciente tenga email
+        if (empty($cita['paciente_correo'])) {
+            error_log("⚠️ Paciente sin email para cita ID: $id_cita");
+            return [
+                'success' => false,
+                'message' => 'El paciente no tiene email registrado'
+            ];
+        }
+        
+        // ✅ USAR EL MAILSERVICE PARA ENVIAR EL EMAIL
+        require_once __DIR__ . '/../../config/MailService.php';
+        $mailService = new MailService();
+        
+        // Preparar datos del paciente
+        $paciente = [
+            'nombres' => $cita['paciente_nombres'],
+            'apellidos' => $cita['paciente_apellidos'],
+            'correo' => $cita['paciente_correo']
+        ];
+        
+        // Enviar email según el tipo
+        $emailEnviado = false;
+        switch ($tipo) {
+            case 'confirmacion':
+                $emailEnviado = $mailService->enviarConfirmacionCita($cita, $paciente);
+                break;
+                
+            case 'recordatorio':
+                $emailEnviado = $mailService->enviarRecordatorioCita($cita, $paciente);
+                break;
+                
+            case 'cancelacion':
+                $emailEnviado = $mailService->enviarCancelacionCita($cita, $paciente);
+                break;
+        }
+        
+        if ($emailEnviado) {
+            error_log("✅ Email de $tipo enviado exitosamente para cita ID: $id_cita");
+            return [
+                'success' => true,
+                'message' => "Email de $tipo enviado exitosamente",
+                'data' => [
+                    'tipo' => $tipo,
+                    'destinatario' => $cita['paciente_correo'],
+                    'cita_id' => $id_cita
+                ]
+            ];
+        } else {
+            error_log("❌ Error enviando email de $tipo para cita ID: $id_cita");
+            return [
+                'success' => false,
+                'message' => "Error enviando email de $tipo"
+            ];
+        }
+        
+    } catch (Exception $e) {
+        error_log("❌ Excepción en enviarNotificacionCita: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error enviando notificación: ' . $e->getMessage()
+        ];
+    }
+}
    
    // ===== MÉTODOS PARA ESTADÍSTICAS =====
    private function obtenerEstadisticas() {
@@ -1292,18 +1318,19 @@ class RecepcionistaController {
        return $id_submenu;
    }
    
-   private function generarEnlaceVirtual($plataforma) {
-       $enlaces = [
-           'zoom' => 'https://zoom.us/j/' . rand(100000000, 999999999),
-           'meet' => 'https://meet.google.com/' . $this->generarCodigoMeet(),
-           'teams' => 'https://teams.microsoft.com/l/meetup-join/' . $this->generarCodigoTeams(),
-           'whatsapp' => 'https://wa.me/' . rand(1000000000, 9999999999),
-           'otro' => 'Por definir'
-       ];
-       
-       return $enlaces[$plataforma] ?? 'Por definir';
-   }
-   
+/**
+ * Generar enlace virtual según la plataforma
+ */
+private function generarEnlaceVirtual($plataforma) {
+    $enlaces = [
+        'zoom' => 'https://zoom.us/j/' . rand(100000000, 999999999),
+        'meet' => 'https://meet.google.com/' . uniqid(),
+        'teams' => 'https://teams.microsoft.com/l/meetup-join/' . uniqid(),
+        'jitsi' => 'https://meet.jit.si/' . uniqid()
+    ];
+    
+    return $enlaces[$plataforma] ?? $enlaces['zoom'];
+}
    private function generarCodigoMeet() {
        $caracteres = 'abcdefghijklmnopqrstuvwxyz';
        $codigo = '';

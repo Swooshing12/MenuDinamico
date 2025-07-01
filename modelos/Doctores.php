@@ -308,32 +308,56 @@ class Doctores {
     /**
      * Obtener doctores por especialidad y sucursal
      */
-    public function obtenerPorEspecialidadYSucursal($id_especialidad, $id_sucursal) {
-        try {
-            $query = "SELECT d.*, u.nombres, u.apellidos, u.cedula,
-                             ds.dias_atencion, ds.horario_inicio, ds.horario_fin,
-                             e.nombre_especialidad
-                      FROM doctores d
-                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
-                      INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-                      INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
-                      WHERE d.id_especialidad = :id_especialidad 
-                        AND ds.id_sucursal = :id_sucursal
-                        AND u.id_estado = 1
-                      ORDER BY u.nombres, u.apellidos";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([
-                ':id_especialidad' => $id_especialidad,
-                ':id_sucursal' => $id_sucursal
-            ]);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo doctores por especialidad y sucursal: " . $e->getMessage());
-            throw new Exception("Error al obtener doctores");
-        }
+    /**
+ * Obtener doctores por especialidad y sucursal
+ */
+public function obtenerPorEspecialidadYSucursal($id_especialidad, $id_sucursal) {
+    try {
+        $query = "SELECT d.*, u.nombres, u.apellidos, u.cedula,
+                         e.nombre_especialidad,
+                         -- Obtener horarios de la nueva tabla doctor_horarios
+                         GROUP_CONCAT(
+                             CONCAT(
+                                 CASE dh.dia_semana 
+                                     WHEN 1 THEN 'Lun'
+                                     WHEN 2 THEN 'Mar'
+                                     WHEN 3 THEN 'Mié'
+                                     WHEN 4 THEN 'Jue'
+                                     WHEN 5 THEN 'Vie'
+                                     WHEN 6 THEN 'Sáb'
+                                     WHEN 7 THEN 'Dom'
+                                 END,
+                                 ' ', TIME_FORMAT(dh.hora_inicio, '%H:%i'), 
+                                 '-', TIME_FORMAT(dh.hora_fin, '%H:%i')
+                             ) 
+                             ORDER BY dh.dia_semana 
+                             SEPARATOR ', '
+                         ) as horarios_disponibles
+                  FROM doctores d
+                  INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                  INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
+                  INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
+                  LEFT JOIN doctor_horarios dh ON d.id_doctor = dh.id_doctor 
+                       AND dh.id_sucursal = ds.id_sucursal 
+                       AND dh.activo = 1
+                  WHERE d.id_especialidad = :id_especialidad 
+                    AND ds.id_sucursal = :id_sucursal
+                    AND u.id_estado = 1
+                  GROUP BY d.id_doctor, u.nombres, u.apellidos, u.cedula, e.nombre_especialidad
+                  ORDER BY u.nombres, u.apellidos";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':id_especialidad' => $id_especialidad,
+            ':id_sucursal' => $id_sucursal
+        ]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error obteniendo doctores por especialidad y sucursal: " . $e->getMessage());
+        throw new Exception("Error al obtener doctores");
     }
+}
     
     /**
      * Obtener horarios disponibles de un doctor en una fecha

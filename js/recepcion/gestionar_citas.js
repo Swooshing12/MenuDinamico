@@ -1046,7 +1046,10 @@ function cargarDoctoresPorEspecialidad() {
 }
 
 // ===== GENERAR CALENDARIO SEMANAL =====
+// ===== GENERAR CALENDARIO SEMANAL CORREGIDO =====
 function generarCalendarioSemanal(datosHorarios) {
+    console.log('🔄 Datos recibidos del servidor:', datosHorarios);
+    
     const inicioSemana = obtenerInicioSemana(semanaActual);
     const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const hoy = new Date();
@@ -1090,8 +1093,11 @@ function generarCalendarioSemanal(datosHorarios) {
                 const fecha = new Date(inicioSemana);
                 fecha.setDate(fecha.getDate() + dia);
                 
-                const fechaStr = formatearFecha(fecha);
-                const diaNumero = fecha.getDay() === 0 ? 7 : fecha.getDay(); // Lunes = 1, Domingo = 7
+                const fechaStr = formatearFechaParaPHP(fecha); // YYYY-MM-DD
+                
+                // ✅ CORREGIR EL CÁLCULO DEL DÍA DE LA SEMANA
+                // dia=0 es Lunes, dia=1 es Martes, etc.
+                const diaNumero = dia + 1; // Convertir a formato BD: 1=Lunes, 2=Martes, etc.
                 
                 // Verificar disponibilidad
                 const disponibilidad = verificarDisponibilidadSlot(datosHorarios, diaNumero, horaStr, fechaStr, fecha, hoy);
@@ -1131,14 +1137,15 @@ function generarCalendarioSemanal(datosHorarios) {
     
     $('#calendarioHorarios').html(html);
     
-    // Agregar eventos de click
+    // Agregar eventos de click SOLO a slots disponibles
     $('.slot-horario.disponible').click(function() {
         seleccionarSlotHorario(this);
     });
     
-    console.log('📅 Calendario semanal generado');
+    console.log('📅 Calendario semanal generado correctamente');
 }
 // ===== SELECCIONAR SLOT DE HORARIO =====
+// ===== SELECCIONAR SLOT DE HORARIO CORREGIDO =====
 function seleccionarSlotHorario(elemento) {
     // Remover selección anterior
     $('.slot-horario').removeClass('seleccionado');
@@ -1148,31 +1155,46 @@ function seleccionarSlotHorario(elemento) {
     
     const fecha = $(elemento).data('fecha');
     const hora = $(elemento).data('hora');
+    const dia = $(elemento).data('dia');
     
-    // Guardar datos
-    $('#fechaCita').val(fecha);
-    $('#horaCita').val(hora + ':00');
-    $('#fechaHoraCompleta').val(fecha + ' ' + hora + ':00');
+    // ✅ CONVERTIR FECHA PARA EL FORMULARIO (YYYY-MM-DD -> DD/MM/YYYY)
+    const fechaPartes = fecha.split('-'); // ['2025', '07', '03']
+    const fechaFormulario = `${fechaPartes[2]}/${fechaPartes[1]}/${fechaPartes[0]}`; // '03/07/2025'
     
-    slotSeleccionado = {
-        fecha: fecha,
-        hora: hora,
-        elemento: elemento
-    };
+    // Guardar en las variables globales del wizard
+    datosCitaWizard.fecha = fechaFormulario;
+    datosCitaWizard.hora = hora + ':00';
     
-    console.log('✅ Horario seleccionado:', fecha, hora);
+    console.log('✅ Slot seleccionado correctamente:', {
+        fechaOriginal: fecha,
+        fechaFormulario: fechaFormulario,
+        hora: hora + ':00',
+        dia: dia
+    });
     
-    // Mostrar confirmación visual con SweetAlert
+    // Mostrar confirmación visual
+    const fechaLegible = formatearFechaLegible(fecha);
     Swal.fire({
         icon: 'success',
         title: 'Horario seleccionado',
-        text: `${formatearFechaLegible(fecha)} a las ${hora}`,
+        text: `${fechaLegible} a las ${hora}`,
         timer: 2000,
         timerProgressBar: true,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
     });
+    
+    // Habilitar botón para continuar (si existe)
+    $('#btnContinuarHorario').prop('disabled', false);
+}
+
+// ===== FUNCIÓN AUXILIAR PARA FORMATEAR FECHA PARA PHP =====
+function formatearFechaParaPHP(fecha) {
+    const año = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${año}-${mes}-${dia}`;
 }
 function mostrarCalendarioLoading() {
     $('#calendarioHorarios').html(`
@@ -1249,12 +1271,13 @@ function mostrarCalendarioVacio(mensaje) {
 }
 
 // ===== VERIFICAR DISPONIBILIDAD DE SLOT =====
+// ===== VERIFICAR DISPONIBILIDAD DE SLOT CORREGIDO =====
 function verificarDisponibilidadSlot(datosHorarios, diaNumero, horaStr, fechaStr, fechaObj, hoy) {
     let clase = 'slot-horario';
     let texto = '';
     let dataAtributos = '';
     
-    // Verificar si es fecha pasada
+    // 1. Verificar si es fecha pasada
     if (esFechaPasada(fechaObj, hoy)) {
         return {
             clase: clase + ' pasado',
@@ -1263,50 +1286,65 @@ function verificarDisponibilidadSlot(datosHorarios, diaNumero, horaStr, fechaStr
         };
     }
     
-    // Buscar horario del doctor para este día y hora
-    const horarioEncontrado = datosHorarios.horarios.find(h => {
-        const horaCompleta = horaStr + ':00';
-        return h.dia_semana == diaNumero && 
-               horaCompleta >= h.hora_inicio && 
-               horaCompleta < h.hora_fin;
+    // 2. Verificar si el doctor trabaja este día
+    const horariosDelDia = datosHorarios.horarios.filter(h => h.dia_semana == diaNumero);
+    
+    if (horariosDelDia.length === 0) {
+        return {
+            clase: clase + ' no-disponible',
+            texto: '',
+            dataAtributos: ''
+        };
+    }
+    
+    // 3. Verificar si la hora está dentro del horario de trabajo
+    const horaCompleta = horaStr + ':00'; // 09:00:00
+    let dentroDeTurno = false;
+    
+    for (const horario of horariosDelDia) {
+        if (horaCompleta >= horario.hora_inicio && horaCompleta < horario.hora_fin) {
+            dentroDeTurno = true;
+            break;
+        }
+    }
+    
+    if (!dentroDeTurno) {
+        return {
+            clase: clase + ' no-disponible',
+            texto: '',
+            dataAtributos: ''
+        };
+    }
+    
+    // 4. Verificar excepciones
+    const excepcion = datosHorarios.excepciones.find(e => e.fecha === fechaStr);
+    if (excepcion && ['no_laborable', 'vacaciones', 'feriado'].includes(excepcion.tipo)) {
+        return {
+            clase: clase + ' no-disponible',
+            texto: 'No disp.',
+            dataAtributos: `title="${excepcion.motivo || excepcion.tipo}"`
+        };
+    }
+    
+    // 5. ✅ VERIFICAR SI HAY CITA OCUPADA (CORREGIDO)
+    const citaOcupada = datosHorarios.citas_ocupadas.find(c => {
+        return c.fecha === fechaStr && c.hora === horaCompleta;
     });
     
-    if (!horarioEncontrado) {
-        return {
-            clase: clase + ' no-disponible',
-            texto: '',
-            dataAtributos: ''
-        };
-    }
-    
-    // Verificar si hay cita ocupada
-    const citaOcupada = datosHorarios.citas_ocupadas.find(c => 
-        c.fecha === fechaStr && c.hora === horaStr + ':00'
-    );
-    
-    // Verificar excepciones
-    const excepcion = datosHorarios.excepciones.find(e => e.fecha === fechaStr);
-    if (excepcion && (excepcion.tipo === 'no_laborable' || excepcion.tipo === 'vacaciones' || excepcion.tipo === 'feriado')) {
-        return {
-            clase: clase + ' no-disponible',
-            texto: '',
-            dataAtributos: ''
-        };
-    }
-    
     if (citaOcupada) {
+        console.log(`🔴 Slot ocupado encontrado: ${fechaStr} ${horaCompleta}`, citaOcupada);
         return {
             clase: clase + ' ocupado',
             texto: 'Ocupado',
-            dataAtributos: ''
+            dataAtributos: `title="Cita: ${citaOcupada.motivo || 'Consulta médica'}"`
         };
     }
     
-    // Disponible
+    // 6. Slot disponible
     return {
         clase: clase + ' disponible',
         texto: '✓',
-        dataAtributos: `data-fecha="${fechaStr}" data-hora="${horaStr}" data-dia="${diaNumero}"`
+        dataAtributos: `data-fecha="${fechaStr}" data-hora="${horaStr}" data-dia="${diaNumero}" title="Disponible - Click para seleccionar" style="cursor: pointer;"`
     };
 }
 
@@ -1341,13 +1379,15 @@ function cargarCalendarioHorarios() {
     $.ajax({
         url: config.baseUrl,
         type: 'GET',
-        data: {
-            action: 'obtenerHorariosDoctor',
-            id_doctor: idDoctor,
-            id_sucursal: idSucursal,
-            semana: formatearFecha(semanaActual),
-            submenu_id: config.submenuId
-        },
+       data: {
+    action: 'obtenerHorariosDoctor',
+    id_doctor: idDoctor,
+    id_sucursal: idSucursal,
+    semana: semanaActual.getFullYear() + '-' + 
+           String(semanaActual.getMonth() + 1).padStart(2, '0') + '-' + 
+           String(semanaActual.getDate()).padStart(2, '0'),  // ✅ FORMATO CORRECTO
+    submenu_id: config.submenuId
+},
         dataType: 'json',
         success: function(response) {
             if (response.success) {

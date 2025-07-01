@@ -446,27 +446,41 @@ class Citas {
     /**
      * Verificar disponibilidad de horario
      */
-    public function verificarDisponibilidad($id_doctor, $fecha_hora) {
-        try {
-            $query = "SELECT COUNT(*) as total 
-                      FROM citas 
-                      WHERE id_doctor = :id_doctor 
-                        AND fecha_hora = :fecha_hora 
-                        AND estado IN ('Pendiente', 'Confirmada')";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([
-                ':id_doctor' => $id_doctor,
-                ':fecha_hora' => $fecha_hora
-            ]);
-            
-            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
-            return (int)$resultado['total'] === 0; // true si está disponible
-        } catch (PDOException $e) {
-            error_log("Error verificando disponibilidad: " . $e->getMessage());
-            throw new Exception("Error al verificar disponibilidad");
+    // En modelos/Citas.php - mejorar el método verificarDisponibilidad
+public function verificarDisponibilidad($id_doctor, $fecha_hora, $id_cita_excluir = null) {
+    try {
+        $query = "SELECT COUNT(*) as total 
+                  FROM citas 
+                  WHERE id_doctor = :id_doctor 
+                    AND fecha_hora = :fecha_hora 
+                    AND estado IN ('Pendiente', 'Confirmada')";
+        
+        $params = [
+            ':id_doctor' => $id_doctor,
+            ':fecha_hora' => $fecha_hora
+        ];
+        
+        // Excluir una cita específica (útil para edición)
+        if ($id_cita_excluir) {
+            $query .= " AND id_cita != :id_cita_excluir";
+            $params[':id_cita_excluir'] = $id_cita_excluir;
         }
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        $citas_existentes = (int)$resultado['total'];
+        
+        // Log para debugging
+        error_log("Verificando disponibilidad - Doctor: $id_doctor, Fecha: $fecha_hora, Citas existentes: $citas_existentes");
+        
+        return $citas_existentes === 0; // true si está disponible
+    } catch (PDOException $e) {
+        error_log("Error verificando disponibilidad: " . $e->getMessage());
+        throw new Exception("Error al verificar disponibilidad");
     }
+}
     
     /**
      * Obtener estadísticas generales
@@ -567,6 +581,7 @@ class Citas {
         }
     }
     
+    
     /**
      * Obtener tipo de cita por ID
      */
@@ -598,5 +613,38 @@ class Citas {
             throw new Exception("Error al validar tipo de cita");
         }
     }
+
+    /**
+ * Obtener cita por ID con todos los datos necesarios para email
+ */
+public function obtenerPorIdCompleto($id_cita) {
+    try {
+        $query = "SELECT c.*, 
+                         p.nombres as paciente_nombres, p.apellidos as paciente_apellidos,
+                         u_paciente.correo as paciente_correo, u_paciente.cedula as paciente_cedula,
+                         d.nombres as doctor_nombres, d.apellidos as doctor_apellidos,
+                         e.nombre_especialidad,
+                         s.nombre_sucursal, s.direccion as sucursal_direccion, s.telefono as sucursal_telefono,
+                         tc.nombre_tipo as tipo_cita_nombre, tc.descripcion as tipo_cita_descripcion
+                  FROM citas c
+                  INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
+                  INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
+                  INNER JOIN usuarios u_paciente ON pac.id_usuario = u_paciente.id_usuario
+                  INNER JOIN doctores doc ON c.id_doctor = doc.id_doctor
+                  INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
+                  INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
+                  INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                  INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
+                  WHERE c.id_cita = :id_cita";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_cita' => $id_cita]);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error obteniendo cita completa por ID: " . $e->getMessage());
+        throw new Exception("Error al obtener datos de la cita");
+    }
+}
 }
 ?>
