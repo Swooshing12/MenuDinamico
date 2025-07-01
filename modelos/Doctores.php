@@ -338,63 +338,47 @@ class Doctores {
     /**
      * Obtener horarios disponibles de un doctor en una fecha
      */
-    public function obtenerHorariosDisponibles($id_doctor, $fecha) {
-        try {
-            // Primero obtener los horarios del doctor en la sucursal
-            $query_horarios = "SELECT ds.horario_inicio, ds.horario_fin, ds.dias_atencion
-                               FROM doctores_sucursales ds
-                               WHERE ds.id_doctor = :id_doctor
-                               LIMIT 1";
-            
-            $stmt = $this->conn->prepare($query_horarios);
-            $stmt->execute([':id_doctor' => $id_doctor]);
-            $horario_doctor = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$horario_doctor) {
-                return [];
-            }
-            
-            // Obtener citas ya programadas para esa fecha
-            $query_citas = "SELECT TIME(fecha_hora) as hora_ocupada
-                            FROM citas
-                            WHERE id_doctor = :id_doctor 
-                              AND DATE(fecha_hora) = :fecha
-                              AND estado IN ('Pendiente', 'Confirmada')";
-            
-            $stmt = $this->conn->prepare($query_citas);
-            $stmt->execute([
-                ':id_doctor' => $id_doctor,
-                ':fecha' => $fecha
-            ]);
-            $citas_ocupadas = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            
-            // Generar horarios disponibles (cada 30 minutos por defecto)
-            $horarios_disponibles = [];
-            $hora_inicio = new DateTime($horario_doctor['horario_inicio']);
-            $hora_fin = new DateTime($horario_doctor['horario_fin']);
-            $intervalo = new DateInterval('PT30M'); // 30 minutos
-            
-            while ($hora_inicio < $hora_fin) {
-                $hora_str = $hora_inicio->format('H:i:s');
-                
-                // Verificar si esta hora no está ocupada
-                if (!in_array($hora_str, $citas_ocupadas)) {
-                    $horarios_disponibles[] = [
-                        'hora' => $hora_str,
-                        'hora_formato' => $hora_inicio->format('H:i'),
-                        'disponible' => true
-                    ];
-                }
-                
-                $hora_inicio->add($intervalo);
-            }
-            
-            return $horarios_disponibles;
-        } catch (PDOException $e) {
-            error_log("Error obteniendo horarios disponibles: " . $e->getMessage());
-            throw new Exception("Error al obtener horarios disponibles");
+    /**
+ * Obtener horarios disponibles usando el nuevo sistema
+ */
+public function obtenerHorariosDisponibles($id_doctor, $fecha) {
+    try {
+        require_once __DIR__ . '/DoctorHorarios.php';
+        $doctorHorarios = new DoctorHorarios();
+        
+        // Obtener sucursal del doctor (usar la primera disponible)
+        $sucursales = $this->obtenerSucursales($id_doctor);
+        if (empty($sucursales)) {
+            return [];
         }
+        
+        $id_sucursal = $sucursales[0]['id_sucursal'];
+        
+        // Obtener horarios para esa semana
+        $datos_semana = $doctorHorarios->obtenerHorariosSemanales(
+            $id_doctor, 
+            $id_sucursal, 
+            $fecha
+        );
+        
+        // Generar slots para el día específico
+        $slots = $doctorHorarios->generarSlotsDisponibles(
+            $datos_semana['horarios'],
+            $datos_semana['citas_ocupadas'],
+            $datos_semana['excepciones'],
+            $fecha
+        );
+        
+        // Filtrar solo los disponibles
+        return array_filter($slots, function($slot) {
+            return $slot['disponible'];
+        });
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo horarios disponibles: " . $e->getMessage());
+        throw new Exception("Error al obtener horarios disponibles");
     }
+}
     
     /**
      * Verificar disponibilidad de un doctor en fecha y hora específica

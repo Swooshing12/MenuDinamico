@@ -17,7 +17,6 @@ class RecepcionistaController {
     private $especialidadesModel;
     private $sucursalesModel;
     private $doctoresModel;
-    private $debug = false;
     
     public function __construct() {
         if (session_status() === PHP_SESSION_NONE) {
@@ -62,6 +61,14 @@ class RecepcionistaController {
                     $this->confirmarCita();
                     break;
                 
+                // === TIPOS DE CITA ===
+                case 'obtenerTiposCita':
+                    $this->obtenerTiposCita();
+                    break;
+                case 'validarTipoCita':
+                    $this->validarTipoCita();
+                    break;
+                
                 // === BÚSQUEDA Y GESTIÓN DE PACIENTES ===
                 case 'buscarPacientePorCedula':
                     $this->buscarPacientePorCedula();
@@ -89,6 +96,9 @@ class RecepcionistaController {
                 case 'obtenerSucursales':
                     $this->obtenerSucursales();
                     break;
+                case 'verificarDisponibilidad':
+                    $this->verificarDisponibilidad();
+                    break;
                 
                 // === TRIAJE ===
                 case 'realizarTriaje':
@@ -104,7 +114,13 @@ class RecepcionistaController {
                 case 'obtenerEstadisticas':
                     $this->obtenerEstadisticas();
                     break;
-                
+                case 'obtenerEstadisticasPorTipo':
+                    $this->obtenerEstadisticasPorTipo();
+                    break;
+                 // === HORARIOS DOCTOR ===
+                    case 'obtenerHorariosDoctor':
+                    $this->obtenerHorariosDoctor();
+                    break;
                 case 'index':
                 default:
                     $this->index();
@@ -143,11 +159,13 @@ class RecepcionistaController {
             // Obtener datos iniciales para la vista
             $sucursales = $this->sucursalesModel->obtenerTodas();
             $especialidades = $this->especialidadesModel->obtenerTodas();
+            $tipos_cita = $this->citasModel->obtenerTiposCita(); // NUEVO: Obtener tipos de cita
             
             // Pasar datos a la vista
             extract([
                 'sucursales' => $sucursales,
                 'especialidades' => $especialidades,
+                'tipos_cita' => $tipos_cita, // NUEVO: Incluir tipos de cita
                 'permisos' => $permisos,
                 'id_submenu' => $id_submenu
             ]);
@@ -179,8 +197,8 @@ class RecepcionistaController {
         
         $this->verificarPermisos('crear');
         
-        // Validar datos requeridos
-        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'fecha', 'hora', 'motivo'];
+        // Validar datos requeridos básicos
+        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'id_tipo_cita', 'fecha', 'hora', 'motivo'];
         $camposFaltantes = [];
         
         foreach ($camposRequeridos as $campo) {
@@ -197,12 +215,32 @@ class RecepcionistaController {
             return;
         }
         
+        // Validar tipo de cita
+        if (!$this->citasModel->validarTipoCita($_POST['id_tipo_cita'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Tipo de cita no válido o inactivo'
+            ]);
+            return;
+        }
+        
+        // Validaciones adicionales para citas virtuales
+        if ($_POST['id_tipo_cita'] == 2) { // Cita virtual
+            if (empty($_POST['plataforma_virtual'])) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'La plataforma virtual es requerida para citas virtuales'
+                ]);
+                return;
+            }
+        }
+        
         try {
             // Combinar fecha y hora
             $fecha_hora = $_POST['fecha'] . ' ' . $_POST['hora'];
             
             // Verificar disponibilidad del doctor
-            $disponible = $this->doctoresModel->verificarDisponibilidad(
+            $disponible = $this->citasModel->verificarDisponibilidad(
                 $_POST['id_doctor'],
                 $fecha_hora
             );
@@ -215,24 +253,50 @@ class RecepcionistaController {
                 return;
             }
             
-            // Crear la cita
+            // Preparar datos de la cita
             $datos_cita = [
                 'id_paciente' => (int)$_POST['id_paciente'],
                 'id_doctor' => (int)$_POST['id_doctor'],
                 'id_sucursal' => (int)$_POST['id_sucursal'],
+                'id_tipo_cita' => (int)$_POST['id_tipo_cita'],
                 'fecha_hora' => $fecha_hora,
                 'motivo' => trim($_POST['motivo']),
+                'tipo_cita' => $_POST['id_tipo_cita'] == 1 ? 'presencial' : 'virtual',
+                'estado' => 'Pendiente',
                 'notas' => trim($_POST['notas'] ?? ''),
-                'estado' => 'Pendiente'
+                'enlace_virtual' => null,
+                'sala_virtual' => null
             ];
+            
+            // Agregar campos específicos para citas virtuales
+            if ($_POST['id_tipo_cita'] == 2) {
+                $datos_cita['enlace_virtual'] = !empty($_POST['enlace_virtual']) ? trim($_POST['enlace_virtual']) : null;
+                $datos_cita['sala_virtual'] = !empty($_POST['sala_virtual']) ? trim($_POST['sala_virtual']) : null;
+                
+                // Si no se proporcionó enlace, generar uno automático según la plataforma
+                if (empty($datos_cita['enlace_virtual'])) {
+                    $datos_cita['enlace_virtual'] = $this->generarEnlaceVirtual($_POST['plataforma_virtual']);
+                }
+            }
             
             $id_cita = $this->citasModel->crear($datos_cita);
             
             if ($id_cita) {
+                // Obtener datos completos de la cita creada
+                $cita_completa = $this->citasModel->obtenerPorId($id_cita);
+                
+                // Enviar notificación si está habilitada
+                if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
+                    $this->enviarNotificacionCita($id_cita, 'confirmacion');
+                }
+                
                 $this->responderJSON([
                     'success' => true,
                     'message' => 'Cita registrada exitosamente',
-                    'data' => ['id_cita' => $id_cita]
+                    'data' => [
+                        'id_cita' => $id_cita,
+                        'cita' => $cita_completa
+                    ]
                 ]);
             } else {
                 $this->responderJSON([
@@ -267,6 +331,10 @@ class RecepcionistaController {
             
             if (!empty($_GET['id_sucursal'])) {
                 $filtros['id_sucursal'] = $_GET['id_sucursal'];
+            }
+            
+            if (!empty($_GET['id_tipo_cita'])) { // NUEVO: Filtro por tipo de cita
+                $filtros['id_tipo_cita'] = $_GET['id_tipo_cita'];
             }
             
             if (!empty($_GET['cedula_paciente'])) {
@@ -307,7 +375,7 @@ class RecepcionistaController {
         $id_cita = (int)$_POST['id_cita'];
         
         // Validar datos requeridos
-        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'fecha', 'hora', 'motivo'];
+        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'id_tipo_cita', 'fecha', 'hora', 'motivo'];
         $camposFaltantes = [];
         
         foreach ($camposRequeridos as $campo) {
@@ -320,6 +388,15 @@ class RecepcionistaController {
             $this->responderJSON([
                 'success' => false,
                 'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+            ]);
+            return;
+        }
+        
+        // Validar tipo de cita
+        if (!$this->citasModel->validarTipoCita($_POST['id_tipo_cita'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Tipo de cita no válido o inactivo'
             ]);
             return;
         }
@@ -342,10 +419,9 @@ class RecepcionistaController {
             if ($cita_actual['id_doctor'] != $_POST['id_doctor'] || 
                 $cita_actual['fecha_hora'] != $fecha_hora) {
                 
-                $disponible = $this->doctoresModel->verificarDisponibilidad(
+                $disponible = $this->citasModel->verificarDisponibilidad(
                     $_POST['id_doctor'],
-                    $fecha_hora,
-                    $id_cita // Excluir la cita actual de la verificación
+                    $fecha_hora
                 );
                 
                 if (!$disponible) {
@@ -357,16 +433,30 @@ class RecepcionistaController {
                 }
             }
             
-            // Actualizar la cita
+            // Preparar datos para actualizar
             $datos_cita = [
                 'id_paciente' => (int)$_POST['id_paciente'],
                 'id_doctor' => (int)$_POST['id_doctor'],
                 'id_sucursal' => (int)$_POST['id_sucursal'],
+                'id_tipo_cita' => (int)$_POST['id_tipo_cita'],
                 'fecha_hora' => $fecha_hora,
                 'motivo' => trim($_POST['motivo']),
+                'tipo_cita' => $_POST['id_tipo_cita'] == 1 ? 'presencial' : 'virtual',
                 'estado' => $_POST['estado'] ?? $cita_actual['estado'],
-                'notas' => trim($_POST['notas'] ?? '')
+                'notas' => trim($_POST['notas'] ?? ''),
+                'enlace_virtual' => $cita_actual['enlace_virtual'],
+                'sala_virtual' => $cita_actual['sala_virtual']
             ];
+            
+            // Actualizar campos virtuales si es cita virtual
+            if ($_POST['id_tipo_cita'] == 2) {
+                $datos_cita['enlace_virtual'] = !empty($_POST['enlace_virtual']) ? trim($_POST['enlace_virtual']) : $cita_actual['enlace_virtual'];
+                $datos_cita['sala_virtual'] = !empty($_POST['sala_virtual']) ? trim($_POST['sala_virtual']) : $cita_actual['sala_virtual'];
+            } else {
+                // Si cambió de virtual a presencial, limpiar campos virtuales
+                $datos_cita['enlace_virtual'] = null;
+                $datos_cita['sala_virtual'] = null;
+            }
             
             $resultado = $this->citasModel->actualizar($id_cita, $datos_cita);
             
@@ -412,6 +502,11 @@ class RecepcionistaController {
             $resultado = $this->citasModel->cambiarEstado($id_cita, 'Cancelada');
             
             if ($resultado) {
+                // Enviar notificación de cancelación si está habilitada
+                if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
+                    $this->enviarNotificacionCita($id_cita, 'cancelacion');
+                }
+                
                 $this->responderJSON([
                     'success' => true,
                     'message' => 'Cita cancelada exitosamente'
@@ -453,6 +548,11 @@ class RecepcionistaController {
             $resultado = $this->citasModel->cambiarEstado($id_cita, 'Confirmada');
             
             if ($resultado) {
+                // Enviar notificación de confirmación si está habilitada
+                if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
+                    $this->enviarNotificacionCita($id_cita, 'confirmacion');
+                }
+                
                 $this->responderJSON([
                     'success' => true,
                     'message' => 'Cita confirmada exitosamente'
@@ -463,6 +563,48 @@ class RecepcionistaController {
                     'message' => 'Error al confirmar la cita'
                 ]);
             }
+        } catch (Exception $e) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    // ===== MÉTODOS PARA TIPOS DE CITA =====
+    private function obtenerTiposCita() {
+        try {
+            $tipos_cita = $this->citasModel->obtenerTiposCita();
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $tipos_cita
+            ]);
+        } catch (Exception $e) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    private function validarTipoCita() {
+        if (empty($_GET['id_tipo_cita'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'ID de tipo de cita requerido'
+            ]);
+            return;
+        }
+        
+        try {
+            $id_tipo_cita = (int)$_GET['id_tipo_cita'];
+            $es_valido = $this->citasModel->validarTipoCita($id_tipo_cita);
+            
+            $this->responderJSON([
+                'success' => true,
+                'valido' => $es_valido
+            ]);
         } catch (Exception $e) {
             $this->responderJSON([
                 'success' => false,
@@ -508,356 +650,6 @@ class RecepcionistaController {
     }
     
     private function registrarPaciente() {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
-        return;
-    }
-    
-    $this->verificarPermisos('crear');
-    
-    // Validar datos requeridos
-    $camposRequeridos = ['cedula', 'nombres', 'apellidos', 'fecha_nacimiento', 'genero', 'telefono', 'direccion'];
-    $camposFaltantes = [];
-    
-    foreach ($camposRequeridos as $campo) {
-        if (empty($_POST[$campo])) {
-            $camposFaltantes[] = $campo;
-        }
-    }
-    
-    if (!empty($camposFaltantes)) {
-        $this->responderJSON([
-            'success' => false,
-            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
-        ]);
-        return;
-    }
-    
-    // Validaciones básicas
-    if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
-        $this->responderJSON([
-            'success' => false,
-            'message' => 'La cédula debe tener al menos 10 dígitos numéricos'
-        ]);
-        return;
-    }
-    
-    // Validar correo si se proporciona
-    if (!empty($_POST['correo']) && !filter_var($_POST['correo'], FILTER_VALIDATE_EMAIL)) {
-        $this->responderJSON([
-            'success' => false,
-            'message' => 'Formato de correo electrónico no válido'
-        ]);
-        return;
-    }
-    
-    try {
-        // Verificar si ya existe un usuario con esa cédula
-        $usuarioExistente = $this->usuarioModel->obtenerPorCedula((int)$_POST['cedula']);
-        if ($usuarioExistente) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Ya existe un usuario registrado con esa cédula'
-            ]);
-            return;
-        }
-        
-        // Verificar si el correo ya existe (si se proporciona)
-        if (!empty($_POST['correo'])) {
-            $correoExistente = $this->usuarioModel->obtenerPorCorreo(trim($_POST['correo']));
-            if ($correoExistente) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'El correo electrónico ya está registrado'
-                ]);
-                return;
-            }
-        }
-        
-        // PASO 1: Crear el USUARIO usando tu método existente
-        $username = $this->generarUsername($_POST['nombres'], $_POST['apellidos']);
-        $passwordTemporal = $this->generarPasswordTemporal();
-        
-        // Buscar ID del rol "Paciente"
-        $rolPaciente = $this->rolesModel->obtenerPorNombre('Paciente');
-        if (!$rolPaciente) {
-            throw new Exception("No se encontró el rol 'Paciente' en el sistema");
-        }
-        
-        $resultado = $this->usuarioModel->crearUsuario(
-            (int)$_POST['cedula'],
-            $username,
-            trim($_POST['nombres']),
-            trim($_POST['apellidos']),
-            $_POST['genero'],
-            'Ecuatoriana', // Nacionalidad por defecto
-            !empty($_POST['correo']) ? trim($_POST['correo']) : null,
-            $passwordTemporal,
-            $rolPaciente['id_rol']
-        );
-        
-        if (!$resultado) {
-            throw new Exception("Error al crear el usuario");
-        }
-        
-        // Obtener el ID del usuario recién creado
-        $usuarioCreado = $this->usuarioModel->obtenerPorUsername($username);
-        if (!$usuarioCreado) {
-            throw new Exception("Error al obtener el usuario creado");
-        }
-        
-        $id_usuario = $usuarioCreado['id_usuario'];
-        
-        // PASO 2: Crear el PACIENTE usando el id_usuario
-        $datos_paciente = [
-            'id_usuario' => $id_usuario,
-            'fecha_nacimiento' => $_POST['fecha_nacimiento'],
-            'tipo_sangre' => !empty($_POST['tipo_sangre']) ? $_POST['tipo_sangre'] : null,
-            'alergias' => !empty($_POST['alergias']) ? trim($_POST['alergias']) : null,
-            'antecedentes_medicos' => !empty($_POST['antecedentes_medicos']) ? trim($_POST['antecedentes_medicos']) : null,
-            'contacto_emergencia' => !empty($_POST['contacto_emergencia']) ? trim($_POST['contacto_emergencia']) : null,
-            'telefono_emergencia' => !empty($_POST['telefono_emergencia']) ? trim($_POST['telefono_emergencia']) : null,
-            'numero_seguro' => !empty($_POST['numero_seguro']) ? trim($_POST['numero_seguro']) : null
-        ];
-        
-        $id_paciente = $this->pacientesModel->crear($datos_paciente);
-        
-        if (!$id_paciente) {
-            throw new Exception("Error al crear el paciente");
-        }
-        
-        // PASO 3: Enviar correo con credenciales (si tiene correo)
-        $envioExitoso = false;
-        if (!empty($_POST['correo'])) {
-            try {
-                // Usar tu MailService existente
-                require_once __DIR__ . '/../../config/MailService.php';
-                $mailService = new MailService();
-                
-                $nombreCompleto = trim($_POST['nombres']) . ' ' . trim($_POST['apellidos']);
-                $envioExitoso = $mailService->enviarPasswordTemporal(
-                    trim($_POST['correo']),
-                    $nombreCompleto,
-                    $username,
-                    $passwordTemporal
-                );
-            } catch (Exception $e) {
-                // Si falla el envío de correo, continuar pero marcar como no enviado
-                error_log("Error enviando correo: " . $e->getMessage());
-                $envioExitoso = false;
-            }
-        }
-        
-        // Obtener los datos completos del paciente
-        $paciente_completo = $this->pacientesModel->obtenerPorId($id_paciente);
-        
-        // Preparar mensaje de respuesta
-        $mensaje = 'Paciente registrado exitosamente';
-        if (!empty($_POST['correo'])) {
-            if ($envioExitoso) {
-                $mensaje .= '. Se ha enviado un correo con las credenciales de acceso.';
-            } else {
-                $mensaje .= ', pero hubo un problema enviando el correo. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
-            }
-        } else {
-            $mensaje .= '. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
-        }
-        
-        $this->responderJSON([
-            'success' => true,
-            'message' => $mensaje,
-            'data' => [
-                'id_paciente' => $id_paciente,
-                'id_usuario' => $id_usuario,
-                'username' => $username,
-                'password_temporal' => $passwordTemporal,
-                'email_enviado' => $envioExitoso,
-                'paciente' => $paciente_completo
-            ]
-        ]);
-        
-    } catch (Exception $e) {
-        $this->responderJSON([
-            'success' => false,
-            'message' => 'Error: ' . $e->getMessage()
-        ]);
-    }
-}
-    
-    private function obtenerDatosCedula() {
-        if (empty($_GET['cedula'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Cédula requerida'
-            ]);
-            return;
-        }
-        
-        $cedula = trim($_GET['cedula']);
-        
-        try {
-            // Llamar al archivo obtenerDatos.php
-            $url = "http://localhost/MenuDinamico/controladores/obtenerDatos.php?cedula=" . urlencode($cedula);
-            $response = file_get_contents($url);
-            
-            if ($response === false) {
-                throw new Exception("No se pudo conectar con el servicio de cédulas");
-            }
-            
-            $datos = json_decode($response, true);
-            
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new Exception("Error al procesar respuesta del servicio");
-            }
-            
-            if (isset($datos['estado']) && $datos['estado'] === 'OK') {
-                // Procesar y formatear los datos
-                $resultado = $datos['resultado'][0] ?? [];
-                
-                $datos_formateados = [
-                    'cedula' => $resultado['cedula'] ?? $cedula,
-                    'nombres' => $this->extraerNombres($resultado['nombre'] ?? ''),
-                    'apellidos' => $this->extraerApellidos($resultado['apellido'] ?? ''),
-                    'fecha_nacimiento' => $this->formatearFecha($resultado['fechaNacimiento'] ?? ''),
-                    'lugar_nacimiento' => $resultado['lugarNacimiento'] ?? '',
-                    'estado_civil' => $resultado['estadoCivil'] ?? '',
-                    'profesion' => $resultado['profesion'] ?? ''
-                ];
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'data' => $datos_formateados
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'No se encontraron datos para esta cédula'
-                ]);
-            }
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    // ===== MÉTODOS PARA DATOS DE FORMULARIOS =====
-   private function obtenerDoctores() {
-    try {
-        // Usar el método obtenerTodos con filtro de estado activo
-        $filtros = ['estado' => 1]; // Solo doctores activos
-        $doctores = $this->doctoresModel->obtenerTodos($filtros);
-        
-        $this->responderJSON([
-            'success' => true,
-            'data' => $doctores,
-            'count' => count($doctores)
-        ]);
-    } catch (Exception $e) {
-        $this->responderJSON([
-            'success' => false,
-            'message' => 'Error: ' . $e->getMessage()
-        ]);
-    }
-}
-    
-    private function obtenerEspecialidadesPorSucursal() {
-        if (empty($_GET['id_sucursal'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID de sucursal requerido'
-            ]);
-            return;
-        }
-        
-        try {
-            $especialidades = $this->especialidadesModel->obtenerPorSucursal($_GET['id_sucursal']);
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $especialidades
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    private function obtenerDoctoresPorEspecialidad() {
-        if (empty($_GET['id_especialidad']) || empty($_GET['id_sucursal'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID de especialidad y sucursal requeridos'
-            ]);
-            return;
-        }
-        
-        try {
-            $doctores = $this->doctoresModel->obtenerPorEspecialidadYSucursal(
-                $_GET['id_especialidad'],
-                $_GET['id_sucursal']
-            );
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $doctores
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    private function obtenerHorariosDisponibles() {
-        if (empty($_GET['id_doctor']) || empty($_GET['fecha'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID de doctor y fecha requeridos'
-            ]);
-            return;
-        }
-        
-        try {
-            $horarios = $this->doctoresModel->obtenerHorariosDisponibles(
-                $_GET['id_doctor'],
-                $_GET['fecha']
-            );
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $horarios
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    private function obtenerSucursales() {
-        try {
-            $sucursales = $this->sucursalesModel->obtenerTodas();
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $sucursales
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    // ===== MÉTODOS PARA TRIAJE =====
-    private function realizarTriaje() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
             return;
@@ -866,7 +658,7 @@ class RecepcionistaController {
         $this->verificarPermisos('crear');
         
         // Validar datos requeridos
-        $camposRequeridos = ['id_cita', 'nivel_urgencia'];
+        $camposRequeridos = ['cedula', 'nombres', 'apellidos', 'fecha_nacimiento', 'genero', 'telefono', 'direccion'];
         $camposFaltantes = [];
         
         foreach ($camposRequeridos as $campo) {
@@ -883,37 +675,424 @@ class RecepcionistaController {
             return;
         }
         
-        try {
-            $datos_triaje = [
-                'id_cita' => (int)$_POST['id_cita'],
-                'id_enfermero' => $_SESSION['id_usuario'],
-                'nivel_urgencia' => (int)$_POST['nivel_urgencia'],
-                'temperatura' => !empty($_POST['temperatura']) ? (float)$_POST['temperatura'] : null,
-                'presion_arterial' => $_POST['presion_arterial'] ?? null,
-                'frecuencia_cardiaca' => !empty($_POST['frecuencia_cardiaca']) ? (int)$_POST['frecuencia_cardiaca'] : null,
-                'frecuencia_respiratoria' => !empty($_POST['frecuencia_respiratoria']) ? (int)$_POST['frecuencia_respiratoria'] : null,
-                'saturacion_oxigeno' => !empty($_POST['saturacion_oxigeno']) ? (int)$_POST['saturacion_oxigeno'] : null,
-                'peso' => !empty($_POST['peso']) ? (float)$_POST['peso'] : null,
-                'talla' => !empty($_POST['talla']) ? (int)$_POST['talla'] : null,
-                'observaciones' => $_POST['observaciones'] ?? null
-            ];
-            
-            // Nota: Aquí necesitarías un modelo Triaje
-            // $id_triaje = $this->triajeModel->crear($datos_triaje);
-            
-            $this->responderJSON([
-                'success' => true,
-                'message' => 'Triaje realizado exitosamente'
-            ]);
-        } catch (Exception $e) {
+        // Validaciones básicas
+        if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'La cédula debe tener al menos 10 dígitos numéricos'
             ]);
+            return;
         }
-    }
-    
-// ===== MÉTODOS PARA NOTIFICACIONES =====
+        
+        // Validar correo si se proporciona
+        if (!empty($_POST['correo']) && !filter_var($_POST['correo'], FILTER_VALIDATE_EMAIL)) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Formato de correo electrónico no válido'
+            ]);
+            return;
+        }
+        
+        try {
+            // Verificar si ya existe un usuario con esa cédula
+            $usuarioExistente = $this->usuarioModel->obtenerPorCedula((int)$_POST['cedula']);
+            if ($usuarioExistente) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Ya existe un usuario registrado con esa cédula'
+                ]);
+                return;
+            }
+            
+            // Verificar si el correo ya existe (si se proporciona)
+            if (!empty($_POST['correo'])) {
+                $correoExistente = $this->usuarioModel->obtenerPorCorreo(trim($_POST['correo']));
+                if ($correoExistente) {
+                    $this->responderJSON([
+                        'success' => false,
+                        'message' => 'El correo electrónico ya está registrado'
+                    ]);
+                    return;
+                }
+            }
+            
+            // PASO 1: Crear el USUARIO
+            $username = $this->generarUsername($_POST['nombres'], $_POST['apellidos']);
+            $passwordTemporal = $this->generarPasswordTemporal();
+            
+            // Buscar ID del rol "Paciente"
+            $rolPaciente = $this->rolesModel->obtenerPorNombre('Paciente');
+            if (!$rolPaciente) {
+                throw new Exception("No se encontró el rol 'Paciente' en el sistema");
+            }
+            
+            $resultado = $this->usuarioModel->crearUsuario(
+                (int)$_POST['cedula'],
+                $username,
+                trim($_POST['nombres']),
+                trim($_POST['apellidos']),
+                $_POST['genero'],
+                'Ecuatoriana', // Nacionalidad por defecto
+                !empty($_POST['correo']) ? trim($_POST['correo']) : null,
+                $passwordTemporal,
+                $rolPaciente['id_rol']
+            );
+            
+            if (!$resultado) {
+                throw new Exception("Error al crear el usuario");
+            }
+            
+            // Obtener el ID del usuario recién creado
+            $usuarioCreado = $this->usuarioModel->obtenerPorUsername($username);
+            if (!$usuarioCreado) {
+                throw new Exception("Error al obtener el usuario creado");
+            }
+            
+            $id_usuario = $usuarioCreado['id_usuario'];
+            
+            // PASO 2: Crear el PACIENTE
+            // PASO 2: Crear el PACIENTE
+                $datos_paciente = [
+                    'id_usuario' => $id_usuario,
+                    'fecha_nacimiento' => $_POST['fecha_nacimiento'],
+                    'telefono' => !empty($_POST['telefono']) ? trim($_POST['telefono']) : null,  // ⭐ NUEVO
+                    'tipo_sangre' => !empty($_POST['tipo_sangre']) ? $_POST['tipo_sangre'] : null,
+                    'alergias' => !empty($_POST['alergias']) ? trim($_POST['alergias']) : null,
+                    'antecedentes_medicos' => !empty($_POST['antecedentes_medicos']) ? trim($_POST['antecedentes_medicos']) : null,
+                    'contacto_emergencia' => !empty($_POST['contacto_emergencia']) ? trim($_POST['contacto_emergencia']) : null,
+                    'telefono_emergencia' => !empty($_POST['telefono_emergencia']) ? trim($_POST['telefono_emergencia']) : null,
+                    'numero_seguro' => !empty($_POST['numero_seguro']) ? trim($_POST['numero_seguro']) : null
+                ];
+                            
+            $id_paciente = $this->pacientesModel->crear($datos_paciente);
+            
+            if (!$id_paciente) {
+                throw new Exception("Error al crear el paciente");
+            }
+            
+            // PASO 3: Enviar correo con credenciales (si tiene correo)
+            $envioExitoso = false;
+            if (!empty($_POST['correo'])) {
+                try {
+                    // Usar tu MailService existente
+                    require_once __DIR__ . '/../../config/MailService.php';
+                    $mailService = new MailService();
+                   
+                   $nombreCompleto = trim($_POST['nombres']) . ' ' . trim($_POST['apellidos']);
+                   $envioExitoso = $mailService->enviarPasswordTemporal(
+                       trim($_POST['correo']),
+                       $nombreCompleto,
+                       $username,
+                       $passwordTemporal
+                   );
+               } catch (Exception $e) {
+                   // Si falla el envío de correo, continuar pero marcar como no enviado
+                   error_log("Error enviando correo: " . $e->getMessage());
+                   $envioExitoso = false;
+               }
+           }
+           
+           // Obtener los datos completos del paciente
+           $paciente_completo = $this->pacientesModel->obtenerPorId($id_paciente);
+           
+           // Preparar mensaje de respuesta
+           $mensaje = 'Paciente registrado exitosamente';
+           if (!empty($_POST['correo'])) {
+               if ($envioExitoso) {
+                   $mensaje .= '. Se ha enviado un correo con las credenciales de acceso.';
+               } else {
+                   $mensaje .= ', pero hubo un problema enviando el correo. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
+               }
+           } else {
+               $mensaje .= '. Credenciales: Usuario: ' . $username . ', Contraseña: ' . $passwordTemporal;
+           }
+           
+           $this->responderJSON([
+               'success' => true,
+               'message' => $mensaje,
+               'data' => [
+                   'id_paciente' => $id_paciente,
+                   'id_usuario' => $id_usuario,
+                   'username' => $username,
+                   'password_temporal' => $passwordTemporal,
+                   'email_enviado' => $envioExitoso,
+                   'paciente' => $paciente_completo
+               ]
+           ]);
+           
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function obtenerDatosCedula() {
+       if (empty($_GET['cedula'])) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Cédula requerida'
+           ]);
+           return;
+       }
+       
+       $cedula = trim($_GET['cedula']);
+       
+       try {
+           // Llamar al archivo obtenerDatos.php
+           $url = "http://localhost/MenuDinamico/controladores/obtenerDatos.php?cedula=" . urlencode($cedula);
+           $response = file_get_contents($url);
+           
+           if ($response === false) {
+               throw new Exception("No se pudo conectar con el servicio de cédulas");
+           }
+           
+           $datos = json_decode($response, true);
+           
+           if (json_last_error() !== JSON_ERROR_NONE) {
+               throw new Exception("Error al procesar respuesta del servicio");
+           }
+           
+           if (isset($datos['estado']) && $datos['estado'] === 'OK') {
+               // Procesar y formatear los datos
+               $resultado = $datos['resultado'][0] ?? [];
+               
+               $datos_formateados = [
+                   'cedula' => $resultado['cedula'] ?? $cedula,
+                   'nombres' => $this->extraerNombres($resultado['nombre'] ?? ''),
+                   'apellidos' => $this->extraerApellidos($resultado['apellido'] ?? ''),
+                   'fecha_nacimiento' => $this->formatearFecha($resultado['fechaNacimiento'] ?? ''),
+                   'lugar_nacimiento' => $resultado['lugarNacimiento'] ?? '',
+                   'estado_civil' => $resultado['estadoCivil'] ?? '',
+                   'profesion' => $resultado['profesion'] ?? ''
+               ];
+               
+               $this->responderJSON([
+                   'success' => true,
+                   'data' => $datos_formateados
+               ]);
+           } else {
+               $this->responderJSON([
+                   'success' => false,
+                   'message' => 'No se encontraron datos para esta cédula'
+               ]);
+           }
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   // ===== MÉTODOS PARA DATOS DE FORMULARIOS =====
+   private function obtenerDoctores() {
+       try {
+           // Usar el método obtenerTodos con filtro de estado activo
+           $filtros = ['estado' => 1]; // Solo doctores activos
+           $doctores = $this->doctoresModel->obtenerTodos($filtros);
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $doctores,
+               'count' => count($doctores)
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function obtenerEspecialidadesPorSucursal() {
+       if (empty($_GET['id_sucursal'])) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'ID de sucursal requerido'
+           ]);
+           return;
+       }
+       
+       try {
+           $especialidades = $this->especialidadesModel->obtenerPorSucursal($_GET['id_sucursal']);
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $especialidades
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function obtenerDoctoresPorEspecialidad() {
+       if (empty($_GET['id_especialidad']) || empty($_GET['id_sucursal'])) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'ID de especialidad y sucursal requeridos'
+           ]);
+           return;
+       }
+       
+       try {
+           $doctores = $this->doctoresModel->obtenerPorEspecialidadYSucursal(
+               $_GET['id_especialidad'],
+               $_GET['id_sucursal']
+           );
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $doctores
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function obtenerHorariosDisponibles() {
+       if (empty($_GET['id_doctor']) || empty($_GET['fecha'])) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'ID de doctor y fecha requeridos'
+           ]);
+           return;
+       }
+       
+       try {
+           $horarios = $this->doctoresModel->obtenerHorariosDisponibles(
+               $_GET['id_doctor'],
+               $_GET['fecha']
+           );
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $horarios
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function obtenerSucursales() {
+       try {
+           $sucursales = $this->sucursalesModel->obtenerTodas();
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $sucursales
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function verificarDisponibilidad() {
+       if (empty($_GET['id_doctor']) || empty($_GET['fecha_hora'])) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'ID de doctor y fecha_hora requeridos'
+           ]);
+           return;
+       }
+       
+       try {
+           $id_cita_excluir = !empty($_GET['id_cita']) ? (int)$_GET['id_cita'] : null;
+           
+           $disponible = $this->citasModel->verificarDisponibilidad(
+               $_GET['id_doctor'],
+               $_GET['fecha_hora']
+           );
+           
+           $this->responderJSON([
+               'success' => true,
+               'disponible' => $disponible
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   // ===== MÉTODOS PARA TRIAJE =====
+   private function realizarTriaje() {
+       if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+           $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+           return;
+       }
+       
+       $this->verificarPermisos('crear');
+       
+       // Validar datos requeridos
+       $camposRequeridos = ['id_cita', 'nivel_urgencia'];
+       $camposFaltantes = [];
+       
+       foreach ($camposRequeridos as $campo) {
+           if (empty($_POST[$campo])) {
+               $camposFaltantes[] = $campo;
+           }
+       }
+       
+       if (!empty($camposFaltantes)) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+           ]);
+           return;
+       }
+       
+       try {
+           $datos_triaje = [
+               'id_cita' => (int)$_POST['id_cita'],
+               'id_enfermero' => $_SESSION['id_usuario'],
+               'nivel_urgencia' => (int)$_POST['nivel_urgencia'],
+               'temperatura' => !empty($_POST['temperatura']) ? (float)$_POST['temperatura'] : null,
+               'presion_arterial' => $_POST['presion_arterial'] ?? null,
+               'frecuencia_cardiaca' => !empty($_POST['frecuencia_cardiaca']) ? (int)$_POST['frecuencia_cardiaca'] : null,
+               'frecuencia_respiratoria' => !empty($_POST['frecuencia_respiratoria']) ? (int)$_POST['frecuencia_respiratoria'] : null,
+               'saturacion_oxigeno' => !empty($_POST['saturacion_oxigeno']) ? (int)$_POST['saturacion_oxigeno'] : null,
+               'peso' => !empty($_POST['peso']) ? (float)$_POST['peso'] : null,
+               'talla' => !empty($_POST['talla']) ? (int)$_POST['talla'] : null,
+               'observaciones' => $_POST['observaciones'] ?? null
+           ];
+           
+           // Calcular IMC si se proporcionaron peso y talla
+           if ($datos_triaje['peso'] && $datos_triaje['talla']) {
+               $altura_metros = $datos_triaje['talla'] / 100;
+               $datos_triaje['imc'] = round($datos_triaje['peso'] / ($altura_metros * $altura_metros), 2);
+           }
+           
+           // Nota: Aquí necesitarías un modelo Triaje
+           // $id_triaje = $this->triajeModel->crear($datos_triaje);
+           
+           $this->responderJSON([
+               'success' => true,
+               'message' => 'Triaje realizado exitosamente'
+           ]);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   // ===== MÉTODOS PARA NOTIFICACIONES =====
    private function enviarNotificacion() {
        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
            $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
@@ -932,35 +1111,106 @@ class RecepcionistaController {
            $id_cita = (int)$_POST['id_cita'];
            $tipo = $_POST['tipo'];
            
+           $resultado = $this->enviarNotificacionCita($id_cita, $tipo);
+           
+           $this->responderJSON($resultado);
+       } catch (Exception $e) {
+           $this->responderJSON([
+               'success' => false,
+               'message' => 'Error: ' . $e->getMessage()
+           ]);
+       }
+   }
+   
+   private function enviarNotificacionCita($id_cita, $tipo) {
+       try {
            // Obtener datos de la cita
            $cita = $this->citasModel->obtenerPorId($id_cita);
            if (!$cita) {
-               $this->responderJSON([
+               return [
                    'success' => false,
                    'message' => 'Cita no encontrada'
-               ]);
-               return;
+               ];
            }
            
            // Generar mensaje según el tipo
            $mensaje = match($tipo) {
                'recordatorio' => "Recordatorio: Tiene una cita médica programada para el " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])),
+                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
+                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'],
                'confirmacion' => "Su cita médica ha sido confirmada para el " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])),
+                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
+                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'],
                'cancelacion' => "Su cita médica del " . 
-                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . " ha sido cancelada",
+                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
+                   " con Dr. " . $cita['doctor_nombres'] . " " . $cita['doctor_apellidos'] . 
+                   " ha sido cancelada",
+               'enlace_virtual' => "Su cita virtual está programada para el " . 
+                   date('d/m/Y H:i', strtotime($cita['fecha_hora'])) . 
+                   ". Enlace de acceso: " . ($cita['enlace_virtual'] ?? 'Se enviará próximamente'),
                default => "Notificación sobre su cita médica"
            };
            
-           $this->responderJSON([
+           // Agregar información adicional para citas virtuales
+           if ($cita['id_tipo_cita'] == 2 && $tipo !== 'cancelacion') {
+               $mensaje .= "\n\nTipo: Cita Virtual";
+               if ($cita['enlace_virtual']) {
+                   $mensaje .= "\nEnlace: " . $cita['enlace_virtual'];
+               }
+               if ($cita['sala_virtual']) {
+                   $mensaje .= "\nID de Sala: " . $cita['sala_virtual'];
+               }
+           } else if ($cita['id_tipo_cita'] == 1 && $tipo !== 'cancelacion') {
+               $mensaje .= "\n\nTipo: Cita Presencial";
+               $mensaje .= "\nUbicación: " . $cita['nombre_sucursal'];
+               $mensaje .= "\nDirección: " . $cita['sucursal_direccion'];
+           }
+           
+           return [
                'success' => true,
-               'message' => 'Notificación enviada exitosamente',
+               'message' => 'Notificación preparada exitosamente',
                'data' => [
                    'tipo' => $tipo,
                    'destinatario' => $cita['paciente_correo'],
-                   'mensaje' => $mensaje
+                   'mensaje' => $mensaje,
+                   'cita_tipo' => $cita['tipo_cita_nombre']
                ]
+           ];
+       } catch (Exception $e) {
+           return [
+               'success' => false,
+               'message' => 'Error preparando notificación: ' . $e->getMessage()
+           ];
+       }
+   }
+   
+   // ===== MÉTODOS PARA ESTADÍSTICAS =====
+   private function obtenerEstadisticas() {
+       try {
+           // Obtener estadísticas generales
+           $estadisticas_generales = $this->citasModel->obtenerEstadisticas();
+           
+           // Obtener estadísticas del día
+           $fecha_hoy = date('Y-m-d');
+           $pacientes_nuevos_hoy = method_exists($this->pacientesModel, 'contarPacientesNuevosPorFecha') 
+               ? $this->pacientesModel->contarPacientesNuevosPorFecha($fecha_hoy) 
+               : 0;
+           
+           $estadisticas = [
+               'citas_hoy' => (int)$estadisticas_generales['hoy'],
+               'citas_pendientes' => (int)$estadisticas_generales['pendientes'],
+               'citas_confirmadas' => (int)$estadisticas_generales['confirmadas'],
+               'citas_completadas' => (int)$estadisticas_generales['completadas'],
+               'citas_canceladas' => (int)$estadisticas_generales['canceladas'],
+               'citas_presenciales' => (int)$estadisticas_generales['presenciales'],
+               'citas_virtuales' => (int)$estadisticas_generales['virtuales'],
+               'total_citas' => (int)$estadisticas_generales['total_citas'],
+               'pacientes_nuevos_hoy' => $pacientes_nuevos_hoy
+           ];
+           
+           $this->responderJSON([
+               'success' => true,
+               'data' => $estadisticas
            ]);
        } catch (Exception $e) {
            $this->responderJSON([
@@ -970,23 +1220,13 @@ class RecepcionistaController {
        }
    }
    
-   // ===== MÉTODOS PARA ESTADÍSTICAS =====
-   private function obtenerEstadisticas() {
+   private function obtenerEstadisticasPorTipo() {
        try {
-           // Obtener estadísticas del día
-           $fecha_hoy = date('Y-m-d');
-           
-           $estadisticas = [
-               'citas_hoy' => $this->citasModel->contarCitasPorFecha($fecha_hoy),
-               'pacientes_nuevos_hoy' => $this->pacientesModel->contarPacientesNuevosPorFecha($fecha_hoy),
-               'citas_pendientes' => $this->citasModel->contarCitasPorEstado('Pendiente'),
-               'citas_confirmadas' => $this->citasModel->contarCitasPorEstado('Confirmada'),
-               'total_pacientes' => $this->pacientesModel->contarTotal()
-           ];
+           $estadisticas_por_tipo = $this->citasModel->obtenerEstadisticasPorTipo();
            
            $this->responderJSON([
                'success' => true,
-               'data' => $estadisticas
+               'data' => $estadisticas_por_tipo
            ]);
        } catch (Exception $e) {
            $this->responderJSON([
@@ -1045,11 +1285,39 @@ class RecepcionistaController {
                      strpos($request_uri, 'realizar_triaje') !== false) {
                $id_submenu = 30; // ID del submenú "Realizar Triaje"
            } else {
-               $id_submenu = 28; // Por defecto, usar "Registrar Pacientes"
+               $id_submenu = 29; // Por defecto, usar "Gestionar Citas"
            }
        }
        
        return $id_submenu;
+   }
+   
+   private function generarEnlaceVirtual($plataforma) {
+       $enlaces = [
+           'zoom' => 'https://zoom.us/j/' . rand(100000000, 999999999),
+           'meet' => 'https://meet.google.com/' . $this->generarCodigoMeet(),
+           'teams' => 'https://teams.microsoft.com/l/meetup-join/' . $this->generarCodigoTeams(),
+           'whatsapp' => 'https://wa.me/' . rand(1000000000, 9999999999),
+           'otro' => 'Por definir'
+       ];
+       
+       return $enlaces[$plataforma] ?? 'Por definir';
+   }
+   
+   private function generarCodigoMeet() {
+       $caracteres = 'abcdefghijklmnopqrstuvwxyz';
+       $codigo = '';
+       for ($i = 0; $i < 3; $i++) {
+           for ($j = 0; $j < 4; $j++) {
+               $codigo .= $caracteres[rand(0, strlen($caracteres) - 1)];
+           }
+           if ($i < 2) $codigo .= '-';
+       }
+       return $codigo;
+   }
+   
+   private function generarCodigoTeams() {
+       return bin2hex(random_bytes(16));
    }
    
    private function extraerNombres($nombre_completo) {
@@ -1097,6 +1365,68 @@ class RecepcionistaController {
        return 'Temp' . rand(1000, 9999) . '!';
    }
    
+
+   /**
+ * Obtener horarios completos de un doctor para el calendario
+ */
+private function obtenerHorariosDoctor() {
+    if (empty($_GET['id_doctor'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de doctor requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_doctor = (int)$_GET['id_doctor'];
+        $semana = $_GET['semana'] ?? date('Y-m-d'); // Fecha de referencia para la semana
+        
+        // Obtener sucursal del contexto (o usar la primera disponible)
+        $id_sucursal = !empty($_GET['id_sucursal']) ? (int)$_GET['id_sucursal'] : null;
+        
+        if (!$id_sucursal) {
+            // Obtener la primera sucursal donde trabaja este doctor
+            $sucursales_doctor = $this->doctoresModel->obtenerSucursales($id_doctor);
+            if (empty($sucursales_doctor)) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Doctor no tiene sucursales asignadas'
+                ]);
+                return;
+            }
+            $id_sucursal = $sucursales_doctor[0]['id_sucursal'];
+        }
+        
+        // Calcular inicio de la semana (lunes)
+        $fecha_referencia = new DateTime($semana);
+        $dia_semana = $fecha_referencia->format('N'); // 1=Lunes, 7=Domingo
+        $dias_atras = $dia_semana - 1;
+        $fecha_referencia->sub(new DateInterval('P' . $dias_atras . 'D'));
+        $fecha_inicio = $fecha_referencia->format('Y-m-d');
+        
+        // Usar el nuevo modelo de horarios
+        require_once __DIR__ . '/../../modelos/DoctorHorarios.php';
+        $doctorHorarios = new DoctorHorarios();
+        
+        $datos_horarios = $doctorHorarios->obtenerHorariosSemanales(
+            $id_doctor, 
+            $id_sucursal, 
+            $fecha_inicio
+        );
+        
+        $this->responderJSON([
+            'success' => true,
+            'data' => $datos_horarios
+        ]);
+        
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
    // ===== MÉTODOS DE RESPUESTA =====
    private function responderJSON($data) {
        // Limpiar cualquier salida previa
@@ -1112,16 +1442,6 @@ class RecepcionistaController {
    private function redirigir($url) {
        header("Location: $url");
        exit();
-   }
-   
-   // ===== MÉTODO DE DEBUG =====
-   private function debug($mensaje, $datos = null) {
-       if ($this->debug) {
-           error_log("DEBUG RecepcionistaController: $mensaje");
-           if ($datos) {
-               error_log("Datos: " . print_r($datos, true));
-           }
-       }
    }
 }
 

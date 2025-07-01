@@ -14,30 +14,36 @@ class Pacientes {
      * Crear un nuevo paciente
      */
     public function crear($datos) {
-        try {
-            $query = "INSERT INTO pacientes (id_usuario, fecha_nacimiento, tipo_sangre, alergias, 
-                                           antecedentes_medicos, contacto_emergencia, telefono_emergencia, numero_seguro) 
-                      VALUES (:id_usuario, :fecha_nacimiento, :tipo_sangre, :alergias, 
-                              :antecedentes_medicos, :contacto_emergencia, :telefono_emergencia, :numero_seguro)";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([
-                ':id_usuario' => $datos['id_usuario'],
-                ':fecha_nacimiento' => $datos['fecha_nacimiento'],
-                ':tipo_sangre' => $datos['tipo_sangre'],
-                ':alergias' => $datos['alergias'],
-                ':antecedentes_medicos' => $datos['antecedentes_medicos'],
-                ':contacto_emergencia' => $datos['contacto_emergencia'],
-                ':telefono_emergencia' => $datos['telefono_emergencia'],
-                ':numero_seguro' => $datos['numero_seguro']
-            ]);
-            
-            return $this->conn->lastInsertId();
-        } catch (PDOException $e) {
-            error_log("Error creando paciente: " . $e->getMessage());
-            throw new Exception("Error al crear el paciente");
-        }
+    try {
+        $query = "INSERT INTO pacientes (
+                    id_usuario, fecha_nacimiento, tipo_sangre, alergias, 
+                    antecedentes_medicos, contacto_emergencia, telefono_emergencia, 
+                    numero_seguro, telefono
+                  ) VALUES (
+                    :id_usuario, :fecha_nacimiento, :tipo_sangre, :alergias,
+                    :antecedentes_medicos, :contacto_emergencia, :telefono_emergencia,
+                    :numero_seguro, :telefono
+                  )";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':id_usuario' => $datos['id_usuario'],
+            ':fecha_nacimiento' => $datos['fecha_nacimiento'],
+            ':tipo_sangre' => $datos['tipo_sangre'] ?? null,
+            ':alergias' => $datos['alergias'] ?? null,
+            ':antecedentes_medicos' => $datos['antecedentes_medicos'] ?? null,
+            ':contacto_emergencia' => $datos['contacto_emergencia'] ?? null,
+            ':telefono_emergencia' => $datos['telefono_emergencia'] ?? null,
+            ':numero_seguro' => $datos['numero_seguro'] ?? null,
+            ':telefono' => $datos['telefono'] ?? null  // ⭐ NUEVO CAMPO
+        ]);
+        
+        return $this->conn->lastInsertId();
+    } catch (PDOException $e) {
+        error_log("Error creando paciente: " . $e->getMessage());
+        throw new Exception("Error al crear paciente");
     }
+}
     
     /**
      * Obtener paciente por ID

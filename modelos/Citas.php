@@ -4,7 +4,7 @@ require_once __DIR__ . "/../config/database.php";
 class Citas {
     private $conn;
     
-     public function __construct() {
+    public function __construct() {
         $this->conn = Database::getConnection();
     }
     
@@ -13,24 +13,24 @@ class Citas {
     /**
      * Crear una nueva cita
      */
-    /**
-     * Crear una nueva cita
-     */
     public function crear($datos) {
         try {
-            $query = "INSERT INTO citas (id_paciente, id_doctor, id_sucursal, fecha_hora, motivo, tipo_cita, estado, notas) 
-                      VALUES (:id_paciente, :id_doctor, :id_sucursal, :fecha_hora, :motivo, :tipo_cita, :estado, :notas)";
+            $query = "INSERT INTO citas (id_paciente, id_doctor, id_sucursal, id_tipo_cita, fecha_hora, motivo, tipo_cita, estado, notas, enlace_virtual, sala_virtual) 
+                      VALUES (:id_paciente, :id_doctor, :id_sucursal, :id_tipo_cita, :fecha_hora, :motivo, :tipo_cita, :estado, :notas, :enlace_virtual, :sala_virtual)";
             
             $stmt = $this->conn->prepare($query);
             $stmt->execute([
                 ':id_paciente' => $datos['id_paciente'],
                 ':id_doctor' => $datos['id_doctor'],
                 ':id_sucursal' => $datos['id_sucursal'],
+                ':id_tipo_cita' => $datos['id_tipo_cita'] ?? 1, // Por defecto Presencial
                 ':fecha_hora' => $datos['fecha_hora'],
                 ':motivo' => $datos['motivo'],
                 ':tipo_cita' => $datos['tipo_cita'] ?? 'presencial',
                 ':estado' => $datos['estado'] ?? 'Pendiente',
-                ':notas' => $datos['notas'] ?? null
+                ':notas' => $datos['notas'] ?? null,
+                ':enlace_virtual' => $datos['enlace_virtual'] ?? null,
+                ':sala_virtual' => $datos['sala_virtual'] ?? null
             ]);
             
             return $this->conn->lastInsertId();
@@ -49,11 +49,14 @@ class Citas {
                         id_paciente = :id_paciente,
                         id_doctor = :id_doctor,
                         id_sucursal = :id_sucursal,
+                        id_tipo_cita = :id_tipo_cita,
                         fecha_hora = :fecha_hora,
                         motivo = :motivo,
                         tipo_cita = :tipo_cita,
                         estado = :estado,
-                        notas = :notas
+                        notas = :notas,
+                        enlace_virtual = :enlace_virtual,
+                        sala_virtual = :sala_virtual
                       WHERE id_cita = :id_cita";
             
             $stmt = $this->conn->prepare($query);
@@ -62,11 +65,14 @@ class Citas {
                 ':id_paciente' => $datos['id_paciente'],
                 ':id_doctor' => $datos['id_doctor'],
                 ':id_sucursal' => $datos['id_sucursal'],
+                ':id_tipo_cita' => $datos['id_tipo_cita'] ?? 1,
                 ':fecha_hora' => $datos['fecha_hora'],
                 ':motivo' => $datos['motivo'],
                 ':tipo_cita' => $datos['tipo_cita'] ?? 'presencial',
                 ':estado' => $datos['estado'],
-                ':notas' => $datos['notas'] ?? null
+                ':notas' => $datos['notas'] ?? null,
+                ':enlace_virtual' => $datos['enlace_virtual'] ?? null,
+                ':sala_virtual' => $datos['sala_virtual'] ?? null
             ]);
         } catch (PDOException $e) {
             error_log("Error actualizando cita: " . $e->getMessage());
@@ -84,7 +90,8 @@ class Citas {
                              u_paciente.cedula as paciente_cedula, u_paciente.correo as paciente_correo,
                              d.nombres as doctor_nombres, d.apellidos as doctor_apellidos,
                              e.nombre_especialidad,
-                             s.nombre_sucursal, s.direccion as sucursal_direccion
+                             s.nombre_sucursal, s.direccion as sucursal_direccion,
+                             tc.nombre_tipo as tipo_cita_nombre, tc.descripcion as tipo_cita_descripcion
                       FROM citas c
                       INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
                       INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
@@ -93,6 +100,7 @@ class Citas {
                       INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
                       INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
                       INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
                       WHERE c.id_cita = :id_cita";
             
             $stmt = $this->conn->prepare($query);
@@ -104,7 +112,6 @@ class Citas {
             throw new Exception("Error al obtener la cita");
         }
     }
-    
     
     /**
      * Cambiar estado de una cita
@@ -172,6 +179,11 @@ class Citas {
                 $params[':id_doctor'] = $filtros['id_doctor'];
             }
             
+            if (!empty($filtros['id_tipo_cita'])) {
+                $where_conditions[] = "c.id_tipo_cita = :id_tipo_cita";
+                $params[':id_tipo_cita'] = $filtros['id_tipo_cita'];
+            }
+            
             if (!empty($filtros['cedula_paciente'])) {
                 $where_conditions[] = "u_paciente.cedula LIKE :cedula";
                 $params[':cedula'] = '%' . $filtros['cedula_paciente'] . '%';
@@ -185,6 +197,7 @@ class Citas {
                              d.nombres as doctor_nombres, d.apellidos as doctor_apellidos,
                              e.nombre_especialidad,
                              s.nombre_sucursal, s.direccion as sucursal_direccion,
+                             tc.nombre_tipo as tipo_cita_nombre, tc.descripcion as tipo_cita_descripcion,
                              CASE 
                                 WHEN c.estado = 'Pendiente' THEN 'warning'
                                 WHEN c.estado = 'Confirmada' THEN 'success'
@@ -200,6 +213,7 @@ class Citas {
                       INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
                       INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
                       INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
                       $where_clause
                       ORDER BY c.fecha_hora DESC";
             
@@ -228,7 +242,8 @@ class Citas {
                                      OR p.apellidos LIKE :busqueda 
                                      OR d.nombres LIKE :busqueda 
                                      OR d.apellidos LIKE :busqueda 
-                                     OR c.motivo LIKE :busqueda)";
+                                     OR c.motivo LIKE :busqueda
+                                     OR tc.nombre_tipo LIKE :busqueda)";
                 $params[':busqueda'] = '%' . $busqueda . '%';
             }
             
@@ -248,6 +263,7 @@ class Citas {
                              d.nombres as doctor_nombres, d.apellidos as doctor_apellidos,
                              e.nombre_especialidad,
                              s.nombre_sucursal,
+                             tc.nombre_tipo as tipo_cita_nombre, tc.descripcion as tipo_cita_descripcion,
                              CASE 
                                 WHEN c.estado = 'Pendiente' THEN 'warning'
                                 WHEN c.estado = 'Confirmada' THEN 'success'
@@ -263,6 +279,7 @@ class Citas {
                       INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
                       INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
                       INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
                       $where_clause
                       ORDER BY c.fecha_hora DESC
                       LIMIT :inicio, :limite";
@@ -296,7 +313,8 @@ class Citas {
                 $where_conditions[] = "(u_paciente.cedula LIKE :busqueda 
                                      OR p.nombres LIKE :busqueda 
                                      OR p.apellidos LIKE :busqueda 
-                                     OR c.motivo LIKE :busqueda)";
+                                     OR c.motivo LIKE :busqueda
+                                     OR tc.nombre_tipo LIKE :busqueda)";
                 $params[':busqueda'] = '%' . $busqueda . '%';
             }
             
@@ -314,6 +332,7 @@ class Citas {
                       INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
                       INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
                       INNER JOIN usuarios u_paciente ON pac.id_usuario = u_paciente.id_usuario
+                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
                       $where_clause";
             
             $stmt = $this->conn->prepare($query);
@@ -364,6 +383,23 @@ class Citas {
     }
     
     /**
+     * Contar citas por tipo de cita
+     */
+    public function contarCitasPorTipo($id_tipo_cita) {
+        try {
+            $query = "SELECT COUNT(*) as total FROM citas WHERE id_tipo_cita = :id_tipo_cita";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_tipo_cita' => $id_tipo_cita]);
+            
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)$resultado['total'];
+        } catch (PDOException $e) {
+            error_log("Error contando citas por tipo: " . $e->getMessage());
+            throw new Exception("Error al contar citas por tipo");
+        }
+    }
+    
+    /**
      * Obtener citas de hoy
      */
     public function obtenerCitasHoy() {
@@ -382,11 +418,13 @@ class Citas {
         try {
             $query = "SELECT c.*, 
                              p.nombres as paciente_nombres, p.apellidos as paciente_apellidos,
-                             u_paciente.cedula as paciente_cedula
+                             u_paciente.cedula as paciente_cedula,
+                             tc.nombre_tipo as tipo_cita_nombre
                       FROM citas c
                       INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
                       INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
                       INNER JOIN usuarios u_paciente ON pac.id_usuario = u_paciente.id_usuario
+                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
                       WHERE c.id_doctor = :id_doctor 
                         AND c.fecha_hora >= NOW()
                         AND c.estado IN ('Pendiente', 'Confirmada')
@@ -441,7 +479,9 @@ class Citas {
                         SUM(CASE WHEN estado = 'Confirmada' THEN 1 ELSE 0 END) as confirmadas,
                         SUM(CASE WHEN estado = 'Completada' THEN 1 ELSE 0 END) as completadas,
                         SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas,
-                        SUM(CASE WHEN DATE(fecha_hora) = CURDATE() THEN 1 ELSE 0 END) as hoy
+                        SUM(CASE WHEN DATE(fecha_hora) = CURDATE() THEN 1 ELSE 0 END) as hoy,
+                        SUM(CASE WHEN id_tipo_cita = 1 THEN 1 ELSE 0 END) as presenciales,
+                        SUM(CASE WHEN id_tipo_cita = 2 THEN 1 ELSE 0 END) as virtuales
                       FROM citas";
             
             $stmt = $this->conn->query($query);
@@ -449,6 +489,33 @@ class Citas {
         } catch (PDOException $e) {
             error_log("Error obteniendo estadísticas: " . $e->getMessage());
             throw new Exception("Error al obtener estadísticas");
+        }
+    }
+    
+    /**
+     * Obtener estadísticas por tipo de cita
+     */
+    public function obtenerEstadisticasPorTipo() {
+        try {
+            $query = "SELECT 
+                        tc.nombre_tipo,
+                        tc.descripcion,
+                        COUNT(c.id_cita) as total_citas,
+                        SUM(CASE WHEN c.estado = 'Pendiente' THEN 1 ELSE 0 END) as pendientes,
+                        SUM(CASE WHEN c.estado = 'Confirmada' THEN 1 ELSE 0 END) as confirmadas,
+                        SUM(CASE WHEN c.estado = 'Completada' THEN 1 ELSE 0 END) as completadas,
+                        SUM(CASE WHEN c.estado = 'Cancelada' THEN 1 ELSE 0 END) as canceladas
+                      FROM tipos_cita tc
+                      LEFT JOIN citas c ON tc.id_tipo_cita = c.id_tipo_cita
+                      WHERE tc.activo = 1
+                      GROUP BY tc.id_tipo_cita, tc.nombre_tipo, tc.descripcion
+                      ORDER BY tc.nombre_tipo";
+            
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo estadísticas por tipo: " . $e->getMessage());
+            throw new Exception("Error al obtener estadísticas por tipo");
         }
     }
     
@@ -482,6 +549,54 @@ class Citas {
             'Cancelada' => ['color' => 'danger', 'texto' => 'Cancelada'],
             'No_Asistio' => ['color' => 'secondary', 'texto' => 'No Asistió']
         ];
+    }
+    
+    // ===== MÉTODOS PARA TIPOS DE CITA =====
+    
+    /**
+     * Obtener todos los tipos de cita activos
+     */
+    public function obtenerTiposCita() {
+        try {
+            $query = "SELECT * FROM tipos_cita WHERE activo = 1 ORDER BY nombre_tipo";
+            $stmt = $this->conn->query($query);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo tipos de cita: " . $e->getMessage());
+            throw new Exception("Error al obtener tipos de cita");
+        }
+    }
+    
+    /**
+     * Obtener tipo de cita por ID
+     */
+    public function obtenerTipoCitaPorId($id_tipo_cita) {
+        try {
+            $query = "SELECT * FROM tipos_cita WHERE id_tipo_cita = :id_tipo_cita AND activo = 1";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_tipo_cita' => $id_tipo_cita]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo tipo de cita: " . $e->getMessage());
+            throw new Exception("Error al obtener tipo de cita");
+        }
+    }
+    
+    /**
+     * Validar si un tipo de cita existe y está activo
+     */
+    public function validarTipoCita($id_tipo_cita) {
+        try {
+            $query = "SELECT COUNT(*) as total FROM tipos_cita WHERE id_tipo_cita = :id_tipo_cita AND activo = 1";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_tipo_cita' => $id_tipo_cita]);
+            
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)$resultado['total'] > 0;
+        } catch (PDOException $e) {
+            error_log("Error validando tipo de cita: " . $e->getMessage());
+            throw new Exception("Error al validar tipo de cita");
+        }
     }
 }
 ?>
