@@ -35,27 +35,32 @@ class Sucursales {
         }
     }
     
-    /**
-     * Obtener sucursal por ID
-     */
-    public function obtenerPorId($id_sucursal) {
-        try {
-            $query = "SELECT s.*,
-                             (SELECT COUNT(*) FROM especialidades_sucursales es WHERE es.id_sucursal = s.id_sucursal) as total_especialidades,
-                             (SELECT COUNT(DISTINCT ds.id_doctor) FROM doctores_sucursales ds WHERE ds.id_sucursal = s.id_sucursal) as total_doctores,
-                             (SELECT COUNT(*) FROM citas c WHERE c.id_sucursal = s.id_sucursal) as total_citas
-                      FROM sucursales s
-                      WHERE s.id_sucursal = :id_sucursal";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_sucursal' => $id_sucursal]);
-            
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo sucursal: " . $e->getMessage());
-            throw new Exception("Error al obtener la sucursal");
-        }
-    }
+ 
+            /**
+             * Obtener sucursal por ID con especialidades
+             */
+            public function obtenerPorId($id_sucursal) {
+                try {
+                    $query = "SELECT s.*
+                            FROM sucursales s
+                            WHERE s.id_sucursal = :id_sucursal";
+                    
+                    $stmt = $this->conn->prepare($query);
+                    $stmt->execute([':id_sucursal' => $id_sucursal]);
+                    
+                    $sucursal = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($sucursal) {
+                        // Obtener especialidades asignadas
+                        $sucursal['especialidades'] = $this->obtenerEspecialidades($id_sucursal);
+                    }
+                    
+                    return $sucursal;
+                } catch (PDOException $e) {
+                    error_log("Error obteniendo sucursal por ID: " . $e->getMessage());
+                    throw new Exception("Error al obtener la sucursal");
+                }
+            }
     
     /**
      * Actualizar una sucursal

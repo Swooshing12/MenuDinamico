@@ -466,5 +466,6 @@ class Especialidades {
             throw new Exception("Error al obtener distribución por sucursal");
         }
     }
+    
 }
 ?>
