@@ -16,17 +16,30 @@ const config = {
 };
 
 // Variables globales
-let calendario;
-let citaSeleccionada = null;
-let pacienteSeleccionado = null;
-let pasoActual = 1;
-let totalPasos = 6;
-let datosCitaWizard = {};
-let semanaActual = new Date();
-let doctorSeleccionado = null;
-let slotSeleccionado = null;
-let sucursalSeleccionada = null;
+// ===== VARIABLES GLOBALES - VERSIÓN CORREGIDA =====
+window.calendario = null;
+window.citaSeleccionada = null;
+window.pacienteSeleccionado = null;
+window.pasoActual = 1;
+window.totalPasos = 6;
+window.datosCitaWizard = {};
+window.semanaActual = new Date();
+window.doctorSeleccionado = null;
+window.slotSeleccionado = null;
+window.sucursalSeleccionada = null;
+window.horarioSeleccionado = false;
 
+// También mantener las versiones sin window para compatibilidad
+let calendario = window.calendario;
+let citaSeleccionada = window.citaSeleccionada;
+let pacienteSeleccionado = window.pacienteSeleccionado;
+let pasoActual = window.pasoActual;
+let totalPasos = window.totalPasos;
+let datosCitaWizard = window.datosCitaWizard;
+let semanaActual = window.semanaActual;
+let doctorSeleccionado = window.doctorSeleccionado;
+let slotSeleccionado = window.slotSeleccionado;
+let sucursalSeleccionada = window.sucursalSeleccionada;
 // ===== INICIALIZACIÓN =====
 $(document).ready(function() {
     console.log('🚀 Iniciando Sistema de Gestión de Citas con Wizard');
@@ -205,14 +218,24 @@ function validarPasoActual() {
             return true;
             
        case 4:
+    console.log('🔍 === VALIDANDO PASO 4 ===');
+    debugCompleto();
+    
     if (!$('#doctorCita').val()) {
         mostrarError('Por favor seleccione un doctor');
         return false;
     }
-    if (!slotSeleccionado || !$('#fechaCita').val() || !$('#horaCita').val()) {
+    
+    if (!window.slotSeleccionado || !$('#fechaCita').val() || !$('#horaCita').val()) {
+        console.log('❌ FALLA EN PASO 4 - usando window:');
+        console.log('  - window.slotSeleccionado:', !!window.slotSeleccionado);
+        console.log('  - fechaCita:', $('#fechaCita').val());
+        console.log('  - horaCita:', $('#horaCita').val());
+        
         mostrarError('Por favor seleccione una fecha y hora en el calendario');
         return false;
     }
+    console.log('✅ PASO 4 VALIDADO CORRECTAMENTE');
     return true;
             
         case 5:
@@ -1152,33 +1175,57 @@ function seleccionarSlotHorario(elemento) {
     // Seleccionar nuevo slot
     $(elemento).addClass('seleccionado');
     
-    const fecha = $(elemento).data('fecha'); // 2025-07-01
-    const hora = $(elemento).data('hora');   // 08:30
+    const fecha = $(elemento).data('fecha');
+    const hora = $(elemento).data('hora');
     
     console.log('✅ Slot seleccionado:', fecha, hora);
     
-    // ✅ CREAR FECHA CORRECTAMENTE SIN PROBLEMA DE ZONA HORARIA
-    const fechaPartes = fecha.split('-'); // ['2025', '07', '01']
+    // Crear fecha correctamente
+    const fechaPartes = fecha.split('-');
     const año = parseInt(fechaPartes[0]);
-    const mes = parseInt(fechaPartes[1]) - 1; // Enero = 0 en JavaScript
+    const mes = parseInt(fechaPartes[1]) - 1;
     const dia = parseInt(fechaPartes[2]);
+    const fechaObj = new Date(año, mes, dia);
     
-    const fechaObj = new Date(año, mes, dia); // Crear fecha local sin timezone
-    
-    // Convertir fecha para el formulario (YYYY-MM-DD -> DD/MM/YYYY)
+    // Convertir fecha para el formulario
     const fechaFormulario = `${fechaPartes[2]}/${fechaPartes[1]}/${fechaPartes[0]}`;
     
-    // Guardar en variables globales
+    // ✅ GUARDAR EN WINDOW Y VARIABLES LOCALES
+    window.datosCitaWizard.fecha = fechaFormulario;
+    window.datosCitaWizard.hora = hora + ':00';
     datosCitaWizard.fecha = fechaFormulario;
     datosCitaWizard.hora = hora + ':00';
     
+    // Crear/llenar campos del DOM
+    if ($('#fechaCita').length === 0) {
+        $('body').append('<input type="hidden" id="fechaCita">');
+    }
+    if ($('#horaCita').length === 0) {
+        $('body').append('<input type="hidden" id="horaCita">');
+    }
+    
+    $('#fechaCita').val(fechaFormulario);
+    $('#horaCita').val(hora + ':00');
+    
+    // Guardar slot seleccionado
+    window.slotSeleccionado = {
+        fecha: fechaFormulario,
+        hora: hora + ':00',
+        fechaCompleta: fecha + ' ' + hora + ':00',
+        elemento: elemento
+    };
+    slotSeleccionado = window.slotSeleccionado;
+    
+    window.horarioSeleccionado = true;
+    
     console.log('📝 Datos guardados:', {
-        fecha: datosCitaWizard.fecha,
-        hora: datosCitaWizard.hora,
-        fechaObj: fechaObj
+        windowSlot: !!window.slotSeleccionado,
+        windowDatos: window.datosCitaWizard,
+        campoFecha: $('#fechaCita').val(),
+        campoHora: $('#horaCita').val()
     });
     
-    // Mostrar confirmación con la fecha correcta
+    // Mostrar confirmación
     const fechaLegible = fechaObj.toLocaleDateString('es-ES', {
         weekday: 'long',
         day: 'numeric',
@@ -2395,3 +2442,37 @@ if (config.debug) {
    
    console.log('🔧 Funciones de debug disponibles en window.debugGestionCitas');
 }
+
+// ===== DEBUG TEMPORAL - AGREGAR AL FINAL DEL ARCHIVO =====
+function debugCompleto() {
+    console.log('🔍 === DEBUG COMPLETO ===');
+    console.log('Variables globales:');
+    console.log('  - pasoActual:', window.pasoActual);
+    console.log('  - datosCitaWizard:', window.datosCitaWizard);
+    console.log('  - slotSeleccionado:', window.slotSeleccionado);
+    console.log('  - doctorSeleccionado:', window.doctorSeleccionado);
+    
+    console.log('Campos del DOM:');
+    console.log('  - #doctorCita valor:', $('#doctorCita').val());
+    console.log('  - #fechaCita existe:', $('#fechaCita').length, 'valor:', $('#fechaCita').val());
+    console.log('  - #horaCita existe:', $('#horaCita').length, 'valor:', $('#horaCita').val());
+    console.log('  - #tipoCitaSeleccionado:', $('#tipoCitaSeleccionado').val());
+    console.log('  - #idPacienteSeleccionado:', $('#idPacienteSeleccionado').val());
+    console.log('  - #sucursalCita:', $('#sucursalCita').val());
+    console.log('  - #especialidadCita:', $('#especialidadCita').val());
+    
+    console.log('Verificar condiciones de validación:');
+    const doctor = $('#doctorCita').val();
+    const fecha = $('#fechaCita').val();
+    const hora = $('#horaCita').val();
+    const slot = window.slotSeleccionado;
+    
+    console.log('  - Doctor:', !!doctor);
+    console.log('  - slotSeleccionado:', !!slot);
+    console.log('  - fecha campo:', !!fecha);
+    console.log('  - hora campo:', !!hora);
+    console.log('  - Condición que falla:', (!slot || !fecha || !hora));
+}
+
+// Hacer disponible globalmente
+window.debugCompleto = debugCompleto;
