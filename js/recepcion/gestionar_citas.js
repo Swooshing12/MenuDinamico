@@ -1144,8 +1144,7 @@ function generarCalendarioSemanal(datosHorarios) {
     
     console.log('📅 Calendario semanal generado correctamente');
 }
-// ===== SELECCIONAR SLOT DE HORARIO =====
-// ===== SELECCIONAR SLOT DE HORARIO CORREGIDO =====
+// ===== SELECCIONAR SLOT DE HORARIO - CORREGIDO =====
 function seleccionarSlotHorario(elemento) {
     // Remover selección anterior
     $('.slot-horario').removeClass('seleccionado');
@@ -1153,27 +1152,39 @@ function seleccionarSlotHorario(elemento) {
     // Seleccionar nuevo slot
     $(elemento).addClass('seleccionado');
     
-    const fecha = $(elemento).data('fecha');
-    const hora = $(elemento).data('hora');
-    const dia = $(elemento).data('dia');
+    const fecha = $(elemento).data('fecha'); // 2025-07-01
+    const hora = $(elemento).data('hora');   // 08:30
     
-    // ✅ CONVERTIR FECHA PARA EL FORMULARIO (YYYY-MM-DD -> DD/MM/YYYY)
-    const fechaPartes = fecha.split('-'); // ['2025', '07', '03']
-    const fechaFormulario = `${fechaPartes[2]}/${fechaPartes[1]}/${fechaPartes[0]}`; // '03/07/2025'
+    console.log('✅ Slot seleccionado:', fecha, hora);
     
-    // Guardar en las variables globales del wizard
+    // ✅ CREAR FECHA CORRECTAMENTE SIN PROBLEMA DE ZONA HORARIA
+    const fechaPartes = fecha.split('-'); // ['2025', '07', '01']
+    const año = parseInt(fechaPartes[0]);
+    const mes = parseInt(fechaPartes[1]) - 1; // Enero = 0 en JavaScript
+    const dia = parseInt(fechaPartes[2]);
+    
+    const fechaObj = new Date(año, mes, dia); // Crear fecha local sin timezone
+    
+    // Convertir fecha para el formulario (YYYY-MM-DD -> DD/MM/YYYY)
+    const fechaFormulario = `${fechaPartes[2]}/${fechaPartes[1]}/${fechaPartes[0]}`;
+    
+    // Guardar en variables globales
     datosCitaWizard.fecha = fechaFormulario;
     datosCitaWizard.hora = hora + ':00';
     
-    console.log('✅ Slot seleccionado correctamente:', {
-        fechaOriginal: fecha,
-        fechaFormulario: fechaFormulario,
-        hora: hora + ':00',
-        dia: dia
+    console.log('📝 Datos guardados:', {
+        fecha: datosCitaWizard.fecha,
+        hora: datosCitaWizard.hora,
+        fechaObj: fechaObj
     });
     
-    // Mostrar confirmación visual
-    const fechaLegible = formatearFechaLegible(fecha);
+    // Mostrar confirmación con la fecha correcta
+    const fechaLegible = fechaObj.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+    });
+    
     Swal.fire({
         icon: 'success',
         title: 'Horario seleccionado',
@@ -1184,9 +1195,6 @@ function seleccionarSlotHorario(elemento) {
         toast: true,
         position: 'top-end'
     });
-    
-    // Habilitar botón para continuar (si existe)
-    $('#btnContinuarHorario').prop('disabled', false);
 }
 
 // ===== FUNCIÓN AUXILIAR PARA FORMATEAR FECHA PARA PHP =====
