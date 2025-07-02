@@ -559,5 +559,121 @@ class Sucursales {
             throw new Exception("Error al obtener resumen de actividad");
         }
     }
+
+
+/**
+     * Contar sucursales con filtros
+     */
+    public function contar($busqueda = '', $filtros = []) {
+        try {
+            $where_conditions = [];
+            $params = [];
+            
+            // Búsqueda por texto
+            if (!empty($busqueda)) {
+                $where_conditions[] = "(s.nombre_sucursal LIKE :busqueda 
+                                     OR s.direccion LIKE :busqueda 
+                                     OR s.telefono LIKE :busqueda 
+                                     OR s.email LIKE :busqueda)";
+                $params[':busqueda'] = '%' . $busqueda . '%';
+            }
+            
+            // Filtro por estado
+            if (isset($filtros['estado']) && $filtros['estado'] !== '') {
+                $where_conditions[] = "s.estado = :estado";
+                $params[':estado'] = $filtros['estado'];
+            }
+            
+            $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+            
+            $query = "SELECT COUNT(*) as total FROM sucursales s $where_clause";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            
+            return (int)$stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        } catch (PDOException $e) {
+            error_log("Error contando sucursales: " . $e->getMessage());
+            throw new Exception("Error al contar las sucursales");
+        }
+    }
+    
+
+    
+    /**
+     * Verificar si existe una sucursal por teléfono
+     */
+    public function existePorTelefono($telefono, $excluir_id = null) {
+        try {
+            $query = "SELECT COUNT(*) as total FROM sucursales WHERE telefono = :telefono";
+            $params = [':telefono' => $telefono];
+            
+            if ($excluir_id) {
+                $query .= " AND id_sucursal != :excluir_id";
+                $params[':excluir_id'] = $excluir_id;
+            }
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($params);
+            
+            return $stmt->fetch(PDO::FETCH_ASSOC)['total'] > 0;
+        } catch (PDOException $e) {
+            error_log("Error verificando teléfono de sucursal: " . $e->getMessage());
+            throw new Exception("Error al verificar el teléfono de la sucursal");
+        }
+    }
+    
+    /**
+     * Verificar relaciones antes de eliminar
+     */
+    public function verificarRelaciones($id_sucursal) {
+        try {
+            // Verificar doctores asignados
+            $query_doctores = "SELECT COUNT(*) as total FROM doctores_sucursales WHERE id_sucursal = :id_sucursal";
+            $stmt = $this->conn->prepare($query_doctores);
+            $stmt->execute([':id_sucursal' => $id_sucursal]);
+            $doctores = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Verificar citas activas
+            $query_citas = "SELECT COUNT(*) as total FROM citas WHERE id_sucursal = :id_sucursal AND fecha_hora >= CURDATE()";
+            $stmt = $this->conn->prepare($query_citas);
+            $stmt->execute([':id_sucursal' => $id_sucursal]);
+            $citas = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Verificar especialidades asignadas
+            $query_especialidades = "SELECT COUNT(*) as total FROM especialidades_sucursales WHERE id_sucursal = :id_sucursal";
+            $stmt = $this->conn->prepare($query_especialidades);
+            $stmt->execute([':id_sucursal' => $id_sucursal]);
+            $especialidades = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            $puede_eliminar = ($doctores === 0 && $citas === 0);
+            
+            $mensaje = '';
+            if (!$puede_eliminar) {
+                $problemas = [];
+                if ($doctores > 0) $problemas[] = "$doctores doctor(es) asignado(s)";
+                if ($citas > 0) $problemas[] = "$citas cita(s) programada(s)";
+                
+                $mensaje = "No se puede eliminar la sucursal porque tiene: " . implode(', ', $problemas);
+            }
+            
+            return [
+                'puede_eliminar' => $puede_eliminar,
+                'mensaje' => $mensaje,
+                'relaciones' => [
+                    'doctores' => $doctores,
+                    'citas' => $citas,
+                    'especialidades' => $especialidades
+                ]
+            ];
+        } catch (PDOException $e) {
+            error_log("Error verificando relaciones de sucursal: " . $e->getMessage());
+            throw new Exception("Error al verificar las relaciones de la sucursal");
+        }
+    }
+    
+  
 }
+
+
 ?>
