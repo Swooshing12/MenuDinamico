@@ -467,5 +467,26 @@ class Especialidades {
         }
     }
     
+
+
+/**
+ * Contar doctores por especialidad
+ */
+public function contarDoctores($id_especialidad) {
+    try {
+        $query = "SELECT COUNT(*) as total FROM doctores WHERE id_especialidad = :id_especialidad";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_especialidad' => $id_especialidad]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $resultado['total'];
+    } catch (PDOException $e) {
+        error_log("Error contando doctores: " . $e->getMessage());
+        return 0;
+    }
+}
+
+
 }
 ?>

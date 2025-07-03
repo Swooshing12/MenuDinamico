@@ -667,5 +667,27 @@ class Doctores {
             throw new Exception("Error al obtener estadísticas");
         }
     }
+
+    /**
+ * Verificar si tiene citas activas
+ */
+public function tieneCitasActivas($id_doctor) {
+    try {
+        $query = "SELECT COUNT(*) as total 
+                  FROM citas 
+                  WHERE id_doctor = :id_doctor 
+                    AND estado IN ('Pendiente', 'Confirmada') 
+                    AND fecha_hora >= NOW()";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_doctor' => $id_doctor]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $resultado['total'];
+    } catch (PDOException $e) {
+        error_log("Error verificando citas activas: " . $e->getMessage());
+        return 0;
+    }
+}
 }
 ?>

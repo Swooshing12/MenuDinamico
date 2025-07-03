@@ -246,6 +246,37 @@ class DoctorHorarios {
         
         return true;
     }
+
+    /**
+     * Obtener horarios por doctor
+     */
+    public function obtenerPorDoctor($id_doctor) {
+        try {
+            $query = "SELECT dh.*,
+                             s.nombre_sucursal,
+                             CASE dh.dia_semana 
+                                 WHEN 1 THEN 'Lunes'
+                                 WHEN 2 THEN 'Martes'
+                                 WHEN 3 THEN 'Miércoles'
+                                 WHEN 4 THEN 'Jueves'
+                                 WHEN 5 THEN 'Viernes'
+                                 WHEN 6 THEN 'Sábado'
+                                 WHEN 7 THEN 'Domingo'
+                             END as nombre_dia
+                      FROM doctor_horarios dh
+                      INNER JOIN sucursales s ON dh.id_sucursal = s.id_sucursal
+                      WHERE dh.id_doctor = :id_doctor AND dh.activo = 1
+                      ORDER BY dh.dia_semana, dh.hora_inicio";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_doctor' => $id_doctor]);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo horarios: " . $e->getMessage());
+            throw new Exception("Error al obtener horarios del doctor");
+        }
+    }
     
 }
 ?>

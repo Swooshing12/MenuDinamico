@@ -416,6 +416,34 @@ public function obtenerPorCedula(int $cedula): ?array {
 }
 
 
+/**
+ * Actualizar contraseña de un usuario
+ */
+public function actualizarPassword($id_usuario, $nueva_password) {
+    try {
+        $query = "UPDATE usuarios SET password = :password WHERE id_usuario = :id_usuario";
+        
+        $stmt = $this->conn->prepare($query);
+        $resultado = $stmt->execute([
+            ':password' => $nueva_password,
+            ':id_usuario' => $id_usuario
+        ]);
+        
+        if ($resultado) {
+            error_log("✅ Contraseña actualizada para usuario ID: $id_usuario");
+            return true;
+        } else {
+            error_log("❌ Error actualizando contraseña para usuario ID: $id_usuario");
+            return false;
+        }
+        
+    } catch (PDOException $e) {
+        error_log("Error actualizando contraseña: " . $e->getMessage());
+        throw new Exception("Error al actualizar la contraseña");
+    }
+}
+
+
 
 
 
