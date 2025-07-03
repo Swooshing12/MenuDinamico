@@ -37,6 +37,11 @@ $(document).ready(function() {
     cargarDoctoresPaginados(1);
     cargarEstadisticas();
     generarPasswordInicial();
+    $.getScript('../../js/nacionalidades.js', function() {
+    console.log('✅ Script de nacionalidades para doctores cargado');
+}).fail(function() {
+    console.error('❌ Error cargando script de nacionalidades para doctores');
+});
 });
 
 // ===== EVENTOS =====
@@ -405,6 +410,7 @@ function mostrarDoctores(doctores) {
 /**
  * Crear nuevo doctor
  */
+// ===== CREAR DOCTOR CON HORARIOS - VERSIÓN CORREGIDA =====
 function crearDoctor(e) {
     e.preventDefault();
     
@@ -412,33 +418,76 @@ function crearDoctor(e) {
         return;
     }
     
-    const formData = new FormData(this);
-    formData.append('action', 'crear');
-    formData.append('submenu_id', config.submenuId);
-    
     // Obtener sucursales seleccionadas
     const sucursalesSeleccionadas = [];
     $('#sucursalesCrear input[type="checkbox"]:checked').each(function() {
         sucursalesSeleccionadas.push($(this).val());
     });
     
+    // Validar que tenga al menos una sucursal
+    if (sucursalesSeleccionadas.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sucursales requeridas',
+            text: 'Debe seleccionar al menos una sucursal para el doctor'
+        });
+        return;
+    }
+    
+    // 🕒 OBTENER HORARIOS - VERSIÓN MEJORADA
+    console.log('📦 === DEBUG ANTES DE OBTENER HORARIOS ===');
+    console.log('horariosDoctor global:', window.horariosDoctor);
+    
+    let horarios = [];
+    if (typeof window.obtenerHorariosParaEnvio === 'function') {
+        horarios = window.obtenerHorariosParaEnvio();
+        console.log('✅ Horarios obtenidos:', horarios);
+    } else {
+        console.log('❌ Función obtenerHorariosParaEnvio no disponible');
+    }
+    
+    // Validar que tenga al menos un horario
+    if (horarios.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Horarios requeridos',
+            text: 'Debe configurar al menos un horario para el doctor',
+            footer: '<small>Seleccione una sucursal y agregue horarios de atención</small>'
+        });
+        return;
+    }
+    
+    console.log(`📋 Total horarios a enviar: ${horarios.length}`);
+    
+    // Crear FormData
+    const formData = new FormData(this);
+    formData.append('action', 'crear');
+    formData.append('submenu_id', config.submenuId);
+    
     // Agregar sucursales al FormData
     sucursalesSeleccionadas.forEach(suc => {
         formData.append('sucursales[]', suc);
     });
     
+    // 🔥 AGREGAR HORARIOS COMO JSON
+    const horariosJson = JSON.stringify(horarios);
+    formData.append('horarios', horariosJson);
+    
+    console.log('📤 JSON de horarios enviado:', horariosJson);
+    
     if (config.debug) {
-        console.log('Datos a enviar (crear):');
+        console.log('📦 === DATOS A ENVIAR ===');
         for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
+            console.log(`${pair[0]}: ${pair[1]}`);
         }
-        console.log('Sucursales seleccionadas:', sucursalesSeleccionadas);
+        console.log('🏥 Sucursales:', sucursalesSeleccionadas);
+        console.log('🕒 Horarios:', horarios);
     }
     
     // Deshabilitar botón de envío
     const submitBtn = $(this).find('button[type="submit"]');
     const textoOriginal = submitBtn.html();
-    submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Creando...');
+    submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Creando doctor...');
     
     $.ajax({
         url: config.baseUrl,
@@ -448,15 +497,23 @@ function crearDoctor(e) {
         contentType: false,
         dataType: 'json',
         success: function(response) {
-            if (config.debug) {
-                console.log('Respuesta del servidor (crear):', response);
-            }
+            console.log('📥 Respuesta del servidor:', response);
             
             if (response.success) {
                 Swal.fire({
                     icon: 'success',
                     title: '¡Doctor registrado!',
-                    text: response.message,
+                    html: `
+                        <div class="text-start">
+                            <p><strong>Doctor creado exitosamente</strong></p>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-person-check text-success me-1"></i> Información personal guardada</li>
+                                <li><i class="bi bi-building text-primary me-1"></i> ${sucursalesSeleccionadas.length} sucursal(es) asignada(s)</li>
+                                <li><i class="bi bi-clock text-info me-1"></i> ${horarios.length} horario(s) configurado(s)</li>
+                            </ul>
+                            <small class="text-muted">${response.message}</small>
+                        </div>
+                    `,
                     timer: 4000,
                     showConfirmButton: true,
                     confirmButtonText: 'Entendido'
@@ -464,6 +521,11 @@ function crearDoctor(e) {
                     $('#crearDoctorModal').modal('hide');
                     cargarDoctoresPaginados(1);
                     cargarEstadisticas();
+                    
+                    // Limpiar horarios
+                    if (typeof window.limpiarTodosLosHorarios === 'function') {
+                        window.limpiarTodosLosHorarios();
+                    }
                 });
             } else {
                 Swal.fire({
@@ -474,7 +536,7 @@ function crearDoctor(e) {
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error en la petición AJAX (crear):', {status, error, response: xhr.responseText});
+            console.error('❌ Error AJAX:', {status, error, response: xhr.responseText});
             Swal.fire({
                 icon: 'error',
                 title: 'Error de conexión',

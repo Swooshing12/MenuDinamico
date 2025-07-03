@@ -144,139 +144,170 @@ class DoctoresController {
     }
     
     private function crear() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON([
-                'success' => false, 
-                'message' => 'Método no permitido'
-            ]);
-            return;
-        }
-        
-        // Verificar permisos
-        $this->verificarPermisos('crear');
-        
-        // Validar datos requeridos
-        $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
-        $camposFaltantes = [];
-        
-        foreach ($camposRequeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                $camposFaltantes[] = $campo;
-            }
-        }
-        
-        if (!empty($camposFaltantes)) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
-            ]);
-            return;
-        }
-        
-        try {
-            // Validar duplicados
-            if ($this->doctoresModel->existeUsuarioPorCedula($_POST['cedula'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe un usuario con esa cédula'
-                ]);
-                return;
-            }
-            
-            if ($this->doctoresModel->existeUsuarioPorUsername($_POST['username'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe un usuario con ese nombre de usuario'
-                ]);
-                return;
-            }
-            
-            if ($this->doctoresModel->existeUsuarioPorCorreo($_POST['correo'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe un usuario con ese correo electrónico'
-                ]);
-                return;
-            }
-            
-            // Preparar datos del usuario
-            $passwordGenerada = $this->generarPasswordAleatoria();
-            $datosUsuario = [
-                'cedula' => trim($_POST['cedula']),
-                'username' => trim($_POST['username']),
-                'nombres' => trim($_POST['nombres']),
-                'apellidos' => trim($_POST['apellidos']),
-                'sexo' => $_POST['sexo'],
-                'nacionalidad' => trim($_POST['nacionalidad']),
-                'correo' => trim($_POST['correo']),
-                'password' => password_hash($passwordGenerada, PASSWORD_DEFAULT),
-                'id_estado' => isset($_POST['id_estado']) ? (int)$_POST['id_estado'] : 1
-            ];
-            
-            // Preparar datos del doctor
-            $datosDoctor = [
-                'id_especialidad' => (int)$_POST['id_especialidad'],
-                'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
-            ];
-            
-            // Obtener sucursales seleccionadas
-            $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
-            
-            // Crear doctor
-            $id_doctor = $this->doctoresModel->crear($datosUsuario, $datosDoctor, $sucursales);
-            
-            // En el método crear(), reemplaza esta parte:
-
-            if ($id_doctor) {
-                // Enviar credenciales por correo
-                try {
-                    $nombreCompleto = trim($datosUsuario['nombres']) . ' ' . trim($datosUsuario['apellidos']);
-                    $this->enviarCredencialesPorCorreo(
-                        $datosUsuario['correo'], 
-                        $nombreCompleto, 
-                        $datosUsuario['username'], 
-                        $passwordGenerada
-                    );
-                    
-                    $mensaje = 'Doctor creado exitosamente';
-                    if (!empty($sucursales)) {
-                        $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
-                    }
-                    $mensaje .= '. Credenciales enviadas por correo.';
-                    
-                } catch (Exception $e) {
-                    if ($this->debug) {
-                        error_log("Error enviando correo: " . $e->getMessage());
-                    }
-                    
-                    // Si falla el correo, aún es éxito pero informar
-                    $mensaje = 'Doctor creado exitosamente';
-                    if (!empty($sucursales)) {
-                        $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
-                    }
-                    $mensaje .= ', pero hubo un problema enviando el correo. Credenciales: Usuario: ' . $datosUsuario['username'] . ', Contraseña: ' . $passwordGenerada;
-                }
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => $mensaje,
-                    'id' => $id_doctor
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al crear el doctor'
-                ]);
-            }
-            
-        } catch (Exception $e) {
-            $this->logError("Error creando doctor: " . $e->getMessage(), $_POST);
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error al crear el doctor: ' . $e->getMessage()
-            ]);
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON([
+            'success' => false, 
+            'message' => 'Método no permitido'
+        ]);
+        return;
+    }
+    
+    // Verificar permisos
+    $this->verificarPermisos('crear');
+    
+    // Validar datos requeridos
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
         }
     }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    try {
+        // Validar duplicados
+        if ($this->doctoresModel->existeUsuarioPorCedula($_POST['cedula'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Ya existe un usuario con esa cédula'
+            ]);
+            return;
+        }
+        
+        if ($this->doctoresModel->existeUsuarioPorUsername($_POST['username'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Ya existe un usuario con ese nombre de usuario'
+            ]);
+            return;
+        }
+        
+        if ($this->doctoresModel->existeUsuarioPorCorreo($_POST['correo'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Ya existe un usuario con ese correo electrónico'
+            ]);
+            return;
+        }
+        
+        // Preparar datos del usuario
+        $passwordGenerada = $this->generarPasswordAleatoria();
+        $datosUsuario = [
+            'cedula' => trim($_POST['cedula']),
+            'username' => trim($_POST['username']),
+            'nombres' => trim($_POST['nombres']),
+            'apellidos' => trim($_POST['apellidos']),
+            'sexo' => $_POST['sexo'],
+            'nacionalidad' => trim($_POST['nacionalidad']),
+            'correo' => trim($_POST['correo']),
+            'password' => password_hash($passwordGenerada, PASSWORD_DEFAULT),
+            'id_estado' => isset($_POST['id_estado']) ? (int)$_POST['id_estado'] : 1
+        ];
+        
+        // Preparar datos del doctor
+        $datosDoctor = [
+            'id_especialidad' => (int)$_POST['id_especialidad'],
+            'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
+        ];
+        
+        // Obtener sucursales seleccionadas
+        $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+        
+        // 🕒 OBTENER HORARIOS
+        $horariosJson = isset($_POST['horarios']) ? $_POST['horarios'] : '[]';
+        $horarios = json_decode($horariosJson, true);
+        
+        if ($horarios === null) {
+            $horarios = [];
+        }
+        // DEBUG
+error_log("📦 Horarios recibidos: " . $horariosJson);
+error_log("📋 Horarios procesados: " . print_r($horarios, true));
+        
+        
+        // Validar que tenga al menos una sucursal
+        if (empty($sucursales)) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Debe seleccionar al menos una sucursal'
+            ]);
+            return;
+        }
+        
+        // Crear doctor con horarios
+        $id_doctor = $this->doctoresModel->crearConHorarios($datosUsuario, $datosDoctor, $sucursales, $horarios);
+        
+        if ($id_doctor) {
+            // Enviar credenciales por correo
+            try {
+                $nombreCompleto = trim($datosUsuario['nombres']) . ' ' . trim($datosUsuario['apellidos']);
+                $this->enviarCredencialesPorCorreo(
+                    $datosUsuario['correo'], 
+                    $nombreCompleto, 
+                    $datosUsuario['username'], 
+                    $passwordGenerada
+                );
+                
+                $mensaje = 'Doctor creado exitosamente';
+                if (!empty($sucursales)) {
+                    $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
+                }
+                if (!empty($horarios)) {
+                    $mensaje .= ' con ' . count($horarios) . ' horario(s) configurado(s)';
+                }
+                $mensaje .= '. Credenciales enviadas por correo.';
+                
+            } catch (Exception $e) {
+                if ($this->debug) {
+                    error_log("Error enviando correo: " . $e->getMessage());
+                }
+                
+                // Si falla el correo, aún es éxito pero informar
+                $mensaje = 'Doctor creado exitosamente';
+                if (!empty($sucursales)) {
+                    $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
+                }
+                if (!empty($horarios)) {
+                    $mensaje .= ' con ' . count($horarios) . ' horario(s) configurado(s)';
+                }
+                $mensaje .= ', pero hubo un problema enviando el correo. Credenciales: Usuario: ' . $datosUsuario['username'] . ', Contraseña: ' . $passwordGenerada;
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'message' => $mensaje,
+                'data' => [
+                    'id_doctor' => $id_doctor,
+                    'total_sucursales' => count($sucursales),
+                    'total_horarios' => count($horarios),
+                    'username' => $datosUsuario['username'],
+                    'password_temporal' => $passwordGenerada
+                ]
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al crear el doctor'
+            ]);
+        }
+        
+    } catch (Exception $e) {
+        $this->logError("Error creando doctor: " . $e->getMessage(), $_POST);
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error al crear el doctor: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function editar() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -664,32 +695,36 @@ class DoctoresController {
         }
     }
     
-    private function verificarUsername() {
-        if (empty($_GET['username'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Username requerido'
-            ]);
-            return;
-        }
-        
-        try {
-            $username = trim($_GET['username']);
-            $id_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
-            
-            $existe = $this->doctoresModel->existeUsuarioPorUsername($username, $id_excluir);
-            
-            $this->responderJSON([
-                'success' => true,
-                'existe' => $existe
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
+    /**
+ * Verificar si un username está disponible
+ */
+private function verificarUsername() {
+    $username = $_GET['username'] ?? '';
+    $id_usuario = isset($_GET['id_usuario']) ? (int)$_GET['id_usuario'] : null;
+    
+    if (empty($username)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Username requerido'
+        ]);
+        return;
     }
+    
+    try {
+        $disponible = !$this->doctoresModel->existeUsuarioPorUsername($username, $id_usuario);
+        
+        $this->responderJSON([
+            'success' => true,
+            'disponible' => $disponible,
+            'username' => $username
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function verificarCorreo() {
         if (empty($_GET['correo'])) {
@@ -906,6 +941,8 @@ private function enviarCredencialesPorCorreo($correo, $nombres, $username, $pass
        
        return $id_submenu;
    }
+
+   
    
    private function logError($mensaje, $datos = []) {
        if ($this->debug) {

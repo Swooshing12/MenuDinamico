@@ -13,63 +13,183 @@ class Doctores {
     /**
      * Crear un nuevo doctor (múltiples tablas)
      */
-    public function crear($datosUsuario, $datosDoctor, $sucursales = []) {
-        try {
-            $this->conn->beginTransaction();
-            
-            // 1. Crear usuario con rol de médico (id_rol = 70)
-            $queryUsuario = "INSERT INTO usuarios 
-                           (cedula, username, nombres, apellidos, sexo, nacionalidad, correo, password, id_rol, id_estado)
-                           VALUES 
-                           (:cedula, :username, :nombres, :apellidos, :sexo, :nacionalidad, :correo, :password, 70, :id_estado)";
-            
-            $stmtUsuario = $this->conn->prepare($queryUsuario);
-            $stmtUsuario->execute([
-                ':cedula' => $datosUsuario['cedula'],
-                ':username' => $datosUsuario['username'],
-                ':nombres' => $datosUsuario['nombres'],
-                ':apellidos' => $datosUsuario['apellidos'],
-                ':sexo' => $datosUsuario['sexo'],
-                ':nacionalidad' => $datosUsuario['nacionalidad'],
-                ':correo' => $datosUsuario['correo'],
-                ':password' => $datosUsuario['password'],
-                ':id_estado' => $datosUsuario['id_estado'] ?? 1
-            ]);
-            
-            $id_usuario = $this->conn->lastInsertId();
-            
-            // 2. Crear doctor
-            $queryDoctor = "INSERT INTO doctores 
-                          (id_usuario, id_especialidad, titulo_profesional)
-                          VALUES 
-                          (:id_usuario, :id_especialidad, :titulo_profesional)";
-            
-            $stmtDoctor = $this->conn->prepare($queryDoctor);
-            $stmtDoctor->execute([
-                ':id_usuario' => $id_usuario,
-                ':id_especialidad' => $datosDoctor['id_especialidad'],
-                ':titulo_profesional' => $datosDoctor['titulo_profesional'] ?? null
-            ]);
-            
-            $id_doctor = $this->conn->lastInsertId();
-            
-            // 3. Asignar sucursales
-            if (!empty($sucursales)) {
-                foreach ($sucursales as $id_sucursal) {
-                    $this->asignarASucursal($id_doctor, $id_sucursal);
-                }
+    /**
+ * Crear un nuevo doctor con horarios - VERSIÓN CORREGIDA
+ */
+public function crearConHorarios($datosUsuario, $datosDoctor, $sucursales = [], $horarios = []) {
+    try {
+        $this->conn->beginTransaction();
+        
+        // 1. Crear usuario con rol de médico (id_rol = 70)
+        $queryUsuario = "INSERT INTO usuarios 
+                       (cedula, username, nombres, apellidos, sexo, nacionalidad, correo, password, id_rol, id_estado)
+                       VALUES 
+                       (:cedula, :username, :nombres, :apellidos, :sexo, :nacionalidad, :correo, :password, 70, :id_estado)";
+        
+        $stmtUsuario = $this->conn->prepare($queryUsuario);
+        $stmtUsuario->execute([
+            ':cedula' => $datosUsuario['cedula'],
+            ':username' => $datosUsuario['username'],
+            ':nombres' => $datosUsuario['nombres'],
+            ':apellidos' => $datosUsuario['apellidos'],
+            ':sexo' => $datosUsuario['sexo'],
+            ':nacionalidad' => $datosUsuario['nacionalidad'],
+            ':correo' => $datosUsuario['correo'],
+            ':password' => $datosUsuario['password'],
+            ':id_estado' => $datosUsuario['id_estado'] ?? 1
+        ]);
+        
+        $id_usuario = $this->conn->lastInsertId();
+        
+        // 2. Crear doctor
+        $queryDoctor = "INSERT INTO doctores 
+                      (id_usuario, id_especialidad, titulo_profesional)
+                      VALUES 
+                      (:id_usuario, :id_especialidad, :titulo_profesional)";
+        
+        $stmtDoctor = $this->conn->prepare($queryDoctor);
+        $stmtDoctor->execute([
+            ':id_usuario' => $id_usuario,
+            ':id_especialidad' => $datosDoctor['id_especialidad'],
+            ':titulo_profesional' => $datosDoctor['titulo_profesional'] ?? null
+        ]);
+        
+        $id_doctor = $this->conn->lastInsertId();
+        
+        // 3. Asignar sucursales
+        if (!empty($sucursales)) {
+            foreach ($sucursales as $id_sucursal) {
+                $this->asignarASucursal($id_doctor, (int)$id_sucursal);
+            }
+        }
+        
+        // 4. 🕒 CREAR HORARIOS - MÉTODO CORREGIDO
+        if (!empty($horarios)) {
+            $this->insertarHorarios($id_doctor, $horarios);
+        }
+        
+        $this->conn->commit();
+        return $id_doctor;
+        
+    } catch (PDOException $e) {
+        $this->conn->rollback();
+        error_log("Error creando doctor con horarios: " . $e->getMessage());
+        throw new Exception("Error al crear el doctor: " . $e->getMessage());
+    }
+}
+
+/**
+ * Insertar horarios en la tabla doctor_horarios - MÉTODO CORREGIDO
+ */
+private function insertarHorarios($id_doctor, $horarios) {
+    try {
+        // Query para insertar en doctor_horarios
+        $query = "INSERT INTO doctor_horarios 
+                  (id_doctor, id_sucursal, dia_semana, hora_inicio, hora_fin, duracion_cita, activo, fecha_creacion)
+                  VALUES 
+                  (:id_doctor, :id_sucursal, :dia_semana, :hora_inicio, :hora_fin, :duracion_cita, 1, NOW())";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        foreach ($horarios as $horario) {
+            // Validar que el horario tenga todos los campos requeridos
+            if (!isset($horario['id_sucursal']) || !isset($horario['dia_semana']) || 
+                !isset($horario['hora_inicio']) || !isset($horario['hora_fin'])) {
+                error_log("❌ Horario inválido - faltan campos: " . json_encode($horario));
+                continue;
             }
             
-            $this->conn->commit();
-            return $id_doctor;
+            // Preparar parámetros
+            $parametros = [
+                ':id_doctor' => (int)$id_doctor,
+                ':id_sucursal' => (int)$horario['id_sucursal'],
+                ':dia_semana' => (int)$horario['dia_semana'],
+                ':hora_inicio' => $horario['hora_inicio'],
+                ':hora_fin' => $horario['hora_fin'],
+                ':duracion_cita' => isset($horario['duracion_cita']) ? (int)$horario['duracion_cita'] : 30
+            ];
             
-        } catch (PDOException $e) {
-            $this->conn->rollback();
-            error_log("Error creando doctor: " . $e->getMessage());
-            throw new Exception("Error al crear el doctor: " . $e->getMessage());
+            // Ejecutar inserción
+            $resultado = $stmt->execute($parametros);
+            
+            if ($resultado) {
+                error_log("✅ Horario insertado: Doctor={$id_doctor}, Sucursal={$horario['id_sucursal']}, Día={$horario['dia_semana']}, {$horario['hora_inicio']}-{$horario['hora_fin']}");
+            } else {
+                error_log("❌ Error insertando horario: " . implode(", ", $stmt->errorInfo()));
+            }
         }
+        
+    } catch (PDOException $e) {
+        error_log("❌ Error PDO insertando horarios: " . $e->getMessage());
+        throw new Exception("Error al insertar horarios: " . $e->getMessage());
     }
-    
+}
+
+/**
+ * Obtener horarios de un doctor - MÉTODO MEJORADO
+ */
+public function obtenerHorarios($id_doctor, $id_sucursal = null) {
+    try {
+        $query = "SELECT dh.*, s.nombre_sucursal,
+                         CASE dh.dia_semana 
+                             WHEN 1 THEN 'Lunes'
+                             WHEN 2 THEN 'Martes'
+                             WHEN 3 THEN 'Miércoles'
+                             WHEN 4 THEN 'Jueves'
+                             WHEN 5 THEN 'Viernes'
+                             WHEN 6 THEN 'Sábado'
+                             WHEN 7 THEN 'Domingo'
+                         END as nombre_dia
+                  FROM doctor_horarios dh
+                  INNER JOIN sucursales s ON dh.id_sucursal = s.id_sucursal
+                  WHERE dh.id_doctor = :id_doctor AND dh.activo = 1";
+        
+        $params = [':id_doctor' => $id_doctor];
+        
+        if ($id_sucursal) {
+            $query .= " AND dh.id_sucursal = :id_sucursal";
+            $params[':id_sucursal'] = $id_sucursal;
+        }
+        
+        $query .= " ORDER BY dh.dia_semana, dh.hora_inicio";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (PDOException $e) {
+        error_log("Error obteniendo horarios: " . $e->getMessage());
+        throw new Exception("Error al obtener horarios");
+    }
+}
+
+/**
+ * Actualizar horarios de un doctor existente
+ */
+public function actualizarHorarios($id_doctor, $horarios) {
+    try {
+        $this->conn->beginTransaction();
+        
+        // Eliminar horarios anteriores
+        $queryEliminar = "UPDATE doctor_horarios SET activo = 0 WHERE id_doctor = :id_doctor";
+        $stmt = $this->conn->prepare($queryEliminar);
+        $stmt->execute([':id_doctor' => $id_doctor]);
+        
+        // Insertar nuevos horarios
+        if (!empty($horarios)) {
+            $this->insertarHorarios($id_doctor, $horarios);
+        }
+        
+        $this->conn->commit();
+        return true;
+        
+    } catch (PDOException $e) {
+        $this->conn->rollback();
+        error_log("Error actualizando horarios: " . $e->getMessage());
+        throw new Exception("Error al actualizar horarios");
+    }
+}
     /**
      * Obtener doctor por ID con toda la información
      */
