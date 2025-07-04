@@ -551,15 +551,22 @@ function crearDoctor(e) {
 }
 
 /**
- * Abrir modal para editar doctor
- */
+* Abrir modal para editar doctor CON HORARIOS
+*/
 function abrirModalEditar(idDoctor) {
-    if (config.debug) {
-        console.log('Abriendo modal editar para doctor:', idDoctor);
+    console.log('🔄 === INICIANDO EDICIÓN DEL DOCTOR ===');
+    console.log('Doctor ID:', idDoctor);
+    
+    // Inicializar edición
+    if (typeof window.iniciarEdicionDoctor === 'function') {
+        window.iniciarEdicionDoctor(idDoctor);
     }
     
     // Limpiar formulario
     document.getElementById('formEditarDoctor').reset();
+    
+    // Mostrar modal
+    $('#editarDoctorModal').modal('show');
     
     // Cargar datos del doctor
     $.ajax({
@@ -572,8 +579,11 @@ function abrirModalEditar(idDoctor) {
         },
         dataType: 'json',
         success: function(response) {
+            console.log('📥 Respuesta obtenerPorId:', response);
+            
             if (response.success && response.data) {
                 const doctor = response.data;
+                console.log('✅ Datos del doctor cargados:', doctor);
                 
                 // Llenar el formulario
                 $('#editarIdDoctor').val(doctor.id_doctor);
@@ -586,36 +596,193 @@ function abrirModalEditar(idDoctor) {
                 $('#editarIdEstado').val(doctor.id_estado);
                 $('#editarCorreo').val(doctor.correo);
                 $('#editarIdEspecialidad').val(doctor.id_especialidad);
-                $('#editarTituloProfesional').val(doctor.titulo_profesional || '');
+                $('#editarTituloProfesional').val(doctor.titulo_profesional);
                 
                 // Marcar sucursales asignadas
-                marcarSucursalesSeleccionadas(doctor.sucursales || []);
-                
-                // Abrir modal
-                $('#editarDoctorModal').modal('show');
-                
-                if (config.debug) {
-                    console.log('Datos cargados para editar:', doctor);
+                $('#sucursalesEditar input[type="checkbox"]').prop('checked', false);
+                if (doctor.sucursales && Array.isArray(doctor.sucursales)) {
+                    doctor.sucursales.forEach(sucursal => {
+                        $(`#editar_sucursal_${sucursal.id_sucursal}`).prop('checked', true);
+                    });
+                    console.log('✅ Sucursales marcadas:', doctor.sucursales.length);
                 }
+                
+                // 🕒 CARGAR HORARIOS PASO A PASO
+                setTimeout(async () => {
+                    console.log('🕒 === INICIANDO CARGA DE HORARIOS ===');
+                    
+                    // 1. Sincronizar sucursales para horarios
+                    if (typeof window.sincronizarSucursalesEdicion === 'function') {
+                        console.log('🔄 Sincronizando sucursales...');
+                        window.sincronizarSucursalesEdicion();
+                    }
+                    
+                    // 2. Esperar un poco más y cargar horarios
+                    setTimeout(async () => {
+                        console.log('📅 Cargando horarios del servidor...');
+                        
+                        if (typeof window.cargarHorariosExistentesDelServidor === 'function') {
+                            try {
+                                const horarios = await window.cargarHorariosExistentesDelServidor(idDoctor);
+                                console.log('📅 Horarios cargados:', horarios);
+                                
+                                if (horarios && horarios.length > 0) {
+                                    // Si hay una sucursal seleccionada, mostrar sus horarios
+                                    const sucursalActual = $('#editarSucursalHorarios').val();
+                                    if (sucursalActual) {
+                                        console.log(`📅 Mostrando horarios para sucursal: ${sucursalActual}`);
+                                        if (typeof window.mostrarHorariosSucursalEditar === 'function') {
+                                            window.mostrarHorariosSucursalEditar(sucursalActual);
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('❌ Error cargando horarios:', error);
+                            }
+                        } else {
+                            console.error('❌ Función cargarHorariosExistentesDelServidor no disponible');
+                        }
+                    }, 500);
+                }, 300);
+                
             } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'No se pudo cargar la información del doctor'
-                });
+                console.error('❌ Error en respuesta:', response);
+                Swal.fire('Error', response.message || 'No se pudo cargar la información del doctor', 'error');
+                $('#editarDoctorModal').modal('hide');
             }
         },
         error: function(xhr, status, error) {
-            console.error('Error cargando doctor:', {xhr, status, error});
-            Swal.fire({
-                icon: 'error',
-                title: 'Error de conexión',
-                text: 'No se pudo cargar la información'
-            });
+            console.error('❌ Error AJAX cargando datos:', {xhr, status, error});
+            Swal.fire('Error', 'Error de conexión al cargar los datos', 'error');
+            $('#editarDoctorModal').modal('hide');
         }
     });
 }
 
+/**
+* Editar doctor CON HORARIOS
+*/
+function editarDoctor(e) {
+   e.preventDefault();
+   
+   if (!validarFormulario('formEditarDoctor')) {
+       return;
+   }
+   
+   // Obtener sucursales seleccionadas
+   const sucursalesSeleccionadas = [];
+   $('#sucursalesEditar input[type="checkbox"]:checked').each(function() {
+       sucursalesSeleccionadas.push($(this).val());
+   });
+   
+   // Validar que tenga al menos una sucursal
+   if (sucursalesSeleccionadas.length === 0) {
+       Swal.fire({
+           icon: 'warning',
+           title: 'Sucursales requeridas',
+           text: 'Debe seleccionar al menos una sucursal para el doctor'
+       });
+       return;
+   }
+   
+   // 🕒 OBTENER HORARIOS ACTUALIZADOS
+   console.log('📦 === DEBUG HORARIOS EN EDICIÓN ===');
+   
+   let horarios = [];
+   if (typeof window.obtenerHorariosParaEnvio === 'function') {
+       horarios = window.obtenerHorariosParaEnvio();
+       console.log('✅ Horarios obtenidos para actualizar:', horarios);
+   } else {
+       console.log('❌ Función obtenerHorariosParaEnvio no disponible');
+   }
+   
+   console.log(`📋 Total horarios a actualizar: ${horarios.length}`);
+   
+   // Crear FormData
+   const formData = new FormData(this);
+   formData.append('action', 'actualizar');
+   formData.append('submenu_id', config.submenuId);
+   
+   // Agregar sucursales al FormData
+   sucursalesSeleccionadas.forEach(suc => {
+       formData.append('sucursales[]', suc);
+   });
+   
+   // 🔥 AGREGAR HORARIOS COMO JSON
+   const horariosJson = JSON.stringify(horarios);
+   formData.append('horarios', horariosJson);
+   
+   console.log('📤 JSON de horarios enviado (edición):', horariosJson);
+   
+   if (config.debug) {
+       console.log('📦 === DATOS A ENVIAR (EDICIÓN) ===');
+       for (let pair of formData.entries()) {
+           console.log(`${pair[0]}: ${pair[1]}`);
+       }
+       console.log('🏥 Sucursales:', sucursalesSeleccionadas);
+       console.log('🕒 Horarios:', horarios);
+   }
+   
+   // Deshabilitar botón de envío
+   const submitBtn = $(this).find('button[type="submit"]');
+   const textoOriginal = submitBtn.html();
+   submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Actualizando...');
+   
+   $.ajax({
+       url: config.baseUrl,
+       method: 'POST',
+       data: formData,
+       processData: false,
+       contentType: false,
+       dataType: 'json',
+       success: function(response) {
+           console.log('📥 Respuesta del servidor (edición):', response);
+           
+           if (response.success) {
+               Swal.fire({
+                   icon: 'success',
+                   title: '¡Doctor actualizado!',
+                   html: `
+                       <div class="text-start">
+                           <p><strong>Doctor actualizado exitosamente</strong></p>
+                           <ul class="list-unstyled">
+                               <li><i class="bi bi-person-check text-success me-1"></i> Información personal actualizada</li>
+                               <li><i class="bi bi-building text-primary me-1"></i> ${sucursalesSeleccionadas.length} sucursal(es) asignada(s)</li>
+                               <li><i class="bi bi-clock text-info me-1"></i> ${horarios.length} horario(s) configurado(s)</li>
+                           </ul>
+                           <small class="text-muted">${response.message}</small>
+                       </div>
+                   `,
+                   timer: 4000,
+                   showConfirmButton: true,
+                   confirmButtonText: 'Entendido'
+               }).then(() => {
+                   $('#editarDoctorModal').modal('hide');
+                   cargarDoctoresPaginados(paginaActual);
+                   cargarEstadisticas();
+               });
+           } else {
+               Swal.fire({
+                   icon: 'error',
+                   title: 'Error al actualizar doctor',
+                   text: response.message || 'Error desconocido'
+               });
+           }
+       },
+       error: function(xhr, status, error) {
+           console.error('❌ Error AJAX (edición):', {status, error, response: xhr.responseText});
+           Swal.fire({
+               icon: 'error',
+               title: 'Error de conexión',
+               text: 'No se pudo conectar con el servidor. Intente nuevamente.'
+           });
+       },
+       complete: function() {
+           // Rehabilitar botón
+           submitBtn.prop('disabled', false).html(textoOriginal);
+       }
+   });
+}
 /**
  * Marcar sucursales seleccionadas en edición
  */
@@ -631,90 +798,6 @@ function marcarSucursalesSeleccionadas(sucursalesAsignadas) {
     }
 }
 
-/**
- * Editar doctor
- */
-function editarDoctor(e) {
-    e.preventDefault();
-    
-    if (!validarFormulario('formEditarDoctor')) {
-        return;
-    }
-    
-    const formData = new FormData(this);
-    formData.append('action', 'editar');
-    formData.append('submenu_id', config.submenuId);
-    
-    // Obtener sucursales seleccionadas
-    const sucursalesSeleccionadas = [];
-    $('#sucursalesEditar input[type="checkbox"]:checked').each(function() {
-        sucursalesSeleccionadas.push($(this).val());
-    });
-    
-    // Agregar sucursales al FormData
-    sucursalesSeleccionadas.forEach(suc => {
-        formData.append('sucursales[]', suc);
-    });
-    
-    if (config.debug) {
-        console.log('Datos a enviar (editar):');
-        for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
-        console.log('Sucursales seleccionadas:', sucursalesSeleccionadas);
-    }
-    
-    // Deshabilitar botón de envío
-    const submitBtn = $(this).find('button[type="submit"]');
-    const textoOriginal = submitBtn.html();
-    submitBtn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Guardando...');
-    
-    $.ajax({
-        url: config.baseUrl,
-        method: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function(response) {
-            if (config.debug) {
-                console.log('Respuesta del servidor (editar):', response);
-            }
-            
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Doctor actualizado!',
-                    text: response.message,
-                    timer: 3000,
-                    showConfirmButton: false
-                }).then(() => {
-                    $('#editarDoctorModal').modal('hide');
-                    cargarDoctoresPaginados(paginaActual);
-                    cargarEstadisticas();
-                });
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al actualizar',
-                    text: response.message || 'Error desconocido'
-                });
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error en la petición AJAX (editar):', {status, error, response: xhr.responseText});
-            Swal.fire({
-                icon: 'error',
-                title: 'Error de conexión',
-                text: 'No se pudo conectar con el servidor. Intente nuevamente.'
-            });
-        },
-        complete: function() {
-            // Rehabilitar botón
-            submitBtn.prop('disabled', false).html(textoOriginal);
-        }
-    });
-}
 
 /**
  * Ver detalles de doctor

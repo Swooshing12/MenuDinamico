@@ -128,6 +128,9 @@ private function insertarHorarios($id_doctor, $horarios) {
 /**
  * Obtener horarios de un doctor - MÉTODO MEJORADO
  */
+/**
+ * Obtener horarios de un doctor - MÉTODO CORREGIDO
+ */
 public function obtenerHorarios($id_doctor, $id_sucursal = null) {
     try {
         $query = "SELECT dh.*, s.nombre_sucursal,
@@ -156,14 +159,20 @@ public function obtenerHorarios($id_doctor, $id_sucursal = null) {
         $stmt = $this->conn->prepare($query);
         $stmt->execute($params);
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $horarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Debug
+        error_log("📅 Horarios obtenidos para doctor {$id_doctor}: " . count($horarios));
+        error_log("📅 Query ejecutada: {$query}");
+        error_log("📅 Datos: " . json_encode($horarios));
+        
+        return $horarios;
         
     } catch (PDOException $e) {
         error_log("Error obteniendo horarios: " . $e->getMessage());
         throw new Exception("Error al obtener horarios");
     }
 }
-
 /**
  * Actualizar horarios de un doctor existente
  */

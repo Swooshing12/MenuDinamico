@@ -650,217 +650,249 @@ if (!isset($doctores)) {
     </div>
 </div>
 
-    <!-- Modal Editar Doctor -->
-    <div class="modal fade" id="editarDoctorModal" tabindex="-1" aria-labelledby="editarDoctorModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editarDoctorModalLabel">
-                        <i class="bi bi-pencil-square me-2"></i>
-                        Editar Doctor
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <form id="formEditarDoctor">
-                   <input type="hidden" id="editarIdDoctor" name="id_doctor">
-                   
-                   <div class="modal-body">
-                       <div class="row g-4">
-                           <!-- Información Personal -->
-                           <div class="col-12">
-                               <h6 class="text-success border-bottom pb-2 mb-3">
-                                   <i class="bi bi-person me-2"></i>
-                                   Información Personal
-                               </h6>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <input type="number" class="form-control" id="editarCedula" name="cedula" 
-                                          placeholder="Cédula" required maxlength="10" min="1000000000" max="9999999999">
-                                   <label for="editarCedula">
-                                       <i class="bi bi-card-text me-1"></i>
-                                       Cédula *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <input type="text" class="form-control" id="editarUsername" name="username" 
-                                          placeholder="Usuario" required maxlength="50">
-                                   <label for="editarUsername">
-                                       <i class="bi bi-person-circle me-1"></i>
-                                       Nombre de Usuario *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <input type="text" class="form-control" id="editarNombres" name="nombres" 
-                                          placeholder="Nombres" required maxlength="255">
-                                   <label for="editarNombres">
-                                       <i class="bi bi-person me-1"></i>
-                                       Nombres *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <input type="text" class="form-control" id="editarApellidos" name="apellidos" 
-                                          placeholder="Apellidos" required maxlength="255">
-                                   <label for="editarApellidos">
-                                       <i class="bi bi-person me-1"></i>
-                                       Apellidos *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-4">
-                               <div class="form-floating">
-                                   <select class="form-select" id="editarSexo" name="sexo" required>
-                                       <option value="">Seleccionar...</option>
-                                       <option value="M">Masculino</option>
-                                       <option value="F">Femenino</option>
-                                   </select>
-                                   <label for="editarSexo">
-                                       <i class="bi bi-gender-ambiguous me-1"></i>
-                                       Sexo *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-4">
-                               <div class="form-floating">
-                                   <input type="text" class="form-control" id="editarNacionalidad" name="nacionalidad" 
-                                          placeholder="Nacionalidad" required maxlength="255">
-                                   <label for="editarNacionalidad">
-                                       <i class="bi bi-flag me-1"></i>
-                                       Nacionalidad *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-4">
-                               <div class="form-floating">
-                                   <select class="form-select" id="editarIdEstado" name="id_estado">
-                                       <option value="1">Activo</option>
-                                       <option value="2">Bloqueado</option>
-                                       <option value="3">Pendiente</option>
-                                       <option value="4">Inactivo</option>
-                                   </select>
-                                   <label for="editarIdEstado">
-                                       <i class="bi bi-toggle-on me-1"></i>
-                                       Estado
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-12">
-                               <div class="form-floating">
-                                   <input type="email" class="form-control" id="editarCorreo" name="correo" 
-                                          placeholder="Correo electrónico" required maxlength="255">
-                                   <label for="editarCorreo">
-                                       <i class="bi bi-envelope me-1"></i>
-                                       Correo Electrónico *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <!-- Información Médica -->
-                           <div class="col-12">
-                               <h6 class="text-success border-bottom pb-2 mb-3 mt-3">
-                                   <i class="bi bi-journal-medical me-2"></i>
-                                   Información Médica
-                               </h6>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <select class="form-select" id="editarIdEspecialidad" name="id_especialidad" required>
-                                       <option value="">Seleccionar especialidad...</option>
-                                       <?php foreach ($especialidades as $especialidad): ?>
-                                       <option value="<?= $especialidad['id_especialidad'] ?>">
-                                           <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
-                                       </option>
-                                       <?php endforeach; ?>
-                                   </select>
-                                   <label for="editarIdEspecialidad">
-                                       <i class="bi bi-journal-medical me-1"></i>
-                                       Especialidad Médica *
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <div class="col-md-6">
-                               <div class="form-floating">
-                                   <input type="text" class="form-control" id="editarTituloProfesional" name="titulo_profesional" 
-                                          placeholder="Título profesional" maxlength="100">
-                                   <label for="editarTituloProfesional">
-                                       <i class="bi bi-mortarboard me-1"></i>
-                                       Título Profesional
-                                   </label>
-                               </div>
-                           </div>
-                           
-                           <!-- Asignación de Sucursales -->
-                           <div class="col-12">
-                               <h6 class="text-success border-bottom pb-2 mb-3">
-                                   <i class="bi bi-building me-2"></i>
-                                   Asignación de Sucursales
-                               </h6>
-                               <p class="text-muted small mb-3">
-                                   Actualiza las sucursales donde trabajará este doctor
-                               </p>
-                           </div>
-                           
-                           <div class="col-12">
-                               <div class="sucursales-container">
-                                   <div class="row" id="sucursalesEditar">
-                                       <?php foreach ($sucursales as $sucursal): ?>
-                                       <div class="col-md-6 col-lg-4">
-                                           <div class="sucursal-item">
-                                               <div class="form-check">
-                                                   <input class="form-check-input" 
-                                                          type="checkbox" 
-                                                          value="<?= $sucursal['id_sucursal'] ?>" 
-                                                          name="sucursales[]" 
-                                                          id="edit_suc_<?= $sucursal['id_sucursal'] ?>">
-                                                   <label class="form-check-label" for="edit_suc_<?= $sucursal['id_sucursal'] ?>">
-                                                       <strong><?= htmlspecialchars($sucursal['nombre_sucursal']) ?></strong>
-                                                       <br>
-                                                       <small class="text-muted">
-                                                           <i class="bi bi-geo-alt me-1"></i>
-                                                           <?= htmlspecialchars(substr($sucursal['direccion'], 0, 40)) ?>...
-                                                       </small>
-                                                   </label>
-                                               </div>
-                                           </div>
-                                       </div>
-                                       <?php endforeach; ?>
-                                   </div>
-                               </div>
-                           </div>
-                       </div>
-                   </div>
-                   
-                   <div class="modal-footer bg-light">
-                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                           <i class="bi bi-x-circle me-1"></i>
-                           Cancelar
-                       </button>
-                       <button type="submit" class="btn btn-success">
-                           <i class="bi bi-check-circle me-1"></i>
-                           Guardar Cambios
-                       </button>
-                   </div>
-               </form>
-           </div>
-       </div>
-   </div>
+    <!-- Modal Editar Doctor CON GESTIÓN DE HORARIOS -->
+<div class="modal fade" id="editarDoctorModal" tabindex="-1" aria-labelledby="editarDoctorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editarDoctorModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Editar Doctor
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <form id="formEditarDoctor">
+                <input type="hidden" id="editarIdDoctor" name="id_doctor">
+                
+                <div class="modal-body">
+                    <div class="row g-4">
+                        <!-- INFORMACIÓN PERSONAL -->
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="bi bi-person me-2"></i>
+                                Información Personal
+                            </h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="number" class="form-control" id="editarCedula" name="cedula" 
+                                       placeholder="Cédula" required maxlength="10" readonly>
+                                <label for="editarCedula">
+                                    <i class="bi bi-card-text me-1"></i>
+                                    Cédula *
+                                </label>
+                            </div>
+                            <small class="text-muted">La cédula no se puede modificar</small>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="editarUsername" name="username" 
+                                       placeholder="Username" required maxlength="50">
+                                <label for="editarUsername">
+                                    <i class="bi bi-person-badge me-1"></i>
+                                    Nombre de Usuario *
+                                </label>
+                            </div>
+                            <div id="editarUsernameFeedback" class="mt-1"></div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="editarNombres" name="nombres" 
+                                       placeholder="Nombres" required>
+                                <label for="editarNombres">
+                                    <i class="bi bi-person me-1"></i>
+                                    Nombres *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="editarApellidos" name="apellidos" 
+                                       placeholder="Apellidos" required>
+                                <label for="editarApellidos">
+                                    <i class="bi bi-person me-1"></i>
+                                    Apellidos *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                <select class="form-select" id="editarSexo" name="sexo" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="F">Femenino</option>
+                                </select>
+                                <label for="editarSexo">
+                                    <i class="bi bi-gender-ambiguous me-1"></i>
+                                    Sexo *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label for="editarNacionalidad" class="form-label">
+                                <i class="bi bi-globe me-1"></i>
+                                Nacionalidad *
+                            </label>
+                            <select class="form-select" id="editarNacionalidad" name="nacionalidad" required>
+                                <option value="">Seleccionar nacionalidad...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-floating">
+                                <select class="form-select" id="editarIdEstado" name="id_estado" required>
+                                    <option value="1">Activo</option>
+                                    <option value="2">Bloqueado</option>
+                                    <option value="3">Pendiente</option>
+                                    <option value="4">Inactivo</option>
+                                </select>
+                                <label for="editarIdEstado">
+                                    <i class="bi bi-toggle-on me-1"></i>
+                                    Estado *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="form-floating">
+                                <input type="email" class="form-control" id="editarCorreo" name="correo" 
+                                       placeholder="Correo" required>
+                                <label for="editarCorreo">
+                                    <i class="bi bi-envelope me-1"></i>
+                                    Correo Electrónico *
+                                </label>
+                            </div>
+                        </div>
 
+                        <!-- INFORMACIÓN MÉDICA -->
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3 mt-3">
+                                <i class="bi bi-heart-pulse me-2"></i>
+                                Información Médica
+                            </h6>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <select class="form-select" id="editarIdEspecialidad" name="id_especialidad" required>
+                                    <option value="">Seleccionar especialidad...</option>
+                                    <?php foreach ($especialidades as $especialidad): ?>
+                                    <option value="<?= $especialidad['id_especialidad'] ?>">
+                                        <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
+                                    </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <label for="editarIdEspecialidad">
+                                    <i class="bi bi-heart-pulse me-1"></i>
+                                    Especialidad Médica *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="text" class="form-control" id="editarTituloProfesional" name="titulo_profesional" 
+                                       placeholder="Título profesional" maxlength="100">
+                                <label for="editarTituloProfesional">
+                                    <i class="bi bi-mortarboard me-1"></i>
+                                    Título Profesional
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- ASIGNACIÓN DE SUCURSALES -->
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="bi bi-building me-2"></i>
+                                Asignación de Sucursales
+                            </h6>
+                        </div>
+                        
+                        <div class="col-12">
+                            <div class="row" id="sucursalesEditar">
+                                <?php foreach ($sucursales as $sucursal): ?>
+                                <div class="col-md-6 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               value="<?= $sucursal['id_sucursal'] ?>" 
+                                               id="editar_sucursal_<?= $sucursal['id_sucursal'] ?>"
+                                               name="sucursales[]">
+                                        <label class="form-check-label" for="editar_sucursal_<?= $sucursal['id_sucursal'] ?>">
+                                            <strong><?= htmlspecialchars($sucursal['nombre_sucursal']) ?></strong><br>
+                                            <small class="text-muted"><?= htmlspecialchars($sucursal['direccion']) ?></small>
+                                        </label>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- 🕒 GESTIÓN DE HORARIOS -->
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="bi bi-clock me-2"></i>
+                                Gestión de Horarios
+                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" id="btnRecargarHorarios">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>
+                                    Recargar
+                                </button>
+                            </h6>
+                        </div>
+                        
+                        <!-- Selector de sucursal para horarios -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-building me-1"></i>
+                                Sucursal para horarios:
+                            </label>
+                            <select class="form-select" id="editarSucursalHorarios">
+                                <option value="">Seleccione una sucursal...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold mb-0">Horarios configurados:</label>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnAgregarHorarioEditar">
+                                    <i class="bi bi-plus-circle me-1"></i>
+                                    Agregar Horario
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Container de horarios -->
+                        <div class="col-12">
+                            <div id="editarHorariosContainer" class="border rounded p-3" style="min-height: 200px; max-height: 400px; overflow-y: auto;">
+                                <div class="text-center text-muted py-4">
+                                    <i class="bi bi-clock-history display-4 d-block mb-2"></i>
+                                    <p>Seleccione una sucursal para ver los horarios</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>
+                        Actualizar Doctor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
    <!-- Modal Ver Detalles -->
    <div class="modal fade" id="verDoctorModal" tabindex="-1" aria-labelledby="verDoctorModalLabel" aria-hidden="true">
        <div class="modal-dialog modal-lg">

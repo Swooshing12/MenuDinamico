@@ -86,6 +86,12 @@ class DoctoresController {
                 case 'generarPassword':
                     $this->generarPassword();
                     break;
+                case 'obtenerHorarios':
+                    $this->obtenerHorarios();
+                    break;
+                 case 'actualizar':
+                    $this->actualizar();
+                        break;
                 case 'index':
                 default:
                     $this->index();
@@ -143,6 +149,77 @@ class DoctoresController {
         }
     }
     
+    /**
+ * Actualizar doctor con horarios
+ */
+private function actualizar() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]);
+        return;
+    }
+    
+    // Verificar permisos
+    $this->verificarPermisos('editar');
+    
+    $id_doctor = isset($_POST['id_doctor']) ? (int)$_POST['id_doctor'] : 0;
+    
+    if (!$id_doctor) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de doctor requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        // Por ahora, respuesta básica para probar
+        $this->responderJSON([
+            'success' => true,
+            'message' => 'Método actualizar funcionando correctamente',
+            'data' => [
+                'id_doctor' => $id_doctor,
+                'action' => 'actualizar'
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+    // Y que exista este método:
+private function obtenerHorarios() {
+    $id_doctor = isset($_GET['id_doctor']) ? (int)$_GET['id_doctor'] : 0;
+    
+    if (!$id_doctor) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de doctor requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $horarios = $this->doctoresModel->obtenerHorarios($id_doctor);
+        
+        $this->responderJSON([
+            'success' => true,
+            'data' => $horarios,
+            'count' => count($horarios)
+        ]);
+        
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
     private function crear() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         $this->responderJSON([
