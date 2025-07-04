@@ -7,7 +7,12 @@ class Citas {
     public function __construct() {
         $this->conn = Database::getConnection();
     }
-    
+    /**
+ * Actualizar estado de una cita (alias para cambiarEstado)
+ */
+public function actualizarEstado($id_cita, $nuevo_estado) {
+    return $this->cambiarEstado($id_cita, $nuevo_estado);
+}
     // ===== MÉTODOS CRUD BÁSICOS =====
     
     /**
@@ -645,6 +650,8 @@ public function obtenerPorIdCompleto($id_cita) {
         error_log("Error obteniendo cita completa por ID: " . $e->getMessage());
         throw new Exception("Error al obtener datos de la cita");
     }
+
+    
 }
 }
 ?>

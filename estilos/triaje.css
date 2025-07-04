@@ -1,0 +1,284 @@
+/**
+ * Estilos específicos para el sistema de triaje
+ */
+
+:root {
+    --triaje-primary: #0d6efd;
+    --triaje-success: #198754;
+    --triaje-warning: #ffc107;
+    --triaje-danger: #dc3545;
+    --triaje-info: #0dcaf0;
+    --triaje-light: #f8f9fa;
+    --triaje-dark: #212529;
+}
+
+/* ===== CARDS DE ESTADÍSTICAS ===== */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* ===== TABLA DE CITAS ===== */
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+    cursor: pointer;
+}
+
+.badge-triaje {
+    font-size: 0.75rem;
+    padding: 0.35em 0.7em;
+    border-radius: 0.5rem;
+}
+
+.badge-pendiente {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.badge-completado {
+    background-color: #198754;
+    color: #fff;
+}
+
+.badge-urgente {
+    background-color: #dc3545;
+    color: #fff;
+    animation: pulse-urgente 2s infinite;
+}
+
+@keyframes pulse-urgente {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* ===== NIVELES DE URGENCIA ===== */
+.urgencia-1 {
+    color: #198754;
+    font-weight: bold;
+}
+
+.urgencia-2 {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+.urgencia-3 {
+    color: #fd7e14;
+    font-weight: bold;
+}
+
+.urgencia-4 {
+    color: #dc3545;
+    font-weight: bold;
+    animation: pulse-critico 1.5s infinite;
+}
+
+@keyframes pulse-critico {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* ===== FORMULARIO DE TRIAJE ===== */
+.modal-xl {
+    max-width: 1200px;
+}
+
+.form-control:focus {
+    border-color: var(--triaje-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.input-group-text {
+    background-color: var(--triaje-light);
+    border-color: #ced4da;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+/* ===== ALERTAS DE SIGNOS VITALES ===== */
+.alerta-signos {
+    animation: slide-down 0.3s ease;
+}
+
+@keyframes slide-down {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alerta-critica {
+    border-left: 4px solid var(--triaje-danger);
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.alerta-advertencia {
+    border-left: 4px solid var(--triaje-warning);
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+/* ===== INDICADORES IMC ===== */
+.imc-bajo-peso {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.imc-normal {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.imc-sobrepeso {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
+
+.imc-obesidad {
+    background-color: #ffebee;
+    color: #d32f2f;
+}
+
+/* ===== BOTONES ESPECIALES ===== */
+.btn-triaje {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-triaje::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.btn-triaje:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* ===== LOADING STATES ===== */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .modal-xl {
+        max-width: 95%;
+        margin: 1rem auto;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+    }
+    
+    .card-title {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .input-group-text {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.5rem;
+    }
+    
+    .form-control {
+        font-size: 0.875rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+}
+
+/* ===== ANIMACIONES ADICIONALES ===== */
+.fade-in {
+    animation: fade-in 0.5s ease;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.slide-up {
+    animation: slide-up 0.3s ease;
+}
+
+@keyframes slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== ESTADOS DE LA TABLA ===== */
+.estado-pendiente {
+    border-left: 4px solid var(--triaje-warning);
+}
+
+.estado-completado {
+    border-left: 4px solid var(--triaje-success);
+}
+
+.estado-urgente {
+    border-left: 4px solid var(--triaje-danger);
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+/* ===== TOOLTIPS PERSONALIZADOS ===== */
+[data-bs-toggle="tooltip"] {
+    cursor: help;
+}
+
+/* ===== ICONOS CONTEXTUALES ===== */
+.icon-temperatura { color: #dc3545; }
+.icon-presion { color: #0dcaf0; }
+.icon-cardiaca { color: #dc3545; }
+.icon-respiratoria { color: #0d6efd; }
+.icon-oxigeno { color: #0dcaf0; }
+.icon-peso { color: #ffc107; }
+.icon-talla { color: #198754; }
+.icon-imc { color: #6f42c1; }

@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../config/database.php";
 
 class Permisos {
-    private $conn;
+    public $conn;
 
     public function __construct() {
         $this->conn = Database::getConnection();

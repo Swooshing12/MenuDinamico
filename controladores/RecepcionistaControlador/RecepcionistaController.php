@@ -979,7 +979,7 @@ class RecepcionistaController {
        }
        
        try {
-           $horarios = $this->doctoresModel->obtenerHorariosDisponibles(
+           $horarios = $this->doctoresModel->obtenerHorarios(
                $_GET['id_doctor'],
                $_GET['fecha']
            );
