@@ -108,23 +108,7 @@ if (!isset($especialidades)) {
                     </div>
                 </div>
                 
-                <div class="col-xl-4 col-md-6">
-                    <div class="card border-0 shadow-sm h-100 estadisticas-card">
-                        <div class="card-body d-flex align-items-center">
-                            <div class="flex-shrink-0">
-                                <div class="bg-success bg-gradient rounded-circle p-3">
-                                    <i class="bi bi-people-fill text-white fs-4"></i>
-                                </div>
-                            </div>
-                            <div class="flex-grow-1 ms-3">
-                                <div class="text-muted small">Con Doctores</div>
-                                <div class="fw-bold fs-4 text-success" id="especialidadesConDoctores">
-                                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    
                 
                 <div class="col-xl-4 col-md-6">
                     <div class="card border-0 shadow-sm h-100 estadisticas-card">
