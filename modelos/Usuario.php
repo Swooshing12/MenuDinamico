@@ -374,11 +374,22 @@ public function existeUsuarioPorCedula(int $cedula): bool {
 /**
  * 🔹 Verificar si existe usuario por correo
  */
-public function existeUsuarioPorCorreo(string $correo): bool {
+/**
+ * 🔹 Verificar si existe usuario por correo (con exclusión opcional)
+ */
+public function existeUsuarioPorCorreo(string $correo, int $id_excluir = null): bool {
     try {
         $query = "SELECT COUNT(*) as total FROM usuarios WHERE correo = :correo";
+        $params = [':correo' => $correo];
+        
+        // Si se proporciona un ID a excluir, agregarlo a la consulta
+        if ($id_excluir !== null) {
+            $query .= " AND id_usuario != :id_excluir";
+            $params[':id_excluir'] = $id_excluir;
+        }
+        
         $stmt = $this->conn->prepare($query);
-        $stmt->execute([':correo' => $correo]);
+        $stmt->execute($params);
         
         $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
         return (int)$resultado['total'] > 0;
@@ -391,11 +402,22 @@ public function existeUsuarioPorCorreo(string $correo): bool {
 /**
  * 🔹 Verificar si existe usuario por username
  */
-public function existeUsuarioPorUsername(string $username): bool {
+/**
+ * 🔹 Verificar si existe usuario por username (con exclusión opcional)
+ */
+public function existeUsuarioPorUsername(string $username, int $id_excluir = null): bool {
     try {
         $query = "SELECT COUNT(*) as total FROM usuarios WHERE username = :username";
+        $params = [':username' => $username];
+        
+        // Si se proporciona un ID a excluir, agregarlo a la consulta
+        if ($id_excluir !== null) {
+            $query .= " AND id_usuario != :id_excluir";
+            $params[':id_excluir'] = $id_excluir;
+        }
+        
         $stmt = $this->conn->prepare($query);
-        $stmt->execute([':username' => $username]);
+        $stmt->execute($params);
         
         $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
         return (int)$resultado['total'] > 0;

@@ -193,10 +193,11 @@ private function actualizar() {
     }
 }
     // Y que exista este método:
+/**
+ * ✅ OBTENER HORARIOS DE DOCTOR
+ */
 private function obtenerHorarios() {
-    $id_doctor = isset($_GET['id_doctor']) ? (int)$_GET['id_doctor'] : 0;
-    
-    if (!$id_doctor) {
+    if (!isset($_GET['id_doctor'])) {
         $this->responderJSON([
             'success' => false,
             'message' => 'ID de doctor requerido'
@@ -205,18 +206,21 @@ private function obtenerHorarios() {
     }
     
     try {
-        $horarios = $this->doctoresModel->obtenerHorarios($id_doctor);
+        $id_doctor = (int)$_GET['id_doctor'];
+        $id_sucursal = isset($_GET['id_sucursal']) ? (int)$_GET['id_sucursal'] : null;
+        
+        $horarios = $this->doctoresModel->obtenerHorarios($id_doctor, $id_sucursal);
         
         $this->responderJSON([
             'success' => true,
             'data' => $horarios,
-            'count' => count($horarios)
+            'message' => 'Horarios obtenidos exitosamente'
         ]);
         
     } catch (Exception $e) {
         $this->responderJSON([
             'success' => false,
-            'message' => 'Error: ' . $e->getMessage()
+            'message' => 'Error al obtener horarios: ' . $e->getMessage()
         ]);
     }
 }
@@ -386,132 +390,163 @@ error_log("📋 Horarios procesados: " . print_r($horarios, true));
     }
 }
     
-    private function editar() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON([
-                'success' => false, 
-                'message' => 'Método no permitido'
-            ]);
-            return;
-        }
-        
-        // Verificar permisos
-        $this->verificarPermisos('editar');
-        
-        // Validar ID
-        if (empty($_POST['id_doctor'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID de doctor requerido'
-            ]);
-            return;
-        }
-        
-        $id_doctor = (int)$_POST['id_doctor'];
-        
-        // Validar datos requeridos
-        $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
-        $camposFaltantes = [];
-        
-        foreach ($camposRequeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                $camposFaltantes[] = $campo;
-            }
-        }
-        
-        if (!empty($camposFaltantes)) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => "Campos requeridos: " . implode(', ', $camposFaltantes)
-            ]);
-            return;
-        }
-        
-        try {
-            // Obtener datos actuales del doctor
-            $doctorActual = $this->doctoresModel->obtenerPorId($id_doctor);
-            if (!$doctorActual) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Doctor no encontrado'
-                ]);
-                return;
-            }
-            
-            // Validar duplicados (excluyendo el usuario actual)
-            if ($this->doctoresModel->existeUsuarioPorCedula($_POST['cedula'], $doctorActual['id_usuario'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe otro usuario con esa cédula'
-                ]);
-                return;
-            }
-            
-            if ($this->doctoresModel->existeUsuarioPorUsername($_POST['username'], $doctorActual['id_usuario'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe otro usuario con ese nombre de usuario'
-                ]);
-                return;
-            }
-            
-            if ($this->doctoresModel->existeUsuarioPorCorreo($_POST['correo'], $doctorActual['id_usuario'])) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Ya existe otro usuario con ese correo electrónico'
-                ]);
-                return;
-            }
-            
-            // Preparar datos del usuario
-            $datosUsuario = [
-                'cedula' => trim($_POST['cedula']),
-                'username' => trim($_POST['username']),
-                'nombres' => trim($_POST['nombres']),
-                'apellidos' => trim($_POST['apellidos']),
-                'sexo' => $_POST['sexo'],
-                'nacionalidad' => trim($_POST['nacionalidad']),
-                'correo' => trim($_POST['correo']),
-                'id_estado' => isset($_POST['id_estado']) ? (int)$_POST['id_estado'] : 1
-            ];
-            
-            // Preparar datos del doctor
-            $datosDoctor = [
-                'id_especialidad' => (int)$_POST['id_especialidad'],
-                'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
-            ];
-            
-            // Obtener sucursales seleccionadas
-            $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
-            
-            // Actualizar doctor
-            $resultado = $this->doctoresModel->actualizar($id_doctor, $datosUsuario, $datosDoctor, $sucursales);
-            
-            if ($resultado) {
-                $mensaje = 'Doctor actualizado exitosamente';
-                if (!empty($sucursales)) {
-                    $mensaje .= ' con ' . count($sucursales) . ' sucursal(es) asignada(s)';
-                }
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => $mensaje
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al actualizar el doctor'
-                ]);
-            }
-            
-        } catch (Exception $e) {
-            $this->logError("Error editando doctor: " . $e->getMessage(), $_POST);
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error al actualizar el doctor: ' . $e->getMessage()
-            ]);
+    /**
+ * ✅ EDITAR DOCTOR - MÉTODO COMPLETO
+ */
+private function editar() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]);
+        return;
+    }
+    
+    // Verificar permisos
+    $this->verificarPermisos('editar');
+    
+    // Validar ID
+    if (empty($_POST['id_doctor'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de doctor requerido'
+        ]);
+        return;
+    }
+    
+    $id_doctor = (int)$_POST['id_doctor'];
+    
+    // Validar campos requeridos
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
         }
     }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => "Campos requeridos faltantes: " . implode(', ', $camposFaltantes)
+        ]);
+        return;
+    }
+    
+    try {
+        // Obtener datos actuales del doctor
+        $doctorActual = $this->doctoresModel->obtenerPorId($id_doctor);
+        if (!$doctorActual) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Doctor no encontrado'
+            ]);
+            return;
+        }
+        
+        // Validar duplicados (excluyendo el usuario actual)
+        if ($this->usuarioModel->existeUsuarioPorUsername($_POST['username'], $doctorActual['id_usuario'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Ya existe otro usuario con ese nombre de usuario'
+            ]);
+            return;
+        }
+        
+        if ($this->usuarioModel->existeUsuarioPorCorreo($_POST['correo'], $doctorActual['id_usuario'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Ya existe otro usuario con ese correo electrónico'
+            ]);
+            return;
+        }
+        
+        // Preparar datos del usuario
+        $datosUsuario = [
+            'cedula' => trim($_POST['cedula']),
+            'username' => trim($_POST['username']),
+            'nombres' => trim($_POST['nombres']),
+            'apellidos' => trim($_POST['apellidos']),
+            'sexo' => $_POST['sexo'],
+            'nacionalidad' => trim($_POST['nacionalidad']),
+            'correo' => trim($_POST['correo']),
+            'id_estado' => isset($_POST['id_estado']) ? (int)$_POST['id_estado'] : 1
+        ];
+        
+        // Preparar datos del doctor
+        $datosDoctor = [
+            'id_especialidad' => (int)$_POST['id_especialidad'],
+            'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
+        ];
+        
+        // Obtener sucursales seleccionadas
+        $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+        
+        // Procesar horarios si se enviaron
+        $horarios = [];
+        if (isset($_POST['horarios']) && is_array($_POST['horarios'])) {
+            foreach ($_POST['horarios'] as $horario) {
+                if (isset($horario['id_sucursal'], $horario['dia_semana'], $horario['hora_inicio'], $horario['hora_fin'])) {
+                    $horarios[] = [
+                        'id_sucursal' => (int)$horario['id_sucursal'],
+                        'dia_semana' => (int)$horario['dia_semana'],
+                        'hora_inicio' => $horario['hora_inicio'],
+                        'hora_fin' => $horario['hora_fin'],
+                        'duracion_cita' => isset($horario['duracion_cita']) ? (int)$horario['duracion_cita'] : 30
+                    ];
+                }
+            }
+        }
+        
+        if ($this->debug) {
+            error_log("🔄 Actualizando doctor ID: $id_doctor");
+            error_log("Datos usuario: " . json_encode($datosUsuario));
+            error_log("Datos doctor: " . json_encode($datosDoctor));
+            error_log("Sucursales: " . json_encode($sucursales));
+            error_log("Horarios: " . json_encode($horarios));
+        }
+        
+        // Actualizar doctor
+        $resultado = $this->doctoresModel->actualizar($id_doctor, $datosUsuario, $datosDoctor, $sucursales);
+        
+        if ($resultado) {
+            // Actualizar horarios si se proporcionaron
+            if (!empty($horarios)) {
+                try {
+                    $this->doctoresModel->actualizarHorarios($id_doctor, $horarios);
+                } catch (Exception $e) {
+                    error_log("Warning: Error actualizando horarios: " . $e->getMessage());
+                }
+            }
+            
+            $mensaje = 'Doctor actualizado exitosamente';
+            if (!empty($sucursales)) {
+                $mensaje .= ' con ' . count($sucursales) . ' sucursal(es) asignada(s)';
+            }
+            if (!empty($horarios)) {
+                $mensaje .= ' y ' . count($horarios) . ' horario(s) configurado(s)';
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'message' => $mensaje
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al actualizar el doctor'
+            ]);
+        }
+        
+    } catch (Exception $e) {
+        error_log("❌ Error editando doctor: " . $e->getMessage());
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error al actualizar el doctor: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function eliminar() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -658,6 +693,7 @@ error_log("📋 Horarios procesados: " . print_r($horarios, true));
         }
     }
     
+    
     private function obtenerDoctoresPaginados() {
         try {
             $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
@@ -711,37 +747,60 @@ error_log("📋 Horarios procesados: " . print_r($horarios, true));
         }
     }
     
-    private function obtenerPorId() {
-        if (empty($_GET['id'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID requerido'
-            ]);
-            return;
+    /**
+ * ✅ OBTENER DOCTOR POR ID - MÉTODO CORREGIDO
+ */
+private function obtenerPorId() {
+    if (!isset($_GET['id'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de doctor requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_doctor = (int)$_GET['id'];
+        
+        if ($this->debug) {
+            error_log("🔍 Obteniendo doctor por ID: $id_doctor");
         }
         
-        try {
-            $id_doctor = (int)$_GET['id'];
-            $doctor = $this->doctoresModel->obtenerPorId($id_doctor);
-            
-            if ($doctor) {
-                $this->responderJSON([
-                    'success' => true,
-                    'data' => $doctor
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Doctor no encontrado'
-                ]);
+        $doctor = $this->doctoresModel->obtenerPorId($id_doctor);
+        
+        if ($doctor) {
+            // Obtener horarios del doctor
+            try {
+                $horarios = $this->doctoresModel->obtenerHorarios($id_doctor);
+                $doctor['horarios'] = $horarios;
+            } catch (Exception $e) {
+                error_log("Warning: No se pudieron cargar horarios para doctor $id_doctor: " . $e->getMessage());
+                $doctor['horarios'] = [];
             }
-        } catch (Exception $e) {
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $doctor,
+                'message' => 'Doctor encontrado'
+            ]);
+        } else {
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'Doctor no encontrado'
             ]);
         }
+        
+    } catch (Exception $e) {
+        if ($this->debug) {
+            error_log("❌ Error en obtenerPorId: " . $e->getMessage());
+        }
+        
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error al obtener el doctor: ' . $e->getMessage()
+        ]);
     }
+}
     
     // ===== MÉTODOS DE VALIDACIÓN =====
     
@@ -904,6 +963,8 @@ private function verificarUsername() {
             ]);
         }
     }
+
+    
     
     // ===== MÉTODOS AUXILIARES =====
     

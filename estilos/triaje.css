@@ -693,3 +693,100 @@
 ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(135deg, var(--medical-primary-dark), var(--medical-primary));
 }
+/* Mejor espaciado en estadísticas */
+.stat-card {
+    padding: 1.5rem !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(0,0,0,0.08) !important;
+    transition: all 0.3s ease !important;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+/* Iconos mejor distribuidos */
+.stat-icon {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.5rem !important;
+}
+
+/* Números más legibles */
+.stat-number {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.25rem !important;
+}
+
+.stat-label {
+    font-size: 0.875rem !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+}
+
+/* Header mejorado */
+.triaje-header {
+    padding: 2rem 2.5rem !important;
+    margin-bottom: 2rem !important;
+}
+
+.triaje-header h1 {
+    font-size: 2.25rem !important;
+    margin-bottom: 0.75rem !important;
+}
+
+.triaje-header .btn {
+    padding: 0.5rem 1.25rem !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+}
+
+/* Controles mejor espaciados */
+.form-label {
+    font-size: 0.875rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.input-group {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
+/* Tabla mejorada */
+.table th {
+    padding: 1rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+}
+
+.table td {
+    padding: 1rem 0.75rem !important;
+    vertical-align: middle !important;
+}
+
+/* Responsive mejorado */
+@media (max-width: 768px) {
+    .triaje-header {
+        padding: 1.5rem !important;
+        text-align: center !important;
+    }
+    
+    .triaje-header h1 {
+        font-size: 1.75rem !important;
+    }
+    
+    .stat-card {
+        text-align: center !important;
+    }
+    
+    .d-flex.gap-2 {
+        justify-content: center !important;
+    }
+}

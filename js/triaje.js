@@ -412,32 +412,32 @@ function mostrarCitas(citas) {
 }
 
 function crearFilaCita(cita) {
-    const hora = new Date(cita.fecha_hora).toLocaleTimeString('es-ES', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    const hora = new Date(cita.fecha_hora).toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit'
     });
     
     const nombreCompleto = `${cita.nombres_paciente} ${cita.apellidos_paciente}`;
-    const doctorCompleto = `Dr. ${cita.nombres_doctor} ${cita.apellidos_doctor}`;
+    const doctorCompleto = `${cita.nombres_doctor} ${cita.apellidos_doctor}`;
     
-    // Estado del triaje
-    let estadoTriaje, badgeClass, urgenciaInfo;
+    // ✅ ESTADOS CORREGIDOS
+    let estadoTriaje, badgeClass, urgenciaInfo, botones;
     
-    if (cita.tiene_triaje) {
-        // Usar estado_triaje de la base de datos
-        const estado = cita.estado_triaje_display || cita.estado_triaje || 'Completado';
-        estadoTriaje = `<span class="badge badge-completado">✅ ${estado}</span>`;
+    if (cita.tiene_consulta) {
+        // Consulta completada por el doctor
+        estadoTriaje = '<span class="badge badge-completado">✅ Consulta Completada</span>';
         badgeClass = 'estado-completado';
         urgenciaInfo = obtenerInfoUrgencia(cita.nivel_urgencia || 1);
-    } else {
-        estadoTriaje = '<span class="badge badge-pendiente">⏳ Pendiente</span>';
+        botones = `
+            <button class="btn btn-sm btn-success" disabled title="Consulta completada">
+                <i class="bi bi-check-circle"></i> Completado
+            </button>
+        `;
+    } else if (cita.tiene_triaje) {
+        // Triaje completado, esperando atención médica
+        estadoTriaje = '<span class="badge badge-pendiente">⏳ Pendiente Atención</span>';
         badgeClass = 'estado-pendiente';
-        urgenciaInfo = '<span class="text-muted">-</span>';
-    }
-    
-    // Botones de acción
-    let botones;
-    if (cita.tiene_triaje) {
+        urgenciaInfo = obtenerInfoUrgencia(cita.nivel_urgencia || 1);
         botones = `
             <button class="btn btn-sm btn-info me-1" onclick="verTriaje(${cita.id_cita})" title="Ver triaje">
                 <i class="bi bi-eye"></i>
@@ -447,6 +447,10 @@ function crearFilaCita(cita) {
             </button>
         `;
     } else {
+        // Sin triaje
+        estadoTriaje = '<span class="badge badge-urgente">❌ Sin Triaje</span>';
+        badgeClass = 'estado-urgente';
+        urgenciaInfo = '<span class="text-muted">-</span>';
         botones = `
             <button class="btn btn-sm btn-primary btn-triaje" onclick="realizarTriaje(${cita.id_cita})" title="Realizar triaje">
                 <i class="bi bi-clipboard2-pulse"></i> Triaje
@@ -456,14 +460,14 @@ function crearFilaCita(cita) {
     
     return `
         <tr class="${badgeClass}" data-cita-id="${cita.id_cita}">
-            <td><strong>${hora}</strong></td>
+            <td class="text-center"><strong>${hora}</strong></td>
             <td>${nombreCompleto}</td>
-            <td><code>${cita.cedula_paciente}</code></td>
+            <td>${cita.cedula_paciente}</td>
             <td>${doctorCompleto}</td>
-            <td><span class="badge bg-secondary">${cita.nombre_especialidad}</span></td>
-            <td>${estadoTriaje}</td>
-            <td>${urgenciaInfo}</td>
-            <td>${botones}</td>
+            <td>${cita.nombre_especialidad}</td>
+            <td class="text-center">${estadoTriaje}</td>
+            <td class="text-center">${urgenciaInfo}</td>
+            <td class="text-center">${botones}</td>
         </tr>
     `;
 }
@@ -872,18 +876,76 @@ function validarFormularioTriaje() {
 }
 
 // ===== ESTADÍSTICAS =====
-function actualizarEstadisticasRapidas(citas) {
-    const total = citas.length;
-    const pendientes = citas.filter(c => !c.tiene_triaje).length;
-    const completados = citas.filter(c => c.tiene_triaje).length;
-    const urgentes = citas.filter(c => c.tiene_triaje && (c.nivel_urgencia >= 3)).length;
+// ===== FUNCIÓN DE ANIMACIÓN PARA CONTADORES =====
+function animarContador(selector, valorFinal) {
+    const elemento = $(selector);
+    const valorInicial = 0;
+    const duracion = 1000;
+    const pasos = 50;
+    const incremento = valorFinal / pasos;
     
-    $('#totalCitas').text(total);
-    $('#citasPendientes').text(pendientes);
-    $('#triageCompletados').text(completados);
-    $('#urgentes').text(urgentes);
+    let valorActual = valorInicial;
+    let paso = 0;
+    
+    const timer = setInterval(() => {
+        paso++;
+        valorActual = Math.min(valorFinal, Math.floor(incremento * paso));
+        elemento.text(valorActual);
+        
+        if (paso >= pasos || valorActual >= valorFinal) {
+            clearInterval(timer);
+            elemento.text(valorFinal); // Asegurar valor final exacto
+        }
+    }, duracion / pasos);
 }
 
+// ===== FUNCIÓN CORREGIDA PARA ACTUALIZAR ESTADÍSTICAS =====
+function actualizarEstadisticasRapidas(citas) {
+    const total = citas.length;
+    const pendientes = citas.filter(c => !c.tiene_triaje && !c.tiene_consulta).length;
+    const completados = citas.filter(c => c.tiene_triaje && !c.tiene_consulta).length;
+    const consultasTerminadas = citas.filter(c => c.tiene_consulta).length;
+    const urgentes = citas.filter(c => c.tiene_triaje && (c.nivel_urgencia >= 3)).length;
+    
+    // Actualizar contadores con animación
+    animarContador('#totalCitas', total);
+    animarContador('#citasPendientes', pendientes);
+    animarContador('#triageCompletados', completados);
+    animarContador('#urgentes', urgentes);
+    
+    // Agregar contador de consultas completadas si no existe
+    if ($('#consultasCompletadas').length === 0) {
+        // Buscar la fila de estadísticas y agregar la nueva tarjeta
+        const $filaEstadisticas = $('.row.g-4.mb-5');
+        if ($filaEstadisticas.length > 0) {
+            const nuevaTarjeta = `
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card stat-info h-100">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon icon-info me-3">
+                                <i class="bi bi-check2-circle"></i>
+                            </div>
+                            <div>
+                                <div class="stat-number" id="consultasCompletadas">0</div>
+                                <div class="stat-label">Consultas Completadas</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $filaEstadisticas.append(nuevaTarjeta);
+        }
+    }
+    
+    // Actualizar el contador de consultas completadas
+    if ($('#consultasCompletadas').length > 0) {
+        animarContador('#consultasCompletadas', consultasTerminadas);
+    }
+    
+    if (config.debug) {
+        console.log(`📊 Estadísticas - Total: ${total}, Pendientes: ${pendientes}, Completados: ${completados}, Consultas: ${consultasTerminadas}, Urgentes: ${urgentes}`);
+    }
+}
 function mostrarEstadisticas() {
     $.ajax({
         url: config.baseUrl,

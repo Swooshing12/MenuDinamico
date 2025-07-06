@@ -1,5 +1,4 @@
 <?php
-
 if (!isset($_SESSION)) session_start();
 
 // Verificar si es enfermero
@@ -11,167 +10,187 @@ if (!isset($_SESSION['id_rol']) || $_SESSION['id_rol'] != 73) {
 $titulo_pagina = "Triaje - Enfermería";
 include_once '../../navbars/header.php';
 include_once '../../navbars/sidebar.php';
-
 ?>
 
 <!-- CSS específico para triaje -->
 <link rel="stylesheet" href="../../estilos/triaje.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-<div class="container-fluid">
+<div class="container-fluid py-4">
     <!-- ✅ HEADER PROFESIONAL REDISEÑADO -->
-    <div class="triaje-header fade-in-up">
+    <div class="triaje-header fade-in-up mb-4">
         <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1>
+            <div class="col-lg-8 col-md-7">
+                <h1 class="mb-3">
                     <i class="bi bi-clipboard2-pulse me-3"></i>
                     Sistema de Triaje Médico
                 </h1>
-                <p class="mb-0">
+                <p class="mb-3">
                     Evaluación inicial y clasificación de pacientes por prioridad médica
                 </p>
-                <div class="mt-3">
-                    <span class="badge bg-light text-dark me-2">
-                        <i class="bi bi-person-badge me-1"></i>
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge bg-light text-dark px-3 py-2">
+                        <i class="bi bi-person-badge me-2"></i>
                         Enfermero/a: <?php echo $_SESSION['nombres'] ?? 'Usuario'; ?>
                     </span>
-                    <span class="badge bg-light text-dark">
-                        <i class="bi bi-calendar-check me-1"></i>
+                    <span class="badge bg-light text-dark px-3 py-2">
+                        <i class="bi bi-calendar-check me-2"></i>
                         <?php echo date('d/m/Y'); ?>
                     </span>
                 </div>
             </div>
-            <div class="col-md-4 text-end">
-                <button type="button" class="btn btn-light me-2" id="btnEstadisticas">
-                    <i class="bi bi-graph-up me-1"></i>
-                    Estadísticas
-                </button>
-                <button type="button" class="btn btn-light" id="btnRefrescar">
-                    <i class="bi bi-arrow-clockwise me-1"></i>
-                    Actualizar
-                </button>
+            <div class="col-lg-4 col-md-5 text-md-end text-start mt-3 mt-md-0">
+                <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                    <button type="button" class="btn btn-light px-4 py-2" id="btnEstadisticas">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Estadísticas
+                    </button>
+                    <button type="button" class="btn btn-light px-4 py-2" id="btnRefrescar">
+                        <i class="bi bi-arrow-clockwise me-2"></i>
+                        Actualizar
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- ✅ ESTADÍSTICAS PROFESIONALES REDISEÑADAS -->
-    <div class="estadisticas-container fade-in-up">
-        <div class="stat-card stat-primary">
-            <div class="stat-icon icon-primary">
-                <i class="bi bi-people-fill"></i>
+    <div class="row g-4 mb-5">
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-primary h-100">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon icon-primary me-3">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" id="totalCitas">0</div>
+                        <div class="stat-label">Total de Citas</div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-number" id="totalCitas">0</div>
-            <div class="stat-label">Total de Citas</div>
         </div>
         
-        <div class="stat-card stat-warning">
-            <div class="stat-icon icon-warning">
-                <i class="bi bi-clock-fill"></i>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-warning h-100">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon icon-warning me-3">
+                        <i class="bi bi-clock-fill"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" id="citasPendientes">0</div>
+                        <div class="stat-label">Triajes Pendientes</div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-number" id="citasPendientes">0</div>
-            <div class="stat-label">Triajes Pendientes</div>
         </div>
         
-        <div class="stat-card stat-success">
-            <div class="stat-icon icon-success">
-                <i class="bi bi-check-circle-fill"></i>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-success h-100">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon icon-success me-3">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" id="triageCompletados">0</div>
+                        <div class="stat-label">Triajes Completados</div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-number" id="triageCompletados">0</div>
-            <div class="stat-label">Triajes Completados</div>
         </div>
         
-        <div class="stat-card stat-danger">
-            <div class="stat-icon icon-danger">
-                <i class="bi bi-exclamation-triangle-fill"></i>
+        <div class="col-lg-3 col-md-6">
+            <div class="stat-card stat-danger h-100">
+                <div class="d-flex align-items-center">
+                    <div class="stat-icon icon-danger me-3">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    </div>
+                    <div>
+                        <div class="stat-number" id="urgentes">0</div>
+                        <div class="stat-label">Casos Urgentes</div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-number" id="urgentes">0</div>
-            <div class="stat-label">Casos Urgentes</div>
         </div>
     </div>
 
     <!-- ✅ CARD PRINCIPAL PROFESIONAL -->
-    <div class="triaje-main-card fade-in-up">
-        <div class="card-header">
-            <div class="row align-items-center">
-                <div class="col-md-3">
-                    <h5 class="mb-0">
-                        <i class="bi bi-list-check me-2"></i>
+    <div class="card border-0 shadow-lg">
+        <div class="card-header bg-white border-0 p-4">
+            <div class="row align-items-center mb-4">
+                <div class="col-lg-4">
+                    <h5 class="mb-2 fw-bold">
+                        <i class="bi bi-list-check me-2 text-primary"></i>
                         Gestión de Triaje
                     </h5>
                     <small class="text-muted">Control de pacientes del día</small>
                 </div>
-                <div class="col-md-9">
-                    <!-- ✅ CONTROLES PROFESIONALES -->
-                    <div class="controls-section">
-                        <div class="row g-3 align-items-end">
-                            <!-- Fecha -->
-                            <div class="col-md-2">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-calendar3 me-1"></i>
-                                    Fecha
-                                </label>
-                                <input type="date" id="fechaTriaje" class="form-control" 
-                                       value="<?php echo date('Y-m-d'); ?>">
+                <div class="col-lg-8">
+                    <!-- ✅ CONTROLES PROFESIONALES MEJORADOS -->
+                    <div class="row g-3">
+                        <!-- Fecha -->
+                        <div class="col-xl-2 col-lg-3 col-md-4">
+                            <label class="form-label fw-semibold mb-2">
+                                <i class="bi bi-calendar3 me-1 text-primary"></i>
+                                Fecha
+                            </label>
+                            <input type="date" id="fechaTriaje" class="form-control" 
+                                   value="<?php echo date('Y-m-d'); ?>">
+                        </div>
+                        
+                        <!-- Buscador -->
+                        <div class="col-xl-4 col-lg-5 col-md-8">
+                            <label class="form-label fw-semibold mb-2">
+                                <i class="bi bi-search me-1 text-primary"></i>
+                                Buscar Paciente
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="bi bi-credit-card text-muted"></i>
+                                </span>
+                                <input type="text" id="buscarCedula" class="form-control border-start-0" 
+                                       placeholder="Ingrese cédula..." 
+                                       pattern="[0-9]*" 
+                                       maxlength="10"
+                                       autocomplete="off">
+                                <button class="btn btn-outline-primary" type="button" id="btnBuscarCedula">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button" id="btnLimpiarBusqueda">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
                             </div>
-                            
-                            <!-- ✅ BUSCADOR PROFESIONAL -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-search me-1"></i>
-                                    Buscar por Cédula
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="bi bi-credit-card"></i>
-                                    </span>
-                                    <input type="text" id="buscarCedula" class="form-control" 
-                                           placeholder="Ingrese cédula del paciente" 
-                                           pattern="[0-9]*" 
-                                           maxlength="10"
-                                           autocomplete="off">
-                                    <div class="btn-search-group">
-                                        <button class="btn btn-search" type="button" id="btnBuscarCedula" title="Buscar paciente">
-                                            <i class="bi bi-search"></i>
-                                        </button>
-                                        <button class="btn btn-clear" type="button" id="btnLimpiarBusqueda" title="Limpiar búsqueda">
-                                            <i class="bi bi-x-circle"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="form-text">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    Mínimo 3 dígitos para búsqueda
-                                </div>
-                            </div>
-                            
-                            <!-- Filtro Estado -->
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-funnel me-1"></i>
-                                    Filtrar Estado
-                                </label>
-                                <select id="filtroEstado" class="form-select">
-                                    <option value="">🔍 Todos los estados</option>
-                                    <option value="Pendiente">⏳ Pendientes de triaje</option>
-                                    <option value="Completado">✅ Triajes completados</option>
-                                    <option value="Urgente">🟠 Casos urgentes</option>
-                                    <option value="Critico">🔴 Casos críticos</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Botón Actualizar -->
-                            <div class="col-md-2">
-                                <button class="btn btn-refresh w-100" id="btnActualizarTabla">
+                            <small class="form-text text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Mínimo 3 dígitos
+                            </small>
+                        </div>
+                        
+                        <!-- Filtro Estado -->
+                        <div class="col-xl-3 col-lg-4 col-md-6">
+                            <label class="form-label fw-semibold mb-2">
+                                <i class="bi bi-funnel me-1 text-primary"></i>
+                                Estado
+                            </label>
+                            <select id="filtroEstado" class="form-select">
+                                <option value="">Todos los estados</option>
+                                <option value="Pendiente">⏳ Pendientes</option>
+                                <option value="Completado">✅ Completados</option>
+                                <option value="Urgente">🟠 Urgentes</option>
+                                <option value="Critico">🔴 Críticos</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Botones de acción -->
+                        <div class="col-xl-3 col-lg-4 col-md-6">
+                            <label class="form-label fw-semibold mb-2 d-block">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary flex-fill" id="btnActualizarTabla">
                                     <i class="bi bi-arrow-clockwise me-1"></i>
                                     Actualizar
                                 </button>
-                            </div>
-                            
-                            <!-- Contador profesional -->
-                            <div class="col-md-1">
-                                <div class="contador-container">
-                                    <div class="contador-badge" id="contadorResultados">0</div>
-                                    <div class="contador-label">resultados</div>
+                                <div class="badge bg-secondary align-self-center px-3 py-2">
+                                    <div class="fw-bold" id="contadorResultados">0</div>
+                                    <small>resultados</small>
                                 </div>
                             </div>
                         </div>
@@ -180,29 +199,31 @@ include_once '../../navbars/sidebar.php';
             </div>
             
             <!-- ✅ ÁREA DE RESULTADOS PROFESIONAL -->
-            <div id="resultadosBusqueda" style="display: none;">
-                <!-- Se llena dinámicamente con alertas profesionales -->
+            <div id="resultadosBusqueda" style="display: none;" class="mt-3">
+                <!-- Se llena dinámicamente -->
             </div>
         </div>
         
         <div class="card-body p-0">
             <!-- ✅ LOADING PROFESIONAL -->
-            <div id="loadingCitas" class="loading-container">
-                <div class="spinner-medical"></div>
+            <div id="loadingCitas" class="loading-container text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
                 <h5 class="text-muted">Cargando información de pacientes...</h5>
-                <p class="text-muted">Por favor espere un momento</p>
+                <p class="text-muted mb-0">Por favor espere un momento</p>
             </div>
 
             <!-- ✅ TABLA PROFESIONAL -->
-            <div class="table-container d-none" id="tablaCitas">
-                <table class="table">
-                    <thead>
+            <div class="table-responsive d-none" id="tablaCitas">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
                         <tr>
-                            <th width="8%">
+                            <th class="text-center" width="8%">
                                 <i class="bi bi-clock me-1"></i>
                                 Hora
                             </th>
-                            <th width="20%">
+                            <th width="18%">
                                 <i class="bi bi-person me-1"></i>
                                 Paciente
                             </th>
@@ -210,23 +231,23 @@ include_once '../../navbars/sidebar.php';
                                 <i class="bi bi-credit-card me-1"></i>
                                 Cédula
                             </th>
-                            <th width="18%">
+                            <th width="16%">
                                 <i class="bi bi-person-badge me-1"></i>
-                                Médico Asignado
+                                Médico
                             </th>
-                            <th width="15%">
+                            <th width="14%">
                                 <i class="bi bi-hospital me-1"></i>
                                 Especialidad
                             </th>
-                            <th width="12%">
+                            <th class="text-center" width="12%">
                                 <i class="bi bi-clipboard-pulse me-1"></i>
-                                Estado Triaje
+                                Estado
                             </th>
-                            <th width="10%">
+                            <th class="text-center" width="10%">
                                 <i class="bi bi-exclamation-circle me-1"></i>
                                 Urgencia
                             </th>
-                            <th width="15%">
+                            <th class="text-center" width="10%">
                                 <i class="bi bi-tools me-1"></i>
                                 Acciones
                             </th>
@@ -239,23 +260,23 @@ include_once '../../navbars/sidebar.php';
             </div>
 
             <!-- ✅ MENSAJES PROFESIONALES -->
-            <div id="sinCitas" class="mensaje-vacio d-none">
-                <i class="bi bi-calendar-x"></i>
-                <h5>No hay citas programadas</h5>
-                <p>No se encontraron citas médicas para la fecha seleccionada.</p>
-                <button class="btn btn-outline-primary" onclick="$('#fechaTriaje').focus()">
+            <div id="sinCitas" class="text-center py-5 d-none">
+                <i class="bi bi-calendar-x text-muted" style="font-size: 4rem;"></i>
+                <h5 class="mt-3 text-muted">No hay citas programadas</h5>
+                <p class="text-muted">No se encontraron citas médicas para la fecha seleccionada.</p>
+                <button class="btn btn-outline-primary mt-2" onclick="$('#fechaTriaje').focus()">
                     <i class="bi bi-calendar-plus me-1"></i>
                     Seleccionar otra fecha
                 </button>
             </div>
 
-            <div id="sinResultados" class="mensaje-vacio d-none">
-                <i class="bi bi-search"></i>
-                <h5>Sin resultados de búsqueda</h5>
-                <p>No se encontraron pacientes que coincidan con los criterios de búsqueda.</p>
-                <button class="btn btn-outline-primary" onclick="limpiarBusqueda()">
+            <div id="sinResultados" class="text-center py-5 d-none">
+                <i class="bi bi-search text-muted" style="font-size: 4rem;"></i>
+                <h5 class="mt-3 text-muted">Sin resultados de búsqueda</h5>
+                <p class="text-muted">No se encontraron pacientes que coincidan con los criterios.</p>
+                <button class="btn btn-outline-primary mt-2" onclick="limpiarBusqueda()">
                     <i class="bi bi-arrow-left me-1"></i>
-                    Mostrar todos los pacientes
+                    Mostrar todos
                 </button>
             </div>
         </div>

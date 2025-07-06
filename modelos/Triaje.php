@@ -108,12 +108,15 @@ class Triaje {
     /**
      * ✅ MÉTODO MEJORADO: Obtener citas para triaje con búsqueda por cédula
      */
-    public function obtenerCitasPendientesTriaje($fecha = null, $buscar_cedula = null): array {
+    /**
+ * ✅ MÉTODO CORREGIDO: Obtener citas para triaje con estados actualizados
+ */
+public function obtenerCitasPendientesTriaje($fecha = null, $buscar_cedula = null): array {
     try {
         $fecha = $fecha ?: date('Y-m-d');
         
         $query = "SELECT c.id_cita, c.fecha_hora, c.motivo, c.estado,
-                         c.id_paciente, -- ⭐ AGREGAR ID_PACIENTE
+                         c.id_paciente,
                          p.nombres as nombres_paciente, 
                          p.apellidos as apellidos_paciente,
                          p.cedula as cedula_paciente,
@@ -123,8 +126,15 @@ class Triaje {
                          s.nombre_sucursal,
                          t.id_triage,
                          t.nivel_urgencia,
-                         t.estado_triaje, -- ⭐ INCLUIR ESTADO_TRIAJE
-                         CASE WHEN t.id_triage IS NOT NULL THEN 1 ELSE 0 END as tiene_triaje
+                         t.estado_triaje,
+                         cm.id_consulta,
+                         CASE 
+                             WHEN cm.id_consulta IS NOT NULL THEN 'Consulta_Completada'
+                             WHEN t.id_triage IS NOT NULL THEN 'Pendiente_Atencion'
+                             ELSE 'Pendiente_Triaje'
+                         END as estado_real,
+                         CASE WHEN t.id_triage IS NOT NULL THEN 1 ELSE 0 END as tiene_triaje,
+                         CASE WHEN cm.id_consulta IS NOT NULL THEN 1 ELSE 0 END as tiene_consulta
                   FROM citas c
                   INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
                   INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
@@ -133,18 +143,24 @@ class Triaje {
                   INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
                   INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
                   LEFT JOIN triage t ON c.id_cita = t.id_cita
+                  LEFT JOIN consultas_medicas cm ON c.id_cita = cm.id_cita
                   WHERE DATE(c.fecha_hora) = :fecha 
-                  AND c.estado IN ('Pendiente', 'Confirmada')";
+                  AND c.estado IN ('Pendiente', 'Confirmada', 'Completada')"; // ✅ INCLUIR COMPLETADAS
         
         $parametros = [':fecha' => $fecha];
         
-        // ✅ BÚSQUEDA POR CÉDULA SI SE PROPORCIONA
+        // Búsqueda por cédula si se proporciona
         if (!empty($buscar_cedula)) {
             $query .= " AND p.cedula LIKE :cedula";
             $parametros[':cedula'] = "%{$buscar_cedula}%";
         }
         
         $query .= " ORDER BY 
+                    CASE 
+                        WHEN cm.id_consulta IS NOT NULL THEN 3
+                        WHEN t.id_triage IS NOT NULL THEN 2
+                        ELSE 1
+                    END,
                     CASE WHEN t.nivel_urgencia IS NOT NULL THEN t.nivel_urgencia ELSE 0 END DESC,
                     c.fecha_hora ASC";
         
@@ -153,7 +169,7 @@ class Triaje {
         
         $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // ✅ DEBUG SIMPLE SIN CONSTANTES
+        // Debug mejorado
         error_log("=== TRIAJE MODEL DEBUG ===");
         error_log("Fecha: $fecha");
         error_log("Búsqueda cédula: " . ($buscar_cedula ?: 'ninguna'));
