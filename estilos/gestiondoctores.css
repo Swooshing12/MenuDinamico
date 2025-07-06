@@ -1281,3 +1281,21 @@ i.bi {
             }
         }
         
+
+
+#modalHorario {
+    z-index: 1060 !important;
+}
+
+#modalHorario .modal-backdrop {
+    z-index: 1055 !important;
+}
+
+/* Asegurar que el backdrop del modal de horarios esté por encima */
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+
+.modal-backdrop:nth-of-type(2) {
+    z-index: 1055 !important;
+}

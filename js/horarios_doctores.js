@@ -211,7 +211,11 @@ function abrirModalAgregarHorarioEditar() {
     $('#modalHorario').modal('show');
 }
 
+// ===== SOLUCION 2: EVITAR CIERRE AUTOMATICO DEL MODAL =====
 function editarHorarioEdicion(index) {
+    event.preventDefault();
+    event.stopPropagation();
+    
     const idSucursal = $('#editarSucursalHorarios').val();
     const horarios = horariosDoctor[idSucursal] || [];
     const horario = horarios[index];
@@ -224,10 +228,20 @@ function editarHorarioEdicion(index) {
     $('#horaInicio').val(horario.hora_inicio);
     $('#horaFin').val(horario.hora_fin);
     $('#duracionCita').val(horario.duracion_cita);
+    
+    // Prevenir que se cierre el modal padre
+    $('#modalHorario').off('hidden.bs.modal.prevenir-cierre');
+    $('#modalHorario').on('hidden.bs.modal.prevenir-cierre', function(e) {
+        e.stopPropagation();
+    });
+    
     $('#modalHorario').modal('show');
 }
 
 function eliminarHorarioEdicion(index) {
+    event.preventDefault();
+    event.stopPropagation();
+    
     const idSucursal = $('#editarSucursalHorarios').val();
     
     Swal.fire({
@@ -235,19 +249,27 @@ function eliminarHorarioEdicion(index) {
         text: 'Esta acción no se puede deshacer',
         icon: 'warning',
         showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
-            horariosDoctor[idSucursal].splice(index, 1);
-            mostrarHorariosSucursalEditar(idSucursal);
-            
-            Swal.fire({
-                icon: 'success',
-                title: 'Horario eliminado',
-                timer: 1500,
-                showConfirmButton: false
-            });
+            // Eliminar del array local
+            if (horariosDoctor[idSucursal]) {
+                horariosDoctor[idSucursal].splice(index, 1);
+                
+                // Reindexar horarios
+                horariosDoctor[idSucursal].forEach((horario, i) => {
+                    horario.index = i;
+                });
+                
+                // Actualizar vista
+                mostrarHorariosSucursalEditar(idSucursal);
+                
+                // NO mostrar mensaje de éxito aquí para evitar confusión
+                console.log('✅ Horario eliminado localmente');
+            }
         }
     });
 }

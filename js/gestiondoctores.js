@@ -218,6 +218,9 @@ function mostrarErrorEnTabla() {
 /**
  * Mostrar doctores en la tabla
  */
+/**
+ * Mostrar doctores en la tabla
+ */
 function mostrarDoctores(doctores) {
     const tbody = $('#tablaDoctoresBody');
     
@@ -259,12 +262,12 @@ function mostrarDoctores(doctores) {
                 estadoBadge = '<span class="badge bg-light text-dark badge-estado">❓ Desconocido</span>';
         }
         
-        // Información personal
+        // Información personal - LÍNEA CORREGIDA
         const informacionPersonal = `
             <div class="d-flex flex-column small">
-                <span><i class="bi bi-card-text me-1 text-muted"></i><strong>CI:</strong> ${doctor.cedula}</span>
-                <span><i class="bi bi-person-circle me-1 text-muted"></i><strong>User:</strong> ${doctor.username}</span>
-                <span><i class="bi bi-envelope me-1 text-muted"></i>${doctor.correo}</span>
+                <span><i class="bi bi-card-text me-1 text-muted"></i><strong>CI:</strong> ${doctor.cedula || 'N/A'}</span>
+                <span><i class="bi bi-person-circle me-1 text-muted"></i><strong>User:</strong> ${doctor.username || 'N/A'}</span>
+                <span><i class="bi bi-envelope me-1 text-muted"></i>${doctor.correo || 'N/A'}</span>
             </div>
         `;
         
@@ -386,7 +389,12 @@ function mostrarDoctores(doctores) {
                         <div>
                             <strong>${doctor.nombres} ${doctor.apellidos}</strong>
                             <br>
-                            <small class="text-muted">${doctor.sexo === 'M' ? 'Masculino' : 'Femenino'} • ${doctor.nacionalidad}</small>
+                            <small class="text-muted">
+                                ${doctor.sexo === 'M' ? 'Masculino' : 'Femenino'} • 
+                                <span class="nacionalidad-banderita-doctor" data-nacionalidad="${doctor.nacionalidad || ''}">
+                                    ${doctor.nacionalidad || 'Sin nacionalidad'}
+                                </span>
+                            </small>
                         </div>
                     </div>
                 </td>
@@ -405,6 +413,15 @@ function mostrarDoctores(doctores) {
     });
     
     tbody.html(html);
+    
+    // 🎌 CARGAR BANDERAS DESPUÉS DE RENDERIZAR LA TABLA
+    setTimeout(() => {
+        if (typeof window.cargarBanderasEnTablaDoctores === 'function') {
+            window.cargarBanderasEnTablaDoctores();
+        } else {
+            console.warn('⚠️ Función cargarBanderasEnTablaDoctores no disponible');
+        }
+    }, 200);
 }
 
 /**
@@ -553,6 +570,7 @@ function crearDoctor(e) {
 /**
 * Abrir modal para editar doctor CON HORARIOS
 */
+// ===== SOLUCION 3: CORREGIR CARGA DE NACIONALIDAD =====
 function abrirModalEditar(idDoctor) {
     console.log('🔄 === INICIANDO EDICIÓN DEL DOCTOR ===');
     console.log('Doctor ID:', idDoctor);
@@ -565,10 +583,27 @@ function abrirModalEditar(idDoctor) {
     // Limpiar formulario
     document.getElementById('formEditarDoctor').reset();
     
+    // 🔥 PASO CRÍTICO: Inicializar Select2 de nacionalidades ANTES de cargar datos
+    if (typeof window.inicializarSelectNacionalidadesDoctores === 'function') {
+        window.inicializarSelectNacionalidadesDoctores(['#editarNacionalidad']).then(() => {
+            console.log('✅ Select2 de nacionalidades inicializado para edición');
+            // Ahora cargar los datos del doctor
+            cargarDatosDoctor(idDoctor);
+        }).catch(error => {
+            console.warn('⚠️ Error inicializando nacionalidades, continuando sin Select2:', error);
+            cargarDatosDoctor(idDoctor);
+        });
+    } else {
+        console.warn('⚠️ Función de nacionalidades no disponible');
+        cargarDatosDoctor(idDoctor);
+    }
+    
     // Mostrar modal
     $('#editarDoctorModal').modal('show');
-    
-    // Cargar datos del doctor
+}
+
+// Nueva función separada para cargar datos
+function cargarDatosDoctor(idDoctor) {
     $.ajax({
         url: config.baseUrl,
         type: 'GET',
@@ -592,11 +627,18 @@ function abrirModalEditar(idDoctor) {
                 $('#editarNombres').val(doctor.nombres);
                 $('#editarApellidos').val(doctor.apellidos);
                 $('#editarSexo').val(doctor.sexo);
-                $('#editarNacionalidad').val(doctor.nacionalidad);
                 $('#editarIdEstado').val(doctor.id_estado);
                 $('#editarCorreo').val(doctor.correo);
                 $('#editarIdEspecialidad').val(doctor.id_especialidad);
                 $('#editarTituloProfesional').val(doctor.titulo_profesional);
+                
+                // 🔥 ASIGNAR NACIONALIDAD CON RETRASO PARA ASEGURAR QUE SELECT2 ESTÉ LISTO
+                if (doctor.nacionalidad) {
+                    setTimeout(() => {
+                        $('#editarNacionalidad').val(doctor.nacionalidad).trigger('change');
+                        console.log('✅ Nacionalidad asignada:', doctor.nacionalidad);
+                    }, 500); // Dar tiempo a que Select2 se inicialice completamente
+                }
                 
                 // Marcar sucursales asignadas
                 $('#sucursalesEditar input[type="checkbox"]').prop('checked', false);
@@ -607,40 +649,17 @@ function abrirModalEditar(idDoctor) {
                     console.log('✅ Sucursales marcadas:', doctor.sucursales.length);
                 }
                 
-                // 🕒 CARGAR HORARIOS PASO A PASO
-                setTimeout(async () => {
+                // Cargar horarios
+                setTimeout(() => {
                     console.log('🕒 === INICIANDO CARGA DE HORARIOS ===');
                     
-                    // 1. Sincronizar sucursales para horarios
                     if (typeof window.sincronizarSucursalesEdicion === 'function') {
-                        console.log('🔄 Sincronizando sucursales...');
                         window.sincronizarSucursalesEdicion();
                     }
                     
-                    // 2. Esperar un poco más y cargar horarios
-                    setTimeout(async () => {
-                        console.log('📅 Cargando horarios del servidor...');
-                        
+                    setTimeout(() => {
                         if (typeof window.cargarHorariosExistentesDelServidor === 'function') {
-                            try {
-                                const horarios = await window.cargarHorariosExistentesDelServidor(idDoctor);
-                                console.log('📅 Horarios cargados:', horarios);
-                                
-                                if (horarios && horarios.length > 0) {
-                                    // Si hay una sucursal seleccionada, mostrar sus horarios
-                                    const sucursalActual = $('#editarSucursalHorarios').val();
-                                    if (sucursalActual) {
-                                        console.log(`📅 Mostrando horarios para sucursal: ${sucursalActual}`);
-                                        if (typeof window.mostrarHorariosSucursalEditar === 'function') {
-                                            window.mostrarHorariosSucursalEditar(sucursalActual);
-                                        }
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('❌ Error cargando horarios:', error);
-                            }
-                        } else {
-                            console.error('❌ Función cargarHorariosExistentesDelServidor no disponible');
+                            window.cargarHorariosExistentesDelServidor(idDoctor);
                         }
                     }, 500);
                 }, 300);
@@ -658,7 +677,6 @@ function abrirModalEditar(idDoctor) {
         }
     });
 }
-
 /**
 * Editar doctor CON HORARIOS
 */

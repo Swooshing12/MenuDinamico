@@ -805,38 +805,35 @@ private function obtenerPorId() {
     // ===== MÉTODOS DE VALIDACIÓN =====
     
     private function verificarCedula() {
-        if (empty($_GET['cedula'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Cédula requerida'
-            ]);
-            return;
-        }
-        
-        try {
-            $cedula = trim($_GET['cedula']);
-            $id_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
-            
-            $existe = $this->doctoresModel->existeUsuarioPorCedula($cedula, $id_excluir);
-            
-            $this->responderJSON([
-                'success' => true,
-                'existe' => $existe
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
+    if (empty($_GET['cedula'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Cédula requerida'
+        ]);
+        return;
     }
     
-    /**
- * Verificar si un username está disponible
- */
+    try {
+        $cedula = trim($_GET['cedula']);
+        $id_doctor_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
+        
+        $existe = $this->doctoresModel->existeCedulaExcluyendoDoctor($cedula, $id_doctor_excluir);
+        
+        $this->responderJSON([
+            'success' => true,
+            'existe' => $existe
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
+
 private function verificarUsername() {
     $username = $_GET['username'] ?? '';
-    $id_usuario = isset($_GET['id_usuario']) ? (int)$_GET['id_usuario'] : null;
+    $id_doctor_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
     
     if (empty($username)) {
         $this->responderJSON([
@@ -847,11 +844,12 @@ private function verificarUsername() {
     }
     
     try {
-        $disponible = !$this->doctoresModel->existeUsuarioPorUsername($username, $id_usuario);
+        $existe = $this->doctoresModel->existeUsernameExcluyendoDoctor($username, $id_doctor_excluir);
         
         $this->responderJSON([
             'success' => true,
-            'disponible' => $disponible,
+            'disponible' => !$existe,
+            'existe' => $existe,
             'username' => $username
         ]);
     } catch (Exception $e) {
@@ -861,33 +859,33 @@ private function verificarUsername() {
         ]);
     }
 }
-    
-    private function verificarCorreo() {
-        if (empty($_GET['correo'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Correo requerido'
-            ]);
-            return;
-        }
-        
-        try {
-            $correo = trim($_GET['correo']);
-            $id_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
-            
-            $existe = $this->doctoresModel->existeUsuarioPorCorreo($correo, $id_excluir);
-            
-            $this->responderJSON([
-                'success' => true,
-                'existe' => $existe
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
+
+private function verificarCorreo() {
+    if (empty($_GET['correo'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Correo requerido'
+        ]);
+        return;
     }
+    
+    try {
+        $correo = trim($_GET['correo']);
+        $id_doctor_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
+        
+        $existe = $this->doctoresModel->existeCorreoExcluyendoDoctor($correo, $id_doctor_excluir);
+        
+        $this->responderJSON([
+            'success' => true,
+            'existe' => $existe
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
+    }
+}
     
     // ===== MÉTODOS DE DATOS =====
     

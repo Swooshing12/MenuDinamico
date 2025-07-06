@@ -350,140 +350,141 @@ public function actualizarHorarios($id_doctor, $horarios) {
     /**
      * Obtener todos los doctores con filtros
      */
-    public function obtenerTodos($filtros = []) {
-        try {
-            $where_conditions = [];
-            $params = [];
-            
-            // Filtro por estado
-            if (!empty($filtros['estado'])) {
-                $where_conditions[] = "u.id_estado = :estado";
-                $params[':estado'] = $filtros['estado'];
-            }
-            
-            // Filtro por especialidad
-            if (!empty($filtros['id_especialidad'])) {
-                $where_conditions[] = "d.id_especialidad = :id_especialidad";
-                $params[':id_especialidad'] = $filtros['id_especialidad'];
-            }
-            
-            // Filtro por sucursal
-            if (!empty($filtros['id_sucursal'])) {
-                $where_conditions[] = "ds.id_sucursal = :id_sucursal";
-                $params[':id_sucursal'] = $filtros['id_sucursal'];
-            }
-            
-            // Filtro por búsqueda de texto
-            if (!empty($filtros['busqueda'])) {
-                $where_conditions[] = "(u.cedula LIKE :busqueda 
-                                     OR u.nombres LIKE :busqueda 
-                                     OR u.apellidos LIKE :busqueda 
-                                     OR e.nombre_especialidad LIKE :busqueda
-                                     OR d.titulo_profesional LIKE :busqueda)";
-                $params[':busqueda'] = '%' . $filtros['busqueda'] . '%';
-            }
-            
-            $join_sucursal = !empty($filtros['id_sucursal']) ? 
-                "INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor" : 
-                "LEFT JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor";
-            
-            $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-            
-            $query = "SELECT d.*, u.cedula, u.nombres, u.apellidos, u.sexo, u.correo,
-                             e.nombre_especialidad, est.nombre_estado,
-                             (SELECT COUNT(*) FROM citas c WHERE c.id_doctor = d.id_doctor) as total_citas,
-                             (SELECT COUNT(DISTINCT ds2.id_sucursal) FROM doctores_sucursales ds2 WHERE ds2.id_doctor = d.id_doctor) as total_sucursales
-                      FROM doctores d
-                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
-                      INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-                      LEFT JOIN estados est ON u.id_estado = est.id_estado
-                      $join_sucursal
-                      $where_clause
-                      GROUP BY d.id_doctor
-                      ORDER BY u.nombres, u.apellidos";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($params);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo doctores: " . $e->getMessage());
-            throw new Exception("Error al obtener los doctores");
+    /**
+ * Obtener todos los doctores con información completa
+ */
+public function obtenerTodos($filtros = []) {
+    try {
+        $where_conditions = [];
+        $params = [];
+        
+        // Filtros
+        if (!empty($filtros['estado'])) {
+            $where_conditions[] = "u.id_estado = :estado";
+            $params[':estado'] = $filtros['estado'];
         }
+        
+        if (!empty($filtros['id_especialidad'])) {
+            $where_conditions[] = "d.id_especialidad = :id_especialidad";
+            $params[':id_especialidad'] = $filtros['id_especialidad'];
+        }
+        
+        if (!empty($filtros['busqueda'])) {
+            $where_conditions[] = "(u.cedula LIKE :busqueda 
+                                 OR u.nombres LIKE :busqueda 
+                                 OR u.apellidos LIKE :busqueda 
+                                 OR e.nombre_especialidad LIKE :busqueda)";
+            $params[':busqueda'] = '%' . $filtros['busqueda'] . '%';
+        }
+        
+        $join_sucursal = !empty($filtros['id_sucursal']) ? 
+            "INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor" : 
+            "LEFT JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor";
+        
+        $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+        
+        // 🔥 QUERY CORREGIDA - AGREGADO u.username
+        $query = "SELECT d.*, u.cedula, u.username, u.nombres, u.apellidos, u.sexo, u.nacionalidad, u.correo,
+                         e.nombre_especialidad, est.nombre_estado,
+                         (SELECT COUNT(*) FROM citas c WHERE c.id_doctor = d.id_doctor) as total_citas,
+                         (SELECT COUNT(DISTINCT ds2.id_sucursal) FROM doctores_sucursales ds2 WHERE ds2.id_doctor = d.id_doctor) as total_sucursales
+                  FROM doctores d
+                  INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                  INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
+                  LEFT JOIN estados est ON u.id_estado = est.id_estado
+                  $join_sucursal
+                  $where_clause
+                  GROUP BY d.id_doctor
+                  ORDER BY u.nombres, u.apellidos";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error obteniendo doctores: " . $e->getMessage());
+        throw new Exception("Error al obtener los doctores");
     }
+}
     
     /**
      * Obtener doctores paginados
      */
-    public function obtenerPaginados($inicio, $limite, $busqueda = '', $filtros = []) {
-        try {
-            $where_conditions = [];
-            $params = [];
-            
-            // Búsqueda de texto
-            if (!empty($busqueda)) {
-                $where_conditions[] = "(u.cedula LIKE :busqueda 
-                                     OR u.nombres LIKE :busqueda 
-                                     OR u.apellidos LIKE :busqueda 
-                                     OR e.nombre_especialidad LIKE :busqueda
-                                     OR d.titulo_profesional LIKE :busqueda)";
-                $params[':busqueda'] = '%' . $busqueda . '%';
-            }
-            
-            // Filtros adicionales
-            foreach ($filtros as $campo => $valor) {
-                if (!empty($valor)) {
-                    if ($campo === 'estado') {
-                        $where_conditions[] = "u.id_estado = :estado";
-                        $params[':estado'] = $valor;
-                    } elseif ($campo === 'id_especialidad') {
-                        $where_conditions[] = "d.id_especialidad = :id_especialidad";
-                        $params[':id_especialidad'] = $valor;
-                    } elseif ($campo === 'id_sucursal') {
-                        $where_conditions[] = "ds.id_sucursal = :id_sucursal";
-                        $params[':id_sucursal'] = $valor;
-                    }
+    /**
+ * Obtener doctores paginados
+ */
+/**
+ * Obtener doctores paginados
+ */
+public function obtenerPaginados($inicio, $limite, $busqueda = '', $filtros = []) {
+    try {
+        $where_conditions = [];
+        $params = [];
+        
+        // Búsqueda de texto
+        if (!empty($busqueda)) {
+            $where_conditions[] = "(u.cedula LIKE :busqueda 
+                                 OR u.nombres LIKE :busqueda 
+                                 OR u.apellidos LIKE :busqueda 
+                                 OR e.nombre_especialidad LIKE :busqueda
+                                 OR d.titulo_profesional LIKE :busqueda)";
+            $params[':busqueda'] = '%' . $busqueda . '%';
+        }
+        
+        // Filtros adicionales
+        foreach ($filtros as $campo => $valor) {
+            if (!empty($valor)) {
+                if ($campo === 'estado') {
+                    $where_conditions[] = "u.id_estado = :estado";
+                    $params[':estado'] = $valor;
+                } elseif ($campo === 'id_especialidad') {
+                    $where_conditions[] = "d.id_especialidad = :id_especialidad";
+                    $params[':id_especialidad'] = $valor;
+                } elseif ($campo === 'id_sucursal') {
+                    $where_conditions[] = "ds.id_sucursal = :id_sucursal";
+                    $params[':id_sucursal'] = $valor;
                 }
             }
-            
-            $join_sucursal = !empty($filtros['id_sucursal']) ? 
-                "INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor" : 
-                "LEFT JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor";
-            
-            $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-            
-            $query = "SELECT d.*, u.cedula, u.nombres, u.apellidos, u.sexo, u.correo, u.id_estado,
-                             e.nombre_especialidad, est.nombre_estado,
-                             (SELECT COUNT(*) FROM citas c WHERE c.id_doctor = d.id_doctor) as total_citas,
-                             (SELECT COUNT(DISTINCT ds2.id_sucursal) FROM doctores_sucursales ds2 WHERE ds2.id_doctor = d.id_doctor) as total_sucursales
-                      FROM doctores d
-                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
-                      INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
-                      LEFT JOIN estados est ON u.id_estado = est.id_estado
-                      $join_sucursal
-                      $where_clause
-                      GROUP BY d.id_doctor
-                      ORDER BY u.nombres, u.apellidos
-                      LIMIT :inicio, :limite";
-            
-            $stmt = $this->conn->prepare($query);
-            
-            // Bind de parámetros
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':inicio', $inicio, PDO::PARAM_INT);
-            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
-            
-            $stmt->execute();
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo doctores paginados: " . $e->getMessage());
-            throw new Exception("Error al obtener doctores paginados");
         }
+        
+        $join_sucursal = !empty($filtros['id_sucursal']) ? 
+            "INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor" : 
+            "LEFT JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor";
+        
+        $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+        
+        // 🔥 QUERY FINAL CORREGIDA - AGREGADO u.nacionalidad
+        $query = "SELECT d.*, u.cedula, u.username, u.nombres, u.apellidos, u.sexo, u.nacionalidad, u.correo, u.id_estado,
+                         e.nombre_especialidad, est.nombre_estado,
+                         (SELECT COUNT(*) FROM citas c WHERE c.id_doctor = d.id_doctor) as total_citas,
+                         (SELECT COUNT(DISTINCT ds2.id_sucursal) FROM doctores_sucursales ds2 WHERE ds2.id_doctor = d.id_doctor) as total_sucursales
+                  FROM doctores d
+                  INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                  INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
+                  LEFT JOIN estados est ON u.id_estado = est.id_estado
+                  $join_sucursal
+                  $where_clause
+                  GROUP BY d.id_doctor
+                  ORDER BY u.nombres, u.apellidos
+                  LIMIT :inicio, :limite";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        // Bind de parámetros
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':inicio', $inicio, PDO::PARAM_INT);
+        $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error obteniendo doctores paginados: " . $e->getMessage());
+        throw new Exception("Error al obtener los doctores");
     }
-    
+}
     /**
      * Contar doctores con filtros
      */
@@ -864,6 +865,71 @@ public function obtenerPorUsuario($id_usuario) {
     } catch (PDOException $e) {
         error_log("Error obteniendo doctor por usuario: " . $e->getMessage());
         return null; // Retornar null si no es doctor o hay error
+    }
+
+
+}
+
+/**
+ * Verificar si existe usuario por cédula excluyendo un doctor específico
+ */
+public function existeCedulaExcluyendoDoctor($cedula, $id_doctor_excluir = null) {
+    try {
+        $id_usuario_excluir = null;
+        
+        if ($id_doctor_excluir) {
+            $query = "SELECT id_usuario FROM doctores WHERE id_doctor = :id_doctor";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_doctor' => $id_doctor_excluir]);
+            $id_usuario_excluir = $stmt->fetchColumn();
+        }
+        
+        return $this->existeUsuarioPorCedula($cedula, $id_usuario_excluir);
+    } catch (Exception $e) {
+        error_log("Error verificando cédula excluyendo doctor: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Verificar si existe usuario por username excluyendo un doctor específico
+ */
+public function existeUsernameExcluyendoDoctor($username, $id_doctor_excluir = null) {
+    try {
+        $id_usuario_excluir = null;
+        
+        if ($id_doctor_excluir) {
+            $query = "SELECT id_usuario FROM doctores WHERE id_doctor = :id_doctor";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_doctor' => $id_doctor_excluir]);
+            $id_usuario_excluir = $stmt->fetchColumn();
+        }
+        
+        return $this->existeUsuarioPorUsername($username, $id_usuario_excluir);
+    } catch (Exception $e) {
+        error_log("Error verificando username excluyendo doctor: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Verificar si existe usuario por correo excluyendo un doctor específico
+ */
+public function existeCorreoExcluyendoDoctor($correo, $id_doctor_excluir = null) {
+    try {
+        $id_usuario_excluir = null;
+        
+        if ($id_doctor_excluir) {
+            $query = "SELECT id_usuario FROM doctores WHERE id_doctor = :id_doctor";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_doctor' => $id_doctor_excluir]);
+            $id_usuario_excluir = $stmt->fetchColumn();
+        }
+        
+        return $this->existeUsuarioPorCorreo($correo, $id_usuario_excluir);
+    } catch (Exception $e) {
+        error_log("Error verificando correo excluyendo doctor: " . $e->getMessage());
+        throw $e;
     }
 }
 }
