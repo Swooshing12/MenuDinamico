@@ -1,7 +1,7 @@
 /**
- * Sistema de Gestión de Especialidades
+ * Sistema de Gestión de Especialidades con Sucursales
  * Autor: Sistema MediSys
- * Descripción: CRUD completo para gestión de especialidades médicas
+ * Descripción: CRUD completo para especialidades con asignación de sucursales
  */
 
 // ===== CONFIGURACIÓN GLOBAL =====
@@ -37,7 +37,6 @@ $(document).ready(function() {
 });
 
 // ===== EVENTOS PRINCIPALES =====
-
 function inicializarEventos() {
     console.log('🎯 Inicializando eventos...');
     
@@ -63,256 +62,229 @@ function inicializarEventos() {
         cargarEspecialidadesPaginadas(1);
     });
     
-    $('#limpiarBusqueda').on('click', limpiarBusqueda);
     $('#refrescarTabla').on('click', function() {
         cargarEspecialidadesPaginadas(paginaActual);
+    });
+    
+    // Paginación
+    $(document).on('click', '#paginacion a', function(e) {
+        e.preventDefault();
+        const pagina = $(this).data('pagina');
+        if (pagina && pagina !== paginaActual) {
+            cargarEspecialidadesPaginadas(pagina);
+        }
     });
     
     // Modal de eliminación
     $('#btnConfirmarEliminar').on('click', confirmarEliminarEspecialidad);
     
-    // Editar desde ver detalles
-    $('#btnEditarDesdeVer').on('click', function() {
-        const idEspecialidad = $(this).data('id-especialidad');
-        if (idEspecialidad) {
-            $('#verEspecialidadModal').modal('hide');
-            setTimeout(() => abrirModalEditar(idEspecialidad), 300);
-        }
+    // Eventos de sucursales en modal CREAR
+    $('#seleccionarTodasSucursales').on('click', function() {
+        $('.sucursal-checkbox').prop('checked', true);
+        actualizarContadorSucursales('crear');
     });
     
-    // Limpiar modales al cerrar
+    $('#deseleccionarTodasSucursales').on('click', function() {
+        $('.sucursal-checkbox').prop('checked', false);
+        actualizarContadorSucursales('crear');
+    });
+    
+    // Eventos de sucursales en modal EDITAR
+    $('#editarSeleccionarTodasSucursales').on('click', function() {
+        $('.editar-sucursal-checkbox').prop('checked', true);
+        actualizarContadorSucursales('editar');
+    });
+    
+    $('#editarDeseleccionarTodasSucursales').on('click', function() {
+        $('.editar-sucursal-checkbox').prop('checked', false);
+        actualizarContadorSucursales('editar');
+    });
+    
+    // Cambios en checkboxes individuales
+    $(document).on('change', '.sucursal-checkbox', function() {
+        actualizarContadorSucursales('crear');
+    });
+    
+    $(document).on('change', '.editar-sucursal-checkbox', function() {
+        actualizarContadorSucursales('editar');
+    });
+    
+    // Limpiar modales al cerrarlos
     $('#crearEspecialidadModal').on('hidden.bs.modal', limpiarModalCrear);
     $('#editarEspecialidadModal').on('hidden.bs.modal', limpiarModalEditar);
     
     console.log('✅ Eventos inicializados');
 }
 
+// ===== VALIDACIONES =====
 function inicializarValidaciones() {
-    console.log('✅ Validaciones inicializadas');
+    console.log('📋 Inicializando validaciones...');
     
-    // Validación en tiempo real para nombre
-    $('#nombre_especialidad, #editarNombreEspecialidad').on('input', function() {
-        const valor = $(this).val().trim();
-        
-        if (valor.length > 0 && valor.length < 3) {
-            $(this).addClass('is-invalid');
-            mostrarTooltipError($(this), 'Mínimo 3 caracteres');
-        } else if (valor.length > 100) {
-            $(this).addClass('is-invalid');
-            mostrarTooltipError($(this), 'Máximo 100 caracteres');
-        } else {
-            $(this).removeClass('is-invalid');
-        }
-    });
+    // Validación en tiempo real para nombre de especialidad
+    $('#nombre_especialidad').on('input', validarNombreEspecialidad);
+    $('#editarNombreEspecialidad').on('input', validarNombreEspecialidad);
     
     // Contador de caracteres para descripción
-    $('#descripcion, #editarDescripcion').on('input', function() {
-        const valor = $(this).val();
-        const contador = valor.length;
-        const maximo = 500;
-        
-        const parent = $(this).closest('.col-12');
-        let contadorElement = parent.find('.contador-caracteres');
-        
-        if (contadorElement.length === 0) {
-            contadorElement = $('<small class="contador-caracteres text-muted float-end"></small>');
-            parent.find('.form-text').append(contadorElement);
-        }
-        
-        contadorElement.text(`${contador}/${maximo} caracteres`);
-        
-        if (contador > maximo) {
-            $(this).addClass('is-invalid');
-            contadorElement.addClass('text-danger').removeClass('text-muted');
+    $('#descripcion').on('input', function() {
+        const maxLength = 500;
+        const currentLength = $(this).val().length;
+        $(this).next('.form-text').html(`
+            <i class="bi bi-info-circle me-1"></i>
+            ${currentLength}/${maxLength} caracteres
+        `);
+    });
+    
+    $('#editarDescripcion').on('input', function() {
+        const maxLength = 500;
+        const currentLength = $(this).val().length;
+        $(this).next('.form-text').html(`
+            <i class="bi bi-info-circle me-1"></i>
+            ${currentLength}/${maxLength} caracteres
+        `);
+    });
+    
+    console.log('✅ Validaciones inicializadas');
+}
+
+function validarNombreEspecialidad() {
+    const campo = $(this);
+    const valor = campo.val().trim();
+    
+    // Limpiar validaciones anteriores
+    campo.removeClass('is-invalid is-valid');
+    campo.next('.invalid-feedback').remove();
+    
+    if (!valor) {
+        return;
+    }
+    
+    // Validaciones básicas
+    if (valor.length < 3) {
+        mostrarErrorCampo(campo[0], 'El nombre debe tener al menos 3 caracteres');
+        return;
+    }
+    
+    if (valor.length > 100) {
+        mostrarErrorCampo(campo[0], 'El nombre no puede exceder 100 caracteres');
+        return;
+    }
+    
+    // Verificar si ya existe (solo si no estamos editando la misma especialidad)
+    const isEditing = campo.closest('#editarEspecialidadModal').length > 0;
+    const idExcluir = isEditing ? $('#editarIdEspecialidad').val() : null;
+    
+    verificarNombreDisponible(valor, idExcluir).then(disponible => {
+        if (disponible) {
+            campo.removeClass('is-invalid').addClass('is-valid');
         } else {
-            $(this).removeClass('is-invalid');
-            contadorElement.removeClass('text-danger').addClass('text-muted');
+            mostrarErrorCampo(campo[0], 'Ya existe una especialidad con este nombre');
         }
     });
 }
 
-// ===== CRUD PRINCIPAL =====
-
-function crearEspecialidad(event) {
-    event.preventDefault();
-    
-    if (!validarFormularioCrear()) {
-        return;
-    }
-    
-    const formData = new FormData($('#formCrearEspecialidad')[0]);
-    formData.append('accion', 'crear');
-    formData.append('submenu_id', config.submenuId);
-    
-    // Mostrar loading
-    const submitBtn = $('#formCrearEspecialidad button[type="submit"]');
-    const originalText = submitBtn.html();
-    submitBtn.html('<i class="bi bi-arrow-clockwise spin"></i> Creando...').prop('disabled', true);
-    
-    if (config.debug) {
-        console.log('📤 Creando especialidad:', Object.fromEntries(formData));
-    }
-    
-    $.ajax({
-        url: config.baseUrl,
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function(response) {
-            console.log('📥 Respuesta crear especialidad:', response);
-            
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Especialidad creada',
-                    text: response.message,
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    $('#crearEspecialidadModal').modal('hide');
-                    cargarEspecialidadesPaginadas(1);
-                    cargarEstadisticas();
-                });
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('❌ Error AJAX crear especialidad:', {xhr, status, error});
-            let mensaje = 'Error de conexión al crear la especialidad';
-            
-            if (xhr.responseJSON && xhr.responseJSON.message) {
-                mensaje = xhr.responseJSON.message;
-            }
-            
-            Swal.fire('Error', mensaje, 'error');
-        },
-        complete: function() {
-            submitBtn.html(originalText).prop('disabled', false);
+async function verificarNombreDisponible(nombre, idExcluir = null) {
+    try {
+        const params = new URLSearchParams({
+            action: 'verificarNombre',
+            nombre: nombre,
+            submenu_id: config.submenuId
+        });
+        
+        if (idExcluir) {
+            params.append('id_excluir', idExcluir);
         }
-    });
+        
+        const response = await fetch(`${config.baseUrl}?${params}`);
+        const result = await response.json();
+        
+        return result.success ? result.disponible : true;
+    } catch (error) {
+        console.warn('Error verificando nombre:', error);
+        return true; // En caso de error, asumimos que está disponible
+    }
 }
 
-function editarEspecialidad(event) {
-    event.preventDefault();
+function mostrarErrorCampo(campo, mensaje) {
+    const $campo = $(campo);
+    $campo.addClass('is-invalid');
     
-    if (!validarFormularioEditar()) {
-        return;
-    }
+    // Remover mensaje anterior
+    $campo.next('.invalid-feedback').remove();
     
-    const formData = new FormData($('#formEditarEspecialidad')[0]);
-    formData.append('accion', 'editar');
-    formData.append('submenu_id', config.submenuId);
-    
-    // Mostrar loading
-    const submitBtn = $('#formEditarEspecialidad button[type="submit"]');
-    const originalText = submitBtn.html();
-    submitBtn.html('<i class="bi bi-arrow-clockwise spin"></i> Guardando...').prop('disabled', true);
-    
-    $.ajax({
-        url: config.baseUrl,
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function(response) {
-            console.log('📥 Respuesta editar especialidad:', response);
-            
-            if (response.success) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Especialidad actualizada',
-                    text: response.message,
-                    timer: 2000,
-                    showConfirmButton: false
-                }).then(() => {
-                    $('#editarEspecialidadModal').modal('hide');
-                    cargarEspecialidadesPaginadas(paginaActual);
-                    cargarEstadisticas();
-                });
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('❌ Error AJAX editar especialidad:', {xhr, status, error});
-            Swal.fire('Error', 'Error de conexión al actualizar la especialidad', 'error');
-        },
-        complete: function() {
-            submitBtn.html(originalText).prop('disabled', false);
-        }
-    });
+    // Agregar nuevo mensaje
+    $campo.after(`<div class="invalid-feedback">${mensaje}</div>`);
 }
 
-// ===== CARGAR Y MOSTRAR DATOS =====
+// ===== FUNCIONES PRINCIPALES =====
 
+// ===== CARGAR ESPECIALIDADES PAGINADAS =====
 function cargarEspecialidadesPaginadas(pagina = 1) {
-    console.log(`📄 Cargando especialidades - Página ${pagina}`);
-    
     paginaActual = pagina;
     
-    // Mostrar loading
-    const container = $('#especialidades-container');
-    container.html(`
-        <tr>
-            <td colspan="4" class="text-center py-5">
-                <div class="spinner-border text-info" role="status">
-                    <span class="visually-hidden">Cargando...</span>
-                </div>
-                <p class="text-muted mt-2 mb-0">Cargando especialidades...</p>
-            </td>
-        </tr>
-    `);
-    
-    const params = {
-        action: 'obtenerPaginadas',
+    const parametros = {
+        action: 'obtenerEspecialidadesPaginadas',
         pagina: pagina,
         limit: registrosPorPagina,
         busqueda: busquedaActual,
         submenu_id: config.submenuId
     };
     
+    if (config.debug) {
+        console.log('📥 Cargando especialidades con parámetros:', parametros);
+    }
+    
+    // Mostrar loading
+    $('#especialidades-container').html(`
+        <tr>
+            <td colspan="6" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-3 text-muted">Cargando especialidades...</p>
+            </td>
+        </tr>
+    `);
+    
     $.ajax({
         url: config.baseUrl,
         type: 'GET',
-        data: params,
+        data: parametros,
         dataType: 'json',
         success: function(response) {
-            console.log('📥 Especialidades cargadas:', response);
+            if (config.debug) {
+                console.log('📥 Respuesta del servidor:', response);
+            }
             
             if (response.success) {
                 mostrarEspecialidades(response.data);
                 actualizarPaginacion(response);
-                actualizarContador(response);
-                
-                totalRegistros = response.totalRegistros;
-                totalPaginas = response.totalPaginas;
+                actualizarInfoTabla(response);
             } else {
-                mostrarErrorCarga('Error de datos', response.message);
+                mostrarError('Error al cargar especialidades: ' + response.message);
+                mostrarErrorEnTabla();
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error cargando especialidades:', {xhr, status, error});
-            mostrarErrorCarga('Error de conexión', 'No se pudieron cargar las especialidades');
+            console.error('❌ Error AJAX:', {xhr, status, error});
+            mostrarError('Error de conexión al cargar especialidades');
+            mostrarErrorEnTabla();
         }
     });
 }
 
 function mostrarEspecialidades(especialidades) {
-    const container = $('#especialidades-container');
+    const tbody = $('#especialidades-container');
     
     if (!especialidades || especialidades.length === 0) {
-        container.html(`
+        tbody.html(`
             <tr>
-                <td colspan="4" class="text-center py-5">
-                    <div class="text-muted">
-                        <i class="bi bi-search fs-1"></i>
-                        <p class="mt-2 mb-0">No se encontraron especialidades</p>
-                        <small>Intente ajustar los filtros de búsqueda</small>
-                    </div>
+                <td colspan="6" class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                    <p class="text-muted">No se encontraron especialidades</p>
+                    ${busquedaActual ? 
+                        '<button class="btn btn-outline-secondary btn-sm" onclick="limpiarBusqueda()">Limpiar búsqueda</button>' : 
+                        ''
+                    }
                 </td>
             </tr>
         `);
@@ -322,178 +294,197 @@ function mostrarEspecialidades(especialidades) {
     let html = '';
     
     especialidades.forEach(especialidad => {
-        const descripcionCompleta = especialidad.descripcion || 'Sin descripción';
-        const descripcionCorta = descripcionCompleta.length > 100 ? 
-            descripcionCompleta.substring(0, 100) + '...' : descripcionCompleta;
+        // Descripción truncada
+        const descripcionCorta = especialidad.descripcion ? 
+            (especialidad.descripcion.length > 80 ? 
+                especialidad.descripcion.substring(0, 80) + '...' : 
+                especialidad.descripcion) : 
+            '<span class="text-muted fst-italic">Sin descripción</span>';
         
-        const totalDoctores = especialidad.total_doctores || 0;
+        // Badges de sucursales y doctores
+        const badgeSucursales = `
+            <span class="badge bg-info">
+                <i class="bi bi-building me-1"></i>
+                ${especialidad.total_sucursales || 0}
+            </span>
+        `;
+        
+        const badgeDoctores = `
+            <span class="badge bg-success">
+                <i class="bi bi-people me-1"></i>
+                ${especialidad.total_doctores || 0}
+            </span>
+        `;
+        
+        // Botones de acción
+        let botones = '';
+        
+        // Botón ver (siempre disponible)
+        botones += `
+            <button class="btn btn-outline-info btn-sm me-1" onclick="verEspecialidad(${especialidad.id_especialidad})" 
+                    title="Ver detalles">
+                <i class="bi bi-eye"></i>
+            </button>
+        `;
+        
+        // Botón editar
+        if (config.permisos.puede_editar) {
+            botones += `
+                <button class="btn btn-outline-warning btn-sm me-1" onclick="abrirModalEditar(${especialidad.id_especialidad})" 
+                        title="Editar">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            `;
+        }
+        
+        // Botón eliminar
+        if (config.permisos.puede_eliminar) {
+            botones += `
+                <button class="btn btn-outline-danger btn-sm" onclick="confirmarEliminar(${especialidad.id_especialidad}, '${especialidad.nombre_especialidad.replace(/'/g, "\\'")}', ${especialidad.total_doctores || 0})" 
+                        title="Eliminar">
+                    <i class="bi bi-trash"></i>
+                </button>
+            `;
+        }
         
         html += `
-            <tr data-id-especialidad="${especialidad.id_especialidad}">
+            <tr>
+                <td class="text-center">
+                    <span class="badge bg-primary">#${especialidad.id_especialidad}</span>
+                </td>
                 <td>
                     <div class="d-flex align-items-center">
-                        <div class="bg-info bg-opacity-10 rounded-circle p-2 me-3">
-                            <i class="bi bi-hospital text-info fs-5"></i>
+                        <div class="especialidad-icon bg-primary bg-opacity-10 text-primary rounded-circle me-3">
+                            <i class="bi bi-hospital"></i>
                         </div>
                         <div>
-                            <div class="fw-bold">${especialidad.nombre_especialidad}</div>
-                            <small class="text-muted">ID: ${especialidad.id_especialidad}</small>
+                            <h6 class="mb-0 fw-bold">${especialidad.nombre_especialidad}</h6>
+                            <small class="text-muted">Especialidad médica</small>
                         </div>
                     </div>
                 </td>
                 <td>
-                    <div class="descripcion-cell" title="${descripcionCompleta}">
-                        ${descripcionCorta}
-                    </div>
+                    <span class="text-muted">${descripcionCorta}</span>
                 </td>
-                <td>
-                    <span class="badge ${totalDoctores > 0 ? 'bg-success' : 'bg-secondary'}">
-                        ${totalDoctores} doctor${totalDoctores !== 1 ? 'es' : ''}
-                    </span>
-                </td>
-                <td>
+                <td class="text-center">${badgeSucursales}</td>
+                <td class="text-center">${badgeDoctores}</td>
+                <td class="text-center">
                     <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-outline-info" 
-                                onclick="verDetallesEspecialidad(${especialidad.id_especialidad})" 
-                                title="Ver detalles">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        
-                        ${config.permisos.puede_editar ? 
-                            `<button type="button" class="btn btn-sm btn-outline-warning" 
-                                    onclick="abrirModalEditar(${especialidad.id_especialidad})" 
-                                    title="Editar">
-                                <i class="bi bi-pencil"></i>
-                            </button>` : ''
-                        }
-                        
-                        ${config.permisos.puede_eliminar ? 
-                            `<button type="button" class="btn btn-sm btn-outline-danger" 
-                                    onclick="abrirModalEliminar(${especialidad.id_especialidad}, '${especialidad.nombre_especialidad.replace(/'/g, "\\'")}', ${totalDoctores})" 
-                                    title="Eliminar">
-                                <i class="bi bi-trash"></i>
-                            </button>` : ''
-                        }
+                        ${botones}
                     </div>
                 </td>
             </tr>
         `;
     });
     
-    container.html(html);
-    
-    // Inicializar tooltips
-    $('[title]').tooltip();
-    
-    console.log('✅ Especialidades mostradas en tabla');
+    tbody.html(html);
 }
 
-// ===== ACCIONES DE ESPECIALIDAD =====
+function mostrarErrorEnTabla() {
+    $('#especialidades-container').html(`
+        <tr>
+            <td colspan="6" class="text-center py-5">
+                <i class="bi bi-exclamation-triangle fs-1 text-warning mb-3"></i>
+                <p class="text-muted">Error al cargar los datos</p>
+                <button class="btn btn-outline-primary btn-sm" onclick="cargarEspecialidadesPaginadas(${paginaActual})">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Reintentar
+                </button>
+            </td>
+        </tr>
+    `);
+}
 
-function verDetallesEspecialidad(idEspecialidad) {
-    console.log('👁️ Viendo detalles de especialidad:', idEspecialidad);
+// ===== CREAR ESPECIALIDAD =====
+function crearEspecialidad(e) {
+    e.preventDefault();
     
-    // Mostrar loading en el modal
-    $('#contenidoVerEspecialidad').html(`
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-            </div>
-            <p class="mt-3 text-muted">Cargando información de la especialidad...</p>
-        </div>
+    console.log('💾 Creando nueva especialidad...');
+    
+    if (!validarFormulario('formCrearEspecialidad')) {
+        return;
+    }
+    
+    const form = document.getElementById('formCrearEspecialidad');
+    const formData = new FormData(form);
+    
+    // Agregar datos adicionales
+    formData.append('action', 'crear');
+    formData.append('submenu_id', config.submenuId);
+    
+    // Obtener sucursales seleccionadas
+    const sucursalesSeleccionadas = [];
+    $('.sucursal-checkbox:checked').each(function() {
+        sucursalesSeleccionadas.push($(this).val());
+    });
+    
+    // Agregar sucursales al FormData
+    sucursalesSeleccionadas.forEach(sucursal => {
+        formData.append('sucursales[]', sucursal);
+    });
+    
+    const submitBtn = $('#formCrearEspecialidad button[type="submit"]');
+    const textoOriginal = submitBtn.html();
+    
+    // Deshabilitar botón y mostrar loading
+    submitBtn.prop('disabled', true).html(`
+        <span class="spinner-border spinner-border-sm me-1"></span>
+        Creando...
     `);
     
-    $('#verEspecialidadModal').modal('show');
-    
-    // Cargar datos de la especialidad
     $.ajax({
         url: config.baseUrl,
-        type: 'GET',
-        data: {
-            action: 'obtenerPorId',
-            id: idEspecialidad,
-            submenu_id: config.submenuId
-        },
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
         dataType: 'json',
         success: function(response) {
-            if (response.success && response.data) {
-                mostrarDetallesEspecialidad(response.data);
-                $('#btnEditarDesdeVer').data('id-especialidad', idEspecialidad);
+            if (config.debug) {
+                console.log('📥 Respuesta crear:', response);
+            }
+            
+            if (response.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: response.message,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                
+                $('#crearEspecialidadModal').modal('hide');
+                cargarEspecialidadesPaginadas(1);
+                cargarEstadisticas();
             } else {
-                $('#contenidoVerEspecialidad').html(`
-                    <div class="alert alert-danger">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        Error: ${response.message || 'No se pudo cargar la información'}
-                    </div>
-                `);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message
+                });
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error cargando detalles:', {xhr, status, error});
-            $('#contenidoVerEspecialidad').html(`
-                <div class="alert alert-danger">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    Error de conexión al cargar los detalles
-                </div>
-            `);
+            console.error('❌ Error AJAX crear:', {xhr, status, error});
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'No se pudo conectar con el servidor. Intente nuevamente.'
+            });
+        },
+        complete: function() {
+            // Rehabilitar botón
+            submitBtn.prop('disabled', false).html(textoOriginal);
         }
     });
 }
 
-function mostrarDetallesEspecialidad(especialidad) {
-    const html = `
-        <div class="row">
-            <div class="col-12">
-                <div class="card border-0 bg-light">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="mb-0">
-                            <i class="bi bi-hospital me-2"></i>
-                            Información de la Especialidad
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <strong>ID:</strong><br>
-                                <span class="badge bg-secondary">${especialidad.id_especialidad}</span>
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Nombre:</strong><br>
-                                <span class="fs-5 fw-bold text-info">${especialidad.nombre_especialidad}</span>
-                            </div>
-                            <div class="col-12">
-                                <strong>Descripción:</strong><br>
-                                <div class="bg-white p-3 rounded border">
-                                    ${especialidad.descripcion || '<em class="text-muted">Sin descripción</em>'}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Total de Doctores:</strong><br>
-                                <span class="badge ${(especialidad.total_doctores || 0) > 0 ? 'bg-success' : 'bg-secondary'} fs-6">
-                                    ${especialidad.total_doctores || 0} doctor${(especialidad.total_doctores || 0) !== 1 ? 'es' : ''}
-                                </span>
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Total de Sucursales:</strong><br>
-                                <span class="badge bg-info fs-6">
-                                    ${especialidad.total_sucursales || 0} sucursal${(especialidad.total_sucursales || 0) !== 1 ? 'es' : ''}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    $('#contenidoVerEspecialidad').html(html);
-}
-
+// ===== EDITAR ESPECIALIDAD =====
 function abrirModalEditar(idEspecialidad) {
-    console.log('✏️ Abriendo modal editar para especialidad:', idEspecialidad);
+    console.log('🔄 Abriendo modal editar para ID:', idEspecialidad);
     
     // Limpiar formulario
-    limpiarModalEditar();
+    document.getElementById('formEditarEspecialidad').reset();
+    $('.editar-sucursal-checkbox').prop('checked', false);
     
     // Mostrar modal
     $('#editarEspecialidadModal').modal('show');
@@ -509,533 +500,610 @@ function abrirModalEditar(idEspecialidad) {
         },
         dataType: 'json',
         success: function(response) {
+            if (config.debug) {
+                console.log('📥 Datos de especialidad:', response);
+            }
+            
             if (response.success && response.data) {
-                llenarFormularioEditar(response.data);
+                const especialidad = response.data;
+                
+                // Llenar formulario
+                $('#editarIdEspecialidad').val(especialidad.id_especialidad);
+                $('#editarNombreEspecialidad').val(especialidad.nombre_especialidad);
+                $('#editarDescripcion').val(especialidad.descripcion || '');
+                
+                // Marcar sucursales asignadas
+                if (especialidad.sucursales && Array.isArray(especialidad.sucursales)) {
+                    especialidad.sucursales.forEach(sucursal => {
+                        $(`#editar_sucursal_${sucursal.id_sucursal}`).prop('checked', true);
+                    });
+                }
+                
+                actualizarContadorSucursales('editar');
+                console.log('✅ Datos cargados en modal de edición');
             } else {
-                Swal.fire('Error', response.message || 'No se pudo cargar la información de la especialidad', 'error');
+                Swal.fire('Error', response.message || 'No se pudo cargar la información', 'error');
                 $('#editarEspecialidadModal').modal('hide');
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error cargando datos para editar:', {xhr, status, error});
+            console.error('❌ Error cargando datos:', {xhr, status, error});
             Swal.fire('Error', 'Error de conexión al cargar los datos', 'error');
             $('#editarEspecialidadModal').modal('hide');
         }
     });
 }
 
-function llenarFormularioEditar(especialidad) {
-    console.log('📝 Llenando formulario de edición:', especialidad);
+function editarEspecialidad(e) {
+    e.preventDefault();
     
-    $('#editarIdEspecialidad').val(especialidad.id_especialidad);
-    $('#editarNombreEspecialidad').val(especialidad.nombre_especialidad);
-    $('#editarDescripcion').val(especialidad.descripcion || '');
+    console.log('💾 Editando especialidad...');
     
-    // Trigger del contador de caracteres
-    $('#editarDescripcion').trigger('input');
-    
-    console.log('✅ Formulario de edición llenado');
-}
-
-function abrirModalEliminar(idEspecialidad, nombreEspecialidad, totalDoctores) {
-    especialidadSeleccionadaParaEliminar = idEspecialidad;
-    
-    let mensaje = nombreEspecialidad;
-    if (totalDoctores > 0) {
-        mensaje += `<br><small class="text-warning">(Tiene ${totalDoctores} doctor${totalDoctores !== 1 ? 'es' : ''} asignado${totalDoctores !== 1 ? 's' : ''})</small>`;
-    }
-    
-    $('#especialidadAEliminar').html(mensaje);
-    $('#eliminarEspecialidadModal').modal('show');
-}
-
-function confirmarEliminarEspecialidad() {
-    if (!especialidadSeleccionadaParaEliminar) {
+    if (!validarFormulario('formEditarEspecialidad')) {
         return;
     }
     
-    const btnConfirmar = $('#btnConfirmarEliminar');
-    const textoOriginal = btnConfirmar.html();
-    btnConfirmar.html('<i class="bi bi-arrow-clockwise spin"></i> Eliminando...').prop('disabled', true);
+    const form = document.getElementById('formEditarEspecialidad');
+    const formData = new FormData(form);
+    
+    // Agregar datos adicionales
+    formData.append('action', 'editar');
+    formData.append('submenu_id', config.submenuId);
+    
+    // Obtener sucursales seleccionadas
+    const sucursalesSeleccionadas = [];
+    $('.editar-sucursal-checkbox:checked').each(function() {
+        sucursalesSeleccionadas.push($(this).val());
+    });
+    
+    // Agregar sucursales al FormData
+    sucursalesSeleccionadas.forEach(sucursal => {
+        formData.append('sucursales[]', sucursal);
+    });
+    
+    const submitBtn = $('#formEditarEspecialidad button[type="submit"]');
+    const textoOriginal = submitBtn.html();
+    
+    // Deshabilitar botón y mostrar loading
+    submitBtn.prop('disabled', true).html(`
+        <span class="spinner-border spinner-border-sm me-1"></span>
+        Guardando...
+    `);
     
     $.ajax({
         url: config.baseUrl,
         type: 'POST',
-        data: {
-            accion: 'eliminar',
-            id_especialidad: especialidadSeleccionadaParaEliminar,
-            submenu_id: config.submenuId
-        },
+        data: formData,
+        processData: false,
+        contentType: false,
         dataType: 'json',
         success: function(response) {
+            if (config.debug) {
+                console.log('📥 Respuesta editar:', response);
+            }
+            
             if (response.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: 'Especialidad eliminada',
+                    title: '¡Éxito!',
                     text: response.message,
                     timer: 2000,
                     showConfirmButton: false
-                }).then(() => {
-                    $('#eliminarEspecialidadModal').modal('hide');
-                    cargarEspecialidadesPaginadas(paginaActual);
-                    cargarEstadisticas();
                 });
+                
+                $('#editarEspecialidadModal').modal('hide');
+                cargarEspecialidadesPaginadas(paginaActual);
+                cargarEstadisticas();
             } else {
-                Swal.fire('Error', response.message, 'error');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message
+                });
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error eliminando especialidad:', {xhr, status, error});
-            Swal.fire('Error', 'Error de conexión al eliminar la especialidad', 'error');
+            console.error('❌ Error AJAX editar:', {xhr, status, error});
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de conexión',
+                text: 'No se pudo conectar con el servidor. Intente nuevamente.'
+            });
         },
         complete: function() {
-            btnConfirmar.html(textoOriginal).prop('disabled', false);
-            especialidadSeleccionadaParaEliminar = null;
+            // Rehabilitar botón
+            submitBtn.prop('disabled', false).html(textoOriginal);
         }
     });
 }
 
-// ===== ESTADÍSTICAS =====
-
-function cargarEstadisticas() {
-    console.log('📊 Cargando estadísticas...');
+// ===== VER ESPECIALIDAD =====
+function verEspecialidad(idEspecialidad) {
+    console.log('👁️ Viendo detalles de especialidad ID:', idEspecialidad);
+    
+    $('#contenidoVerEspecialidad').html(`
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2 text-muted">Cargando detalles...</p>
+        </div>
+    `);
+    
+    $('#verEspecialidadModal').modal('show');
     
     $.ajax({
         url: config.baseUrl,
         type: 'GET',
         data: {
-            action: 'obtenerEstadisticas',
+            action: 'obtenerPorId',
+            id: idEspecialidad,
             submenu_id: config.submenuId
         },
         dataType: 'json',
         success: function(response) {
-            if (response.success) {
-                actualizarEstadisticas(response.data);
+            if (response.success && response.data) {
+                const especialidad = response.data;
+                
+                let html = `
+                    <div class="row g-4">
+                        <!-- Información básica -->
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="especialidad-icon bg-primary text-white rounded-circle me-3">
+                                            <i class="bi bi-hospital"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="mb-1">${especialidad.nombre_especialidad}</h4>
+                                            <span class="badge bg-primary">ID: ${especialidad.id_especialidad}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    ${especialidad.descripcion ? `
+                                        <div class="mt-3">
+                                            <h6 class="text-muted mb-2">Descripción:</h6>
+                                            <p class="mb-0">${especialidad.descripcion}</p>
+                                        </div>
+                                    ` : '<p class="text-muted fst-italic">Sin descripción disponible</p>'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Estadísticas -->
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-header bg-success bg-opacity-10">
+                                    <h6 class="mb-0 text-success">
+                                        <i class="bi bi-people me-2"></i>Doctores
+                                    </h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <h3 class="text-success mb-1">${especialidad.total_doctores || 0}</h3>
+                                    <small class="text-muted">Doctores especializados</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card border-info">
+                                <div class="card-header bg-info bg-opacity-10">
+                                    <h6 class="mb-0 text-info">
+                                        <i class="bi bi-building me-2"></i>Sucursales
+                                    </h6>
+                                </div>
+                                <div class="card-body text-center">
+                                    <h3 class="text-info mb-1">${especialidad.total_sucursales || 0}</h3>
+                                    <small class="text-muted">Sucursales asignadas</small>
+                                </div>
+                            </div>
+                        </div>
+                `;
+                
+                // Mostrar sucursales si las hay
+                if (especialidad.sucursales && especialidad.sucursales.length > 0) {
+                    html += `
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-building me-2"></i>
+                                        Sucursales Asignadas (${especialidad.sucursales.length})
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                    `;
+                    
+                    especialidad.sucursales.forEach(sucursal => {
+                        html += `
+                            <div class="col-md-6 mb-2">
+                                <div class="d-flex align-items-center p-2 bg-light rounded">
+                                    <i class="bi bi-building text-primary me-2"></i>
+                                    <div>
+                                        <small class="fw-bold">${sucursal.nombre_sucursal}</small><br>
+                                        <small class="text-muted">${sucursal.direccion}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="col-12">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                Esta especialidad no está asignada a ninguna sucursal.
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+                
+                $('#contenidoVerEspecialidad').html(html);
             } else {
-                console.error('❌ Error en estadísticas:', response.message);
-                mostrarEstadisticasError();
+                $('#contenidoVerEspecialidad').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Error al cargar los detalles de la especialidad.
+                    </div>
+                `);
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error AJAX estadísticas:', {xhr, status, error});
-            mostrarEstadisticasError();
+            console.error('❌ Error cargando detalles:', {xhr, status, error});
+            $('#contenidoVerEspecialidad').html(`
+                <div class="alert alert-danger">
+                    <i class="bi bi-wifi-off me-2"></i>
+                    Error de conexión. No se pudieron cargar los detalles.
+                </div>
+            `);
         }
     });
 }
 
-function actualizarEstadisticas(datos) {
-    console.log('📊 Actualizando estadísticas:', datos);
+// ===== ELIMINAR ESPECIALIDAD =====
+function confirmarEliminar(idEspecialidad, nombreEspecialidad, totalDoctores) {
+    especialidadSeleccionadaParaEliminar = idEspecialidad;
     
-    // Animación de números
-    animarNumero('#totalEspecialidades', datos.total_especialidades || 0);
-    animarNumero('#especialidadesConDoctores', datos.con_doctores || 0);
-    animarNumero('#totalDoctores', datos.total_doctores || 0);
+    $('#nombreEspecialidadEliminar').text(nombreEspecialidad);
     
-    console.log('✅ Estadísticas actualizadas');
+    // Advertencia especial si tiene doctores
+    if (totalDoctores > 0) {
+        $('#eliminarEspecialidadModal .modal-body').append(`
+            <div class="alert alert-danger mt-3">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>¡Atención!</strong> Esta especialidad tiene ${totalDoctores} doctor(es) asignado(s). 
+                No se puede eliminar mientras tenga doctores asociados.
+            </div>
+        `);
+        $('#btnConfirmarEliminar').prop('disabled', true).text('No se puede eliminar');
+    } else {
+        $('#btnConfirmarEliminar').prop('disabled', false).html(`
+            <i class="bi bi-trash me-1"></i>Eliminar Especialidad
+        `);
+    }
+    
+    $('#eliminarEspecialidadModal').modal('show');
 }
 
-function mostrarEstadisticasError() {
-    $('#totalEspecialidades').html('<span class="text-danger">Error</span>');
-    $('#especialidadesConDoctores').html('<span class="text-danger">Error</span>');
-    $('#totalDoctores').html('<span class="text-danger">Error</span>');
-}
-
-function animarNumero(selector, objetivo) {
-    const elemento = $(selector);
-    const actual = parseInt(elemento.text()) || 0;
-    
-    if (actual === objetivo) return;
-    
-    let contador = actual;
-    const incremento = objetivo > actual ? 1 : -1;
-    const tiempo = Math.abs(objetivo - actual) > 20 ? 50 : 100;
-    
-    const timer = setInterval(() => {
-        contador += incremento;
-        elemento.text(contador);
-        
-        if (contador === objetivo) {
-            clearInterval(timer);
-        }
-    }, tiempo);
-}
-
-// ===== PAGINACIÓN =====
-
-function actualizarPaginacion(response) {
-    const container = $('#paginacion');
-    const { paginaActual, totalPaginas } = response;
-    
-    if (totalPaginas <= 1) {
-        container.empty();
-        return;
-    }
-    
-    let html = '';
-    
-    // Botón anterior
-    html += `
-        <li class="page-item ${paginaActual <= 1 ? 'disabled' : ''}">
-            <a class="page-link" href="javascript:void(0)" data-pagina="${paginaActual - 1}">
-                <i class="bi bi-chevron-left"></i>
-            </a>
-        </li>
-    `;
-    
-    // Páginas
-    const inicioRango = Math.max(1, paginaActual - 2);
-    const finRango = Math.min(totalPaginas, paginaActual + 2);
-    
-    if (inicioRango > 1) {
-        html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-pagina="1">1</a></li>`;
-        if (inicioRango > 2) {
-            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-    }
-    
-    for (let i = inicioRango; i <= finRango; i++) {
-        html += `
-            <li class="page-item ${i === paginaActual ? 'active' : ''}">
-                <a class="page-link" href="javascript:void(0)" data-pagina="${i}">${i}</a>
-            </li>
-        `;
-    }
-    
-    if (finRango < totalPaginas) {
-        if (finRango < totalPaginas - 1) {
-            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-        }
-        html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-pagina="${totalPaginas}">${totalPaginas}</a></li>`;
-    }
-    
-    // Botón siguiente
-    html += `
-        <li class="page-item ${paginaActual >= totalPaginas ? 'disabled' : ''}">
-            <a class="page-link" href="javascript:void(0)" data-pagina="${paginaActual + 1}">
-                <i class="bi bi-chevron-right"></i>
-            </a>
-        </li>
-    `;
-    
-    container.html(html);
-    
-    // Agregar eventos
-    container.find('.page-link').on('click', function() {
-        const pagina = parseInt($(this).data('pagina'));
-        if (!isNaN(pagina) && pagina !== paginaActual && !$(this).parent().hasClass('disabled')) {
-            cargarEspecialidadesPaginadas(pagina);
-        }
-    });
-}
-
-function actualizarContador(response) {
-    const { totalRegistros, mostrando, paginaActual } = response;
-    const inicio = ((paginaActual - 1) * registrosPorPagina) + 1;
-    const fin = Math.min(inicio + mostrando - 1, totalRegistros);
-    
-    const texto = totalRegistros > 0 ? 
-        `Mostrando ${inicio} a ${fin} de ${totalRegistros} especialidades` :
-        'No se encontraron especialidades';
-    
-    $('#infoRegistros').text(texto);
-    $('#contadorEspecialidades').html(`
-        <i class="bi bi-hospital me-1"></i>
-        ${totalRegistros} especialidades registradas
-    `);
-}
-
-// ===== BÚSQUEDA Y FILTROS =====
-
-function limpiarBusqueda() {
-    $('#busquedaGlobal').val('');
-    busquedaActual = '';
-    cargarEspecialidadesPaginadas(1);
-}
-
-// ===== VALIDACIONES =====
-
-function validarFormularioCrear() {
-    const nombre = $('#nombre_especialidad').val().trim();
-    
-    if (!nombre) {
-        Swal.fire('Error', 'El nombre de la especialidad es requerido', 'error');
-        $('#nombre_especialidad').focus();
-        return false;
-    }
-    
-    if (nombre.length < 3) {
-        Swal.fire('Error', 'El nombre debe tener al menos 3 caracteres', 'error');
-        $('#nombre_especialidad').focus();
-        return false;
-    }
-    
-    if (nombre.length > 100) {
-        Swal.fire('Error', 'El nombre no puede exceder 100 caracteres', 'error');
-        $('#nombre_especialidad').focus();
-        return false;
-    }
-    
-    const descripcion = $('#descripcion').val();
-    if (descripcion.length > 500) {
-Swal.fire('Error', 'La descripción no puede exceder 500 caracteres', 'error');
-       $('#descripcion').focus();
-       return false;
-   }
+function confirmarEliminarEspecialidad() {
+   if (!especialidadSeleccionadaParaEliminar) return;
    
-   return true;
-}
-
-function validarFormularioEditar() {
-   const nombre = $('#editarNombreEspecialidad').val().trim();
+   console.log('🗑️ Eliminando especialidad ID:', especialidadSeleccionadaParaEliminar);
    
-   if (!nombre) {
-       Swal.fire('Error', 'El nombre de la especialidad es requerido', 'error');
-       $('#editarNombreEspecialidad').focus();
-       return false;
-   }
+   const submitBtn = $('#btnConfirmarEliminar');
+   const textoOriginal = submitBtn.html();
    
-   if (nombre.length < 3) {
-       Swal.fire('Error', 'El nombre debe tener al menos 3 caracteres', 'error');
-       $('#editarNombreEspecialidad').focus();
-       return false;
-   }
-   
-   if (nombre.length > 100) {
-       Swal.fire('Error', 'El nombre no puede exceder 100 caracteres', 'error');
-       $('#editarNombreEspecialidad').focus();
-       return false;
-   }
-   
-   const descripcion = $('#editarDescripcion').val();
-   if (descripcion.length > 500) {
-       Swal.fire('Error', 'La descripción no puede exceder 500 caracteres', 'error');
-       $('#editarDescripcion').focus();
-       return false;
-   }
-   
-   return true;
-}
-
-// ===== UTILIDADES =====
-
-function limpiarModalCrear() {
-   $('#formCrearEspecialidad')[0].reset();
-   $('#formCrearEspecialidad .is-invalid').removeClass('is-invalid');
-   $('#formCrearEspecialidad .contador-caracteres').remove();
-}
-
-function limpiarModalEditar() {
-   $('#formEditarEspecialidad')[0].reset();
-   $('#formEditarEspecialidad .is-invalid').removeClass('is-invalid');
-   $('#formEditarEspecialidad .contador-caracteres').remove();
-}
-
-function mostrarErrorCarga(titulo, mensaje) {
-   $('#especialidades-container').html(`
-       <tr>
-           <td colspan="4" class="text-center py-5">
-               <div class="text-danger">
-                   <i class="bi bi-exclamation-triangle fs-1"></i>
-                   <h6 class="mt-2">${titulo}</h6>
-                   <p class="text-muted">${mensaje}</p>
-                   <button class="btn btn-outline-primary btn-sm" onclick="cargarEspecialidadesPaginadas(paginaActual)">
-                       <i class="bi bi-arrow-repeat me-1"></i>
-                       Reintentar
-                   </button>
-               </div>
-           </td>
-       </tr>
+   // Deshabilitar botón y mostrar loading
+   submitBtn.prop('disabled', true).html(`
+       <span class="spinner-border spinner-border-sm me-1"></span>
+       Eliminando...
    `);
-}
-
-function mostrarTooltipError(elemento, mensaje) {
-   elemento.attr('title', mensaje).tooltip('show');
-   setTimeout(() => {
-       elemento.tooltip('hide');
-   }, 3000);
-}
-
-function showToast(mensaje, tipo = 'info') {
-   const Toast = Swal.mixin({
-       toast: true,
-       position: 'top-end',
-       showConfirmButton: false,
-       timer: 3000,
-       timerProgressBar: true,
-       didOpen: (toast) => {
-           toast.addEventListener('mouseenter', Swal.stopTimer);
-           toast.addEventListener('mouseleave', Swal.resumeTimer);
-       }
-   });
    
-   Toast.fire({
-       icon: tipo,
-       title: mensaje
-   });
-}
-
-// ===== GESTIÓN DE ERRORES GLOBALES =====
-
-$(document).ajaxError(function(event, xhr, settings, thrownError) {
-   if (xhr.status === 0) {
-       console.error('❌ Error de conexión global');
-       Swal.fire({
-           icon: 'error',
-           title: 'Error de conexión',
-           text: 'No se pudo conectar con el servidor. Verifique su conexión a internet.',
-           footer: '<small>Si el problema persiste, contacte al administrador</small>'
-       });
-   } else if (xhr.status === 500) {
-       console.error('❌ Error del servidor:', xhr.responseText);
-       Swal.fire({
-           icon: 'error',
-           title: 'Error del servidor',
-           text: 'Se produjo un error interno del servidor.',
-           footer: '<small>Contacte al administrador si el problema persiste</small>'
-       });
-   }
-});
-
-// ===== FUNCIONES ADICIONALES =====
-
-// Función para exportar especialidades (opcional)
-function exportarEspecialidades() {
-   Swal.fire({
-       title: 'Exportar Especialidades',
-       text: '¿En qué formato desea exportar?',
-       icon: 'question',
-       showCancelButton: true,
-       confirmButtonText: 'Excel',
-       cancelButtonText: 'PDF',
-       showDenyButton: true,
-       denyButtonText: 'Cancelar'
-   }).then((result) => {
-       if (result.isConfirmed) {
-           exportarAExcel();
-       } else if (result.isDismissed && result.dismiss !== Swal.DismissReason.deny) {
-           exportarAPDF();
-       }
-   });
-}
-
-function exportarAExcel() {
-   window.open(`${config.baseUrl}?action=exportarExcel&submenu_id=${config.submenuId}`, '_blank');
-}
-
-function exportarAPDF() {
-   window.open(`${config.baseUrl}?action=exportarPDF&submenu_id=${config.submenuId}`, '_blank');
-}
-
-// Función para buscar especialidades por texto específico
-function buscarEspecialidadEspecifica() {
-   Swal.fire({
-       title: 'Búsqueda Específica',
-       input: 'text',
-       inputLabel: 'Ingrese el nombre de la especialidad',
-       inputPlaceholder: 'Ej: Cardiología',
-       showCancelButton: true,
-       inputValidator: (value) => {
-           if (!value) {
-               return 'Debe ingresar un texto para buscar';
+   $.ajax({
+       url: config.baseUrl,
+       type: 'POST',
+       data: {
+           action: 'eliminar',
+           id: especialidadSeleccionadaParaEliminar,
+           submenu_id: config.submenuId
+       },
+       dataType: 'json',
+       success: function(response) {
+           if (config.debug) {
+               console.log('📥 Respuesta eliminar:', response);
            }
-       }
-   }).then((result) => {
-       if (result.isConfirmed) {
-           $('#busquedaGlobal').val(result.value);
-           busquedaActual = result.value;
-           cargarEspecialidadesPaginadas(1);
+           
+           if (response.success) {
+               Swal.fire({
+                   icon: 'success',
+                   title: '¡Eliminado!',
+                   text: response.message,
+                   timer: 2000,
+                   showConfirmButton: false
+               });
+               
+               $('#eliminarEspecialidadModal').modal('hide');
+               cargarEspecialidadesPaginadas(paginaActual);
+               cargarEstadisticas();
+           } else {
+               Swal.fire({
+                   icon: 'error',
+                   title: 'Error',
+                   text: response.message
+               });
+           }
+       },
+       error: function(xhr, status, error) {
+           console.error('❌ Error AJAX eliminar:', {xhr, status, error});
+           Swal.fire({
+               icon: 'error',
+               title: 'Error de conexión',
+               text: 'No se pudo conectar con el servidor. Intente nuevamente.'
+           });
+       },
+       complete: function() {
+           // Rehabilitar botón
+           submitBtn.prop('disabled', false).html(textoOriginal);
+           especialidadSeleccionadaParaEliminar = null;
        }
    });
 }
 
-// Función para obtener reporte de especialidades
-function generarReporte() {
-   Swal.fire({
-       title: 'Generando reporte...',
-       text: 'Por favor espere',
-       allowOutsideClick: false,
-       didOpen: () => {
-           Swal.showLoading();
-       }
-   });
+// ===== ESTADÍSTICAS =====
+function cargarEstadisticas() {
+   console.log('📊 Cargando estadísticas...');
    
    $.ajax({
        url: config.baseUrl,
        type: 'GET',
        data: {
-           action: 'generarReporte',
+           action: 'obtenerEstadisticas',
            submenu_id: config.submenuId
        },
        dataType: 'json',
        success: function(response) {
-           Swal.close();
-           
-           if (response.success) {
-               mostrarReporte(response.data);
+           if (response.success && response.data) {
+               actualizarEstadisticas(response.data);
            } else {
-               Swal.fire('Error', 'No se pudo generar el reporte', 'error');
+               console.warn('❌ Error en estadísticas:', response.message);
+               mostrarEstadisticasError();
            }
        },
-       error: function() {
-           Swal.close();
-           Swal.fire('Error', 'Error al generar el reporte', 'error');
+       error: function(xhr, status, error) {
+           console.error('❌ Error AJAX estadísticas:', {xhr, status, error});
+           mostrarEstadisticasError();
        }
    });
 }
 
-function mostrarReporte(datos) {
-   const html = `
-       <div class="row">
-           <div class="col-md-6">
-               <div class="card border-info">
-                   <div class="card-header bg-info text-white">
-                       <h6 class="mb-0">Resumen General</h6>
-                   </div>
-                   <div class="card-body">
-                       <ul class="list-unstyled mb-0">
-                           <li><strong>Total Especialidades:</strong> ${datos.total_especialidades}</li>
-                           <li><strong>Con Doctores:</strong> ${datos.con_doctores}</li>
-                           <li><strong>Sin Doctores:</strong> ${datos.total_especialidades - datos.con_doctores}</li>
-                           <li><strong>Total Doctores:</strong> ${datos.total_doctores}</li>
-                       </ul>
-                   </div>
-               </div>
-           </div>
-           <div class="col-md-6">
-               <div class="card border-success">
-                   <div class="card-header bg-success text-white">
-                       <h6 class="mb-0">Métricas</h6>
-                   </div>
-                   <div class="card-body">
-                       <ul class="list-unstyled mb-0">
-                           <li><strong>Promedio Doctores/Especialidad:</strong> ${(datos.total_doctores / datos.total_especialidades).toFixed(1)}</li>
-                           <li><strong>Cobertura:</strong> ${((datos.con_doctores / datos.total_especialidades) * 100).toFixed(1)}%</li>
-                       </ul>
-                   </div>
-               </div>
-           </div>
-       </div>
+function actualizarEstadisticas(datos) {
+   console.log('📊 Actualizando estadísticas:', datos);
+   
+   // Animación de números
+   animarNumero('#totalEspecialidades', datos.total_especialidades || 0);
+   animarNumero('#especialidadesConDoctores', datos.con_doctores || 0);
+   animarNumero('#sucursalesActivas', datos.sucursales_activas || 0);
+   animarNumero('#totalDoctores', datos.total_doctores || 0);
+   
+   console.log('✅ Estadísticas actualizadas');
+}
+
+function mostrarEstadisticasError() {
+   $('#totalEspecialidades').html('<span class="text-danger">Error</span>');
+   $('#especialidadesConDoctores').html('<span class="text-danger">Error</span>');
+   $('#sucursalesActivas').html('<span class="text-danger">Error</span>');
+   $('#totalDoctores').html('<span class="text-danger">Error</span>');
+}
+
+function animarNumero(selector, objetivo) {
+   const elemento = $(selector);
+   const actual = parseInt(elemento.text()) || 0;
+   
+   if (actual === objetivo) return;
+   
+   let contador = actual;
+   const incremento = objetivo > actual ? 1 : -1;
+   const tiempo = Math.abs(objetivo - actual) > 20 ? 30 : 80;
+   
+   const timer = setInterval(() => {
+       contador += incremento;
+       elemento.text(contador);
+       
+       if (contador === objetivo) {
+           clearInterval(timer);
+       }
+   }, tiempo);
+}
+
+// ===== PAGINACIÓN =====
+function actualizarPaginacion(response) {
+   const container = $('#paginacion');
+   const { paginaActual, totalPaginas } = response;
+   
+   totalPaginas = response.totalPaginas;
+   
+   if (totalPaginas <= 1) {
+       container.empty();
+       return;
+   }
+   
+   let html = '';
+   
+   // Botón anterior
+   html += `
+       <li class="page-item ${paginaActual <= 1 ? 'disabled' : ''}">
+           <a class="page-link" href="javascript:void(0)" data-pagina="${paginaActual - 1}">
+               <i class="bi bi-chevron-left"></i>
+           </a>
+       </li>
    `;
    
+   // Páginas
+   const inicioRango = Math.max(1, paginaActual - 2);
+   const finRango = Math.min(totalPaginas, paginaActual + 2);
+   
+   if (inicioRango > 1) {
+       html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-pagina="1">1</a></li>`;
+       if (inicioRango > 2) {
+           html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+       }
+   }
+   
+   for (let i = inicioRango; i <= finRango; i++) {
+       html += `
+           <li class="page-item ${i === paginaActual ? 'active' : ''}">
+               <a class="page-link" href="javascript:void(0)" data-pagina="${i}">${i}</a>
+           </li>
+       `;
+   }
+   
+   if (finRango < totalPaginas) {
+       if (finRango < totalPaginas - 1) {
+           html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+       }
+       html += `<li class="page-item"><a class="page-link" href="javascript:void(0)" data-pagina="${totalPaginas}">${totalPaginas}</a></li>`;
+   }
+   
+   // Botón siguiente
+   html += `
+       <li class="page-item ${paginaActual >= totalPaginas ? 'disabled' : ''}">
+           <a class="page-link" href="javascript:void(0)" data-pagina="${paginaActual + 1}">
+               <i class="bi bi-chevron-right"></i>
+           </a>
+       </li>
+   `;
+   
+   container.html(html);
+}
+
+function actualizarInfoTabla(response) {
+   const { paginaActual, totalPaginas, totalRegistros, registrosPorPagina } = response;
+   
+   const inicio = ((paginaActual - 1) * registrosPorPagina) + 1;
+   const fin = Math.min(paginaActual * registrosPorPagina, totalRegistros);
+   
+   $('#infoRegistros').html(`
+       <i class="bi bi-info-circle me-1"></i>
+       Mostrando ${inicio} a ${fin} de ${totalRegistros} especialidades
+   `);
+   
+   $('#infoPaginacion').html(`
+       Página ${paginaActual} de ${totalPaginas}
+   `);
+}
+
+// ===== FUNCIONES DE SUCURSALES =====
+function actualizarContadorSucursales(tipo) {
+   const selector = tipo === 'crear' ? '.sucursal-checkbox' : '.editar-sucursal-checkbox';
+   const seleccionadas = $(`${selector}:checked`).length;
+   const total = $(selector).length;
+   
+   // Aquí podrías agregar un contador visual si quisieras
+   console.log(`📍 Sucursales seleccionadas (${tipo}): ${seleccionadas}/${total}`);
+}
+
+// ===== FUNCIONES DE UTILIDAD =====
+function validarFormulario(formId) {
+   const form = document.getElementById(formId);
+   if (!form) return false;
+   
+   let esValido = true;
+   
+   // Limpiar validaciones anteriores
+   $(form).find('.is-invalid').removeClass('is-invalid');
+   $(form).find('.invalid-feedback').remove();
+   
+   // Validar campos requeridos
+   const camposRequeridos = form.querySelectorAll('input[required], select[required], textarea[required]');
+   
+   camposRequeridos.forEach(campo => {
+       if (!campo.value.trim()) {
+           mostrarErrorCampo(campo, 'Este campo es requerido');
+           esValido = false;
+       }
+   });
+   
+   // Validar que al menos una sucursal esté seleccionada
+   const checkboxSelector = formId === 'formCrearEspecialidad' ? '.sucursal-checkbox' : '.editar-sucursal-checkbox';
+   const sucursalesSeleccionadas = $(`${checkboxSelector}:checked`).length;
+   
+   if (sucursalesSeleccionadas === 0) {
+       Swal.fire({
+           icon: 'warning',
+           title: 'Sucursales requeridas',
+           text: 'Debe asignar al menos una sucursal a la especialidad'
+       });
+       esValido = false;
+   }
+   
+   return esValido;
+}
+
+function limpiarModalCrear() {
+   console.log('🧹 Limpiando modal crear...');
+   
+   // Limpiar formulario
+   document.getElementById('formCrearEspecialidad').reset();
+   
+   // Desmarcar checkboxes
+   $('.sucursal-checkbox').prop('checked', false);
+   
+   // Limpiar validaciones
+   $('#formCrearEspecialidad .is-invalid').removeClass('is-invalid');
+   $('#formCrearEspecialidad .invalid-feedback').remove();
+   $('#formCrearEspecialidad .is-valid').removeClass('is-valid');
+   
+   actualizarContadorSucursales('crear');
+}
+
+function limpiarModalEditar() {
+   console.log('🧹 Limpiando modal editar...');
+   
+   // Limpiar formulario
+   document.getElementById('formEditarEspecialidad').reset();
+   
+   // Desmarcar checkboxes
+   $('.editar-sucursal-checkbox').prop('checked', false);
+   
+   // Limpiar validaciones
+   $('#formEditarEspecialidad .is-invalid').removeClass('is-invalid');
+   $('#formEditarEspecialidad .invalid-feedback').remove();
+   $('#formEditarEspecialidad .is-valid').removeClass('is-valid');
+   
+   actualizarContadorSucursales('editar');
+}
+
+function limpiarBusqueda() {
+   $('#busquedaGlobal').val('');
+   busquedaActual = '';
+   cargarEspecialidadesPaginadas(1);
+}
+
+function mostrarError(mensaje) {
    Swal.fire({
-       title: 'Reporte de Especialidades',
-       html: html,
-       icon: 'info',
-       width: 600,
-       confirmButtonText: 'Cerrar'
+       icon: 'error',
+       title: 'Error',
+       text: mensaje,
+       timer: 3000,
+       showConfirmButton: false
    });
 }
 
-// Inicializar tooltips cuando el DOM esté listo
-$(document).ready(function() {
-   // Inicializar tooltips para elementos dinámicos
-   $(document).on('mouseenter', '[title]', function() {
-       $(this).tooltip('show');
-   });
-   
-   $(document).on('mouseleave', '[title]', function() {
-       $(this).tooltip('hide');
-   });
-});
+// ===== FUNCIONES EXPORTADAS (para uso global) =====
+window.verEspecialidad = verEspecialidad;
+window.abrirModalEditar = abrirModalEditar;
+window.confirmarEliminar = confirmarEliminar;
+window.limpiarBusqueda = limpiarBusqueda;
 
-console.log('🎯 Sistema de Gestión de Especialidades COMPLETAMENTE CARGADO');
+console.log('🎯 JavaScript de especialidades cargado completamente');

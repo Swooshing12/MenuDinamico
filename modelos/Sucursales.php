@@ -676,7 +676,20 @@ class Sucursales {
             throw new Exception("Error al verificar las relaciones de la sucursal");
         }
     }
-    
+    /**
+ * Contar sucursales activas
+ */
+public function contarActivas() {
+    try {
+        $query = "SELECT COUNT(*) as total FROM sucursales WHERE estado = 1";
+        $stmt = $this->conn->query($query);
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$resultado['total'];
+    } catch (PDOException $e) {
+        error_log("Error contando sucursales activas: " . $e->getMessage());
+        return 0;
+    }
+}
   
 }
 

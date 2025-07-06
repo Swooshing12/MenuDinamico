@@ -21,7 +21,7 @@ class Especialidades {
             $stmt = $this->conn->prepare($query);
             $stmt->execute([
                 ':nombre_especialidad' => $datos['nombre_especialidad'],
-                ':descripcion' => $datos['descripcion'] ?? null
+                ':descripcion' => $datos['descripcion']
             ]);
             
             return $this->conn->lastInsertId();
@@ -32,23 +32,38 @@ class Especialidades {
     }
     
     /**
-     * Obtener especialidad por ID
+     * Crear especialidad con sucursales asignadas
      */
-    public function obtenerPorId($id_especialidad) {
+    public function crearConSucursales($datos, $sucursales = []) {
         try {
-            $query = "SELECT e.*,
-                             (SELECT COUNT(*) FROM doctores d WHERE d.id_especialidad = e.id_especialidad) as total_doctores,
-                             (SELECT COUNT(*) FROM especialidades_sucursales es WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
-                      FROM especialidades e
-                      WHERE e.id_especialidad = :id_especialidad";
+            $this->conn->beginTransaction();
+            
+            // 1. Crear la especialidad
+            $query = "INSERT INTO especialidades (nombre_especialidad, descripcion) 
+                      VALUES (:nombre_especialidad, :descripcion)";
             
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_especialidad' => $id_especialidad]);
+            $stmt->execute([
+                ':nombre_especialidad' => $datos['nombre_especialidad'],
+                ':descripcion' => $datos['descripcion']
+            ]);
             
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $id_especialidad = $this->conn->lastInsertId();
+            
+            // 2. Asignar a sucursales
+            if (!empty($sucursales)) {
+                foreach ($sucursales as $id_sucursal) {
+                    $this->asignarASucursal($id_especialidad, (int)$id_sucursal);
+                }
+            }
+            
+            $this->conn->commit();
+            return $id_especialidad;
+            
         } catch (PDOException $e) {
-            error_log("Error obteniendo especialidad: " . $e->getMessage());
-            throw new Exception("Error al obtener la especialidad");
+            $this->conn->rollback();
+            error_log("Error creando especialidad con sucursales: " . $e->getMessage());
+            throw new Exception("Error al crear la especialidad con sucursales");
         }
     }
     
@@ -58,15 +73,15 @@ class Especialidades {
     public function actualizar($id_especialidad, $datos) {
         try {
             $query = "UPDATE especialidades SET 
-                        nombre_especialidad = :nombre_especialidad,
-                        descripcion = :descripcion
+                      nombre_especialidad = :nombre_especialidad,
+                      descripcion = :descripcion
                       WHERE id_especialidad = :id_especialidad";
             
             $stmt = $this->conn->prepare($query);
             return $stmt->execute([
-                ':id_especialidad' => $id_especialidad,
                 ':nombre_especialidad' => $datos['nombre_especialidad'],
-                ':descripcion' => $datos['descripcion']
+                ':descripcion' => $datos['descripcion'],
+                ':id_especialidad' => $id_especialidad
             ]);
         } catch (PDOException $e) {
             error_log("Error actualizando especialidad: " . $e->getMessage());
@@ -75,25 +90,94 @@ class Especialidades {
     }
     
     /**
+     * Actualizar especialidad con sucursales
+     */
+    public function actualizarConSucursales($id_especialidad, $datos, $sucursales = []) {
+        try {
+            $this->conn->beginTransaction();
+            
+            // 1. Actualizar la especialidad
+            $query = "UPDATE especialidades SET 
+                      nombre_especialidad = :nombre_especialidad,
+                      descripcion = :descripcion
+                      WHERE id_especialidad = :id_especialidad";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([
+                ':nombre_especialidad' => $datos['nombre_especialidad'],
+                ':descripcion' => $datos['descripcion'],
+                ':id_especialidad' => $id_especialidad
+            ]);
+            
+            // 2. Eliminar asignaciones actuales de sucursales
+            $this->eliminarTodasSucursales($id_especialidad);
+            
+            // 3. Asignar nuevas sucursales
+            if (!empty($sucursales)) {
+                foreach ($sucursales as $id_sucursal) {
+                    $this->asignarASucursal($id_especialidad, (int)$id_sucursal);
+                }
+            }
+            
+            $this->conn->commit();
+            return true;
+            
+        } catch (PDOException $e) {
+            $this->conn->rollback();
+            error_log("Error actualizando especialidad con sucursales: " . $e->getMessage());
+            throw new Exception("Error al actualizar la especialidad con sucursales");
+        }
+    }
+    
+    /**
      * Eliminar una especialidad
      */
     public function eliminar($id_especialidad) {
         try {
-            // Verificar si tiene doctores asignados
-            if (!$this->puedeEliminar($id_especialidad)) {
-                throw new Exception("No se puede eliminar la especialidad porque tiene doctores asignados");
-            }
+            $this->conn->beginTransaction();
             
+            // 1. Eliminar asignaciones de sucursales
+            $this->eliminarTodasSucursales($id_especialidad);
+            
+            // 2. Eliminar la especialidad
             $query = "DELETE FROM especialidades WHERE id_especialidad = :id_especialidad";
             $stmt = $this->conn->prepare($query);
-            return $stmt->execute([':id_especialidad' => $id_especialidad]);
+            $resultado = $stmt->execute([':id_especialidad' => $id_especialidad]);
+            
+            $this->conn->commit();
+            return $resultado;
         } catch (PDOException $e) {
+            $this->conn->rollback();
             error_log("Error eliminando especialidad: " . $e->getMessage());
             throw new Exception("Error al eliminar la especialidad");
         }
     }
     
-    // ===== MÉTODOS DE CONSULTA ESPECÍFICOS =====
+    // ===== MÉTODOS DE CONSULTA =====
+    
+    /**
+     * Obtener especialidad por ID
+     */
+    public function obtenerPorId($id_especialidad) {
+        try {
+            $query = "SELECT e.*,
+                             (SELECT COUNT(*) FROM doctores d 
+                              INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                              WHERE d.id_especialidad = e.id_especialidad AND u.id_estado = 1) as total_doctores,
+                             (SELECT COUNT(*) FROM especialidades_sucursales es 
+                              WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
+                      FROM especialidades e
+                      WHERE e.id_especialidad = :id_especialidad";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_especialidad' => $id_especialidad]);
+            
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo especialidad por ID: " . $e->getMessage());
+            throw new Exception("Error al obtener la especialidad");
+        }
+    }
     
     /**
      * Obtener todas las especialidades
@@ -101,15 +185,18 @@ class Especialidades {
     public function obtenerTodas() {
         try {
             $query = "SELECT e.*,
-                             (SELECT COUNT(*) FROM doctores d WHERE d.id_especialidad = e.id_especialidad) as total_doctores,
-                             (SELECT COUNT(*) FROM especialidades_sucursales es WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
+                             (SELECT COUNT(*) FROM doctores d 
+                              INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                              WHERE d.id_especialidad = e.id_especialidad AND u.id_estado = 1) as total_doctores,
+                             (SELECT COUNT(*) FROM especialidades_sucursales es 
+                              WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
                       FROM especialidades e
                       ORDER BY e.nombre_especialidad";
             
             $stmt = $this->conn->query($query);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Error obteniendo especialidades: " . $e->getMessage());
+            error_log("Error obteniendo todas las especialidades: " . $e->getMessage());
             throw new Exception("Error al obtener las especialidades");
         }
     }
@@ -128,8 +215,11 @@ class Especialidades {
             }
             
             $query = "SELECT e.*,
-                             (SELECT COUNT(*) FROM doctores d WHERE d.id_especialidad = e.id_especialidad) as total_doctores,
-                             (SELECT COUNT(*) FROM especialidades_sucursales es WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
+                             (SELECT COUNT(*) FROM doctores d 
+                              INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                              WHERE d.id_especialidad = e.id_especialidad AND u.id_estado = 1) as total_doctores,
+                             (SELECT COUNT(*) FROM especialidades_sucursales es 
+                              WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
                       FROM especialidades e
                       $where_clause
                       ORDER BY e.nombre_especialidad
@@ -137,10 +227,12 @@ class Especialidades {
             
             $stmt = $this->conn->prepare($query);
             
-            // Bind parámetros
+            // Bind parámetros de búsqueda
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
+            
+            // Bind parámetros de paginación
             $stmt->bindValue(':inicio', $inicio, PDO::PARAM_INT);
             $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
             
@@ -148,12 +240,12 @@ class Especialidades {
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error obteniendo especialidades paginadas: " . $e->getMessage());
-            throw new Exception("Error al obtener las especialidades");
+            throw new Exception("Error al obtener especialidades paginadas");
         }
     }
     
     /**
-     * Contar total de especialidades
+     * Contar total de registros (para paginación)
      */
     public function contarTotal($busqueda = '') {
         try {
@@ -161,11 +253,12 @@ class Especialidades {
             $params = [];
             
             if (!empty($busqueda)) {
-                $where_clause = "WHERE nombre_especialidad LIKE :busqueda OR descripcion LIKE :busqueda";
+                $where_clause = "WHERE e.nombre_especialidad LIKE :busqueda OR e.descripcion LIKE :busqueda";
                 $params[':busqueda'] = '%' . $busqueda . '%';
             }
             
-            $query = "SELECT COUNT(*) as total FROM especialidades $where_clause";
+            $query = "SELECT COUNT(*) as total FROM especialidades e $where_clause";
+            
             $stmt = $this->conn->prepare($query);
             $stmt->execute($params);
             
@@ -173,110 +266,101 @@ class Especialidades {
             return (int)$resultado['total'];
         } catch (PDOException $e) {
             error_log("Error contando especialidades: " . $e->getMessage());
-            throw new Exception("Error al contar las especialidades");
-        }
-    }
-    
-    // ===== MÉTODOS ESPECÍFICOS PARA RECEPCIONISTA =====
-    
-    /**
-     * Obtener especialidades disponibles por sucursal
-     */
-    public function obtenerPorSucursal($id_sucursal) {
-        try {
-            $query = "SELECT e.*, es.id_especialidad_sucursal,
-                             (SELECT COUNT(*) FROM doctores d 
-                              INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
-                              WHERE d.id_especialidad = e.id_especialidad 
-                                AND ds.id_sucursal = :id_sucursal) as doctores_disponibles
-                      FROM especialidades e
-                      INNER JOIN especialidades_sucursales es ON e.id_especialidad = es.id_especialidad
-                      WHERE es.id_sucursal = :id_sucursal
-                      ORDER BY e.nombre_especialidad";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_sucursal' => $id_sucursal]);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo especialidades por sucursal: " . $e->getMessage());
-            throw new Exception("Error al obtener especialidades de la sucursal");
+            throw new Exception("Error al contar especialidades");
         }
     }
     
     /**
-     * Obtener especialidades con doctores disponibles por sucursal
+     * Obtener estadísticas generales
      */
-    public function obtenerConDoctoresPorSucursal($id_sucursal) {
+    public function obtenerEstadisticas() {
         try {
-            $query = "SELECT DISTINCT e.*, es.id_especialidad_sucursal,
-                             COUNT(d.id_doctor) as total_doctores
-                      FROM especialidades e
-                      INNER JOIN especialidades_sucursales es ON e.id_especialidad = es.id_especialidad
-                      INNER JOIN doctores d ON e.id_especialidad = d.id_especialidad
-                      INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
-                      WHERE es.id_sucursal = :id_sucursal 
-                        AND ds.id_sucursal = :id_sucursal
-                      GROUP BY e.id_especialidad
-                      HAVING total_doctores > 0
-                      ORDER BY e.nombre_especialidad";
+            $query = "SELECT 
+                        COUNT(*) as total_especialidades,
+                        COUNT(CASE WHEN (
+                            SELECT COUNT(*) FROM doctores d 
+                            INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                            WHERE d.id_especialidad = e.id_especialidad AND u.id_estado = 1
+                        ) > 0 THEN 1 END) as con_doctores,
+                        (SELECT COUNT(*) FROM doctores d 
+                         INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                         WHERE u.id_estado = 1) as total_doctores
+                      FROM especialidades e";
+            
+            $stmt = $this->conn->query($query);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo estadísticas: " . $e->getMessage());
+            throw new Exception("Error al obtener estadísticas");
+        }
+    }
+    
+    // ===== MÉTODOS DE VALIDACIÓN =====
+    
+    /**
+     * Verificar si existe especialidad por nombre (con exclusión opcional)
+     */
+    public function existePorNombre($nombre, $id_excluir = null) {
+        try {
+            $query = "SELECT COUNT(*) as total FROM especialidades WHERE nombre_especialidad = :nombre";
+            $params = [':nombre' => $nombre];
+            
+            if ($id_excluir) {
+                $query .= " AND id_especialidad != :id_excluir";
+                $params[':id_excluir'] = $id_excluir;
+            }
             
             $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_sucursal' => $id_sucursal]);
+            $stmt->execute($params);
             
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)$resultado['total'] > 0;
         } catch (PDOException $e) {
-            error_log("Error obteniendo especialidades con doctores: " . $e->getMessage());
-            throw new Exception("Error al obtener especialidades con doctores");
+            error_log("Error verificando nombre de especialidad: " . $e->getMessage());
+            throw new Exception("Error al verificar nombre de especialidad");
         }
     }
     
     /**
-     * Buscar especialidades por texto (para autocomplete)
+     * Contar doctores asignados a una especialidad
      */
-    public function buscarPorTexto($texto, $limite = 10) {
+    public function contarDoctores($id_especialidad) {
         try {
-            $query = "SELECT id_especialidad, nombre_especialidad, descripcion
-                      FROM especialidades
-                      WHERE nombre_especialidad LIKE :texto 
-                         OR descripcion LIKE :texto
-                      ORDER BY nombre_especialidad
-                      LIMIT :limite";
+            $query = "SELECT COUNT(*) as total 
+                      FROM doctores d
+                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                      WHERE d.id_especialidad = :id_especialidad AND u.id_estado = 1";
             
             $stmt = $this->conn->prepare($query);
-            $stmt->bindValue(':texto', '%' . $texto . '%');
-            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
-            $stmt->execute();
+            $stmt->execute([':id_especialidad' => $id_especialidad]);
             
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)$resultado['total'];
         } catch (PDOException $e) {
-            error_log("Error buscando especialidades: " . $e->getMessage());
-            throw new Exception("Error al buscar especialidades");
+            error_log("Error contando doctores de especialidad: " . $e->getMessage());
+            return 0;
         }
     }
     
     /**
-     * Obtener especialidades más demandadas (con más citas)
+     * Verificar si una especialidad puede ser eliminada
      */
-    public function obtenerMasDemandadas($limite = 5) {
+    public function puedeEliminar($id_especialidad) {
         try {
-            $query = "SELECT e.*, COUNT(c.id_cita) as total_citas
-                      FROM especialidades e
-                      INNER JOIN doctores d ON e.id_especialidad = d.id_especialidad
-                      INNER JOIN citas c ON d.id_doctor = c.id_doctor
-                      WHERE c.fecha_hora >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
-                      GROUP BY e.id_especialidad
-                      ORDER BY total_citas DESC
-                      LIMIT :limite";
+            // Verificar si tiene doctores asignados
+            $query = "SELECT COUNT(*) as total 
+                      FROM doctores d
+                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                      WHERE d.id_especialidad = :id_especialidad AND u.id_estado = 1";
             
             $stmt = $this->conn->prepare($query);
-            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
-            $stmt->execute();
+            $stmt->execute([':id_especialidad' => $id_especialidad]);
             
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)$resultado['total'] === 0;
         } catch (PDOException $e) {
-            error_log("Error obteniendo especialidades más demandadas: " . $e->getMessage());
-            throw new Exception("Error al obtener especialidades más demandadas");
+            error_log("Error verificando eliminación de especialidad: " . $e->getMessage());
+            return false;
         }
     }
     
@@ -289,7 +373,7 @@ class Especialidades {
         try {
             // Verificar si ya existe la relación
             if ($this->existeEnSucursal($id_especialidad, $id_sucursal)) {
-                throw new Exception("La especialidad ya está asignada a esta sucursal");
+                return true; // Ya existe, no hacer nada
             }
             
             $query = "INSERT INTO especialidades_sucursales (id_especialidad, id_sucursal) 
@@ -328,19 +412,28 @@ class Especialidades {
     }
     
     /**
+     * Eliminar todas las asignaciones de sucursales de una especialidad
+     */
+    public function eliminarTodasSucursales($id_especialidad) {
+        try {
+            $query = "DELETE FROM especialidades_sucursales WHERE id_especialidad = :id_especialidad";
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute([':id_especialidad' => $id_especialidad]);
+        } catch (PDOException $e) {
+            error_log("Error eliminando sucursales de especialidad: " . $e->getMessage());
+            throw new Exception("Error al eliminar sucursales de la especialidad");
+        }
+    }
+    
+    /**
      * Obtener sucursales donde está disponible una especialidad
      */
     public function obtenerSucursales($id_especialidad) {
         try {
-            $query = "SELECT s.*, es.id_especialidad_sucursal,
-                             (SELECT COUNT(*) FROM doctores d 
-                              INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
-                              WHERE d.id_especialidad = :id_especialidad 
-                                AND ds.id_sucursal = s.id_sucursal) as doctores_disponibles
+            $query = "SELECT s.*, es.id_especialidad_sucursal
                       FROM sucursales s
                       INNER JOIN especialidades_sucursales es ON s.id_sucursal = es.id_sucursal
-                      WHERE es.id_especialidad = :id_especialidad
-                        AND s.estado = 1
+                      WHERE es.id_especialidad = :id_especialidad AND s.estado = 1
                       ORDER BY s.nombre_sucursal";
             
             $stmt = $this->conn->prepare($query);
@@ -353,34 +446,8 @@ class Especialidades {
         }
     }
     
-    // ===== MÉTODOS DE VALIDACIÓN =====
-    
     /**
-     * Verificar si existe una especialidad por nombre
-     */
-    public function existePorNombre($nombre_especialidad, $id_excluir = null) {
-        try {
-            $query = "SELECT COUNT(*) as total FROM especialidades WHERE nombre_especialidad = :nombre";
-            $params = [':nombre' => $nombre_especialidad];
-            
-            if ($id_excluir) {
-                $query .= " AND id_especialidad != :id_excluir";
-                $params[':id_excluir'] = $id_excluir;
-            }
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($params);
-            
-            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
-            return (int)$resultado['total'] > 0;
-        } catch (PDOException $e) {
-            error_log("Error verificando existencia de especialidad: " . $e->getMessage());
-            throw new Exception("Error al verificar especialidad");
-        }
-    }
-    
-    /**
-     * Verificar si una especialidad existe en una sucursal
+     * Verificar si especialidad existe en sucursal
      */
     public function existeEnSucursal($id_especialidad, $id_sucursal) {
         try {
@@ -398,95 +465,111 @@ class Especialidades {
             return (int)$resultado['total'] > 0;
         } catch (PDOException $e) {
             error_log("Error verificando especialidad en sucursal: " . $e->getMessage());
-            throw new Exception("Error al verificar especialidad en sucursal");
+            return false;
         }
     }
     
     /**
-     * Verificar si una especialidad puede ser eliminada
+     * Obtener especialidades por sucursal
      */
-    public function puedeEliminar($id_especialidad) {
+    public function obtenerPorSucursal($id_sucursal) {
         try {
-            // Verificar si tiene doctores asignados
-            $query = "SELECT COUNT(*) as total FROM doctores WHERE id_especialidad = :id_especialidad";
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_especialidad' => $id_especialidad]);
-            
-            $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
-            return (int)$resultado['total'] === 0;
-        } catch (PDOException $e) {
-            error_log("Error verificando eliminación de especialidad: " . $e->getMessage());
-            throw new Exception("Error al verificar eliminación");
-        }
-    }
-    
-    // ===== MÉTODOS DE ESTADÍSTICAS =====
-    
-    /**
-     * Obtener estadísticas de especialidades
-     */
-    public function obtenerEstadisticas() {
-        try {
-            $query = "SELECT 
-                        COUNT(*) as total_especialidades,
-                        (SELECT COUNT(*) FROM doctores) as total_doctores,
-                        (SELECT COUNT(DISTINCT id_sucursal) FROM especialidades_sucursales) as sucursales_con_especialidades,
-                        AVG(doctores_por_especialidad.total) as promedio_doctores_por_especialidad
+            $query = "SELECT e.*, es.id_especialidad_sucursal,
+                             (SELECT COUNT(*) FROM doctores d 
+                              INNER JOIN usuarios u ON d.id_usuario = u.id_usuario 
+                              WHERE d.id_especialidad = e.id_especialidad AND u.id_estado = 1) as total_doctores
                       FROM especialidades e
-                      LEFT JOIN (
-                          SELECT id_especialidad, COUNT(*) as total 
-                          FROM doctores 
-                          GROUP BY id_especialidad
-                      ) doctores_por_especialidad ON e.id_especialidad = doctores_por_especialidad.id_especialidad";
+                      INNER JOIN especialidades_sucursales es ON e.id_especialidad = es.id_especialidad
+                      WHERE es.id_sucursal = :id_sucursal
+                      ORDER BY e.nombre_especialidad";
             
-            $stmt = $this->conn->query($query);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo estadísticas de especialidades: " . $e->getMessage());
-            throw new Exception("Error al obtener estadísticas");
-        }
-    }
-    
-    /**
-     * Obtener distribución de especialidades por sucursal
-     */
-    public function obtenerDistribucionPorSucursal() {
-        try {
-            $query = "SELECT s.nombre_sucursal, COUNT(es.id_especialidad) as total_especialidades
-                      FROM sucursales s
-                      LEFT JOIN especialidades_sucursales es ON s.id_sucursal = es.id_sucursal
-                      WHERE s.estado = 1
-                      GROUP BY s.id_sucursal, s.nombre_sucursal
-                      ORDER BY total_especialidades DESC";
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_sucursal' => $id_sucursal]);
             
-            $stmt = $this->conn->query($query);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Error obteniendo distribución por sucursal: " . $e->getMessage());
-            throw new Exception("Error al obtener distribución por sucursal");
+            error_log("Error obteniendo especialidades por sucursal: " . $e->getMessage());
+            throw new Exception("Error al obtener especialidades de la sucursal");
         }
     }
     
-
-
-/**
- * Contar doctores por especialidad
- */
-public function contarDoctores($id_especialidad) {
-    try {
-        $query = "SELECT COUNT(*) as total FROM doctores WHERE id_especialidad = :id_especialidad";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([':id_especialidad' => $id_especialidad]);
-        
-        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $resultado['total'];
-    } catch (PDOException $e) {
-        error_log("Error contando doctores: " . $e->getMessage());
-        return 0;
+    /**
+     * Obtener doctores de una especialidad en una sucursal específica
+     */
+    public function obtenerDoctoresPorSucursal($id_especialidad, $id_sucursal) {
+        try {
+            $query = "SELECT d.*, u.nombres, u.apellidos, u.correo, d.titulo_profesional
+                      FROM doctores d
+                      INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                      INNER JOIN doctores_sucursales ds ON d.id_doctor = ds.id_doctor
+                      WHERE d.id_especialidad = :id_especialidad 
+                        AND ds.id_sucursal = :id_sucursal
+                        AND u.id_estado = 1
+                      ORDER BY u.nombres, u.apellidos";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([
+                ':id_especialidad' => $id_especialidad,
+                ':id_sucursal' => $id_sucursal
+            ]);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo doctores de especialidad por sucursal: " . $e->getMessage());
+            throw new Exception("Error al obtener doctores de la especialidad");
+        }
     }
-}
-
-
+    
+    /**
+     * Obtener especialidades más demandadas (con más doctores)
+     */
+    public function obtenerMasDemandadas($limite = 5) {
+        try {
+            $query = "SELECT e.*, 
+                             COUNT(d.id_doctor) as total_doctores,
+                             (SELECT COUNT(*) FROM especialidades_sucursales es 
+                              WHERE es.id_especialidad = e.id_especialidad) as total_sucursales
+                      FROM especialidades e
+                      LEFT JOIN doctores d ON e.id_especialidad = d.id_especialidad
+                      LEFT JOIN usuarios u ON d.id_usuario = u.id_usuario AND u.id_estado = 1
+                      GROUP BY e.id_especialidad
+                      ORDER BY total_doctores DESC, e.nombre_especialidad
+                      LIMIT :limite";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo especialidades más demandadas: " . $e->getMessage());
+            throw new Exception("Error al obtener especialidades más demandadas");
+        }
+    }
+    
+    /**
+     * Obtener especialidades disponibles para una sucursal específica
+     * (que no estén ya asignadas a esa sucursal)
+     */
+    public function obtenerDisponiblesParaSucursal($id_sucursal) {
+        try {
+            $query = "SELECT e.*
+                      FROM especialidades e
+                      WHERE e.id_especialidad NOT IN (
+                          SELECT es.id_especialidad 
+                          FROM especialidades_sucursales es 
+                          WHERE es.id_sucursal = :id_sucursal
+                      )
+                      ORDER BY e.nombre_especialidad";
+            
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute([':id_sucursal' => $id_sucursal]);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error obteniendo especialidades disponibles para sucursal: " . $e->getMessage());
+            throw new Exception("Error al obtener especialidades disponibles");
+        }
+    }
 }
 ?>

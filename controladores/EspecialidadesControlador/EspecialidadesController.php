@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . "/../../modelos/Especialidades.php";
+require_once __DIR__ . "/../../modelos/Sucursales.php";
 require_once __DIR__ . "/../../modelos/Permisos.php";
 
 class EspecialidadesController {
     private $especialidadesModel;
+    private $sucursalesModel;
     private $permisosModel;
     private $debug = true;
     
@@ -13,6 +15,7 @@ class EspecialidadesController {
         }
         
         $this->especialidadesModel = new Especialidades();
+        $this->sucursalesModel = new Sucursales();
         $this->permisosModel = new Permisos();
     }
     
@@ -22,10 +25,10 @@ class EspecialidadesController {
             exit();
         }
         
-        $action = $_GET['action'] ?? $_POST['accion'] ?? '';
+        $action = $_GET['action'] ?? $_POST['action'] ?? '';
         
         if ($this->debug) {
-            error_log("🩺 ESPECIALIDADES - Acción: $action");
+            error_log("🏥 ESPECIALIDADES - Acción: $action");
         }
         
         switch ($action) {
@@ -41,17 +44,27 @@ class EspecialidadesController {
                 break;
                 
             // ===== CONSULTAS =====
+            case 'obtenerEspecialidadesPaginadas':
+                $this->obtenerEspecialidadesPaginadas();
+                break;
             case 'obtenerTodas':
                 $this->obtenerTodas();
-                break;
-            case 'obtenerPaginadas':
-                $this->obtenerPaginadas();
                 break;
             case 'obtenerPorId':
                 $this->obtenerPorId();
                 break;
             case 'obtenerEstadisticas':
                 $this->obtenerEstadisticas();
+                break;
+                
+            // ===== VALIDACIONES =====
+            case 'verificarNombre':
+                $this->verificarNombre();
+                break;
+                
+            // ===== SUCURSALES =====
+            case 'obtenerSucursalesEspecialidad':
+                $this->obtenerSucursalesEspecialidad();
                 break;
                 
             default:
@@ -62,8 +75,11 @@ class EspecialidadesController {
         }
     }
     
-    // ===== CRUD PRINCIPAL =====
+    // ===== CRUD PRINCIPAL CON SUCURSALES =====
     
+    /**
+     * Crear especialidad con sucursales asignadas
+     */
     private function crear() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->responderJSON([
@@ -95,23 +111,40 @@ class EspecialidadesController {
                 return;
             }
             
-            // Preparar datos
+            // Preparar datos de la especialidad
             $datos = [
                 'nombre_especialidad' => trim($_POST['nombre_especialidad']),
                 'descripcion' => !empty($_POST['descripcion']) ? trim($_POST['descripcion']) : null
             ];
             
-            // Crear especialidad
-            $id_especialidad = $this->especialidadesModel->crear($datos);
+            // Obtener sucursales seleccionadas
+            $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+            
+            if (empty($sucursales)) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Debe asignar al menos una sucursal a la especialidad'
+                ]);
+                return;
+            }
+            
+            // Crear especialidad con sucursales
+            $id_especialidad = $this->especialidadesModel->crearConSucursales($datos, $sucursales);
             
             if ($id_especialidad) {
+                $mensaje = 'Especialidad creada exitosamente';
+                if (!empty($sucursales)) {
+                    $mensaje .= ' y asignada a ' . count($sucursales) . ' sucursal(es)';
+                }
+                
                 $this->responderJSON([
                     'success' => true,
-                    'message' => 'Especialidad creada exitosamente',
+                    'message' => $mensaje,
                     'data' => [
                         'id_especialidad' => $id_especialidad,
                         'nombre_especialidad' => $datos['nombre_especialidad'],
-                        'descripcion' => $datos['descripcion']
+                        'descripcion' => $datos['descripcion'],
+                        'total_sucursales' => count($sucursales)
                     ]
                 ]);
             } else {
@@ -127,6 +160,9 @@ class EspecialidadesController {
         }
     }
     
+    /**
+     * Editar especialidad con sucursales
+     */
     private function editar() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->responderJSON([
@@ -177,19 +213,39 @@ class EspecialidadesController {
                 return;
             }
             
-            // Preparar datos
+            // Preparar datos de la especialidad
             $datos = [
                 'nombre_especialidad' => trim($_POST['nombre_especialidad']),
                 'descripcion' => !empty($_POST['descripcion']) ? trim($_POST['descripcion']) : null
             ];
             
-            // Actualizar especialidad
-            $resultado = $this->especialidadesModel->actualizar($id_especialidad, $datos);
+            // Obtener sucursales seleccionadas
+            $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+            
+            if (empty($sucursales)) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Debe asignar al menos una sucursal a la especialidad'
+                ]);
+                return;
+            }
+            
+            // Actualizar especialidad con sucursales
+            $resultado = $this->especialidadesModel->actualizarConSucursales($id_especialidad, $datos, $sucursales);
             
             if ($resultado) {
+                $mensaje = 'Especialidad actualizada exitosamente';
+                if (!empty($sucursales)) {
+                    $mensaje .= ' y reasignada a ' . count($sucursales) . ' sucursal(es)';
+                }
+                
                 $this->responderJSON([
                     'success' => true,
-                    'message' => 'Especialidad actualizada exitosamente'
+                    'message' => $mensaje,
+                    'data' => [
+                        'id_especialidad' => $id_especialidad,
+                        'total_sucursales' => count($sucursales)
+                    ]
                 ]);
             } else {
                 throw new Exception("No se pudo actualizar la especialidad");
@@ -204,6 +260,9 @@ class EspecialidadesController {
         }
     }
     
+    /**
+     * Eliminar especialidad
+     */
     private function eliminar() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->responderJSON([
@@ -215,7 +274,7 @@ class EspecialidadesController {
         
         $this->verificarPermisos('eliminar');
         
-        if (empty($_POST['id_especialidad'])) {
+        if (empty($_POST['id'])) {
             $this->responderJSON([
                 'success' => false,
                 'message' => 'ID de especialidad requerido'
@@ -224,7 +283,7 @@ class EspecialidadesController {
         }
         
         try {
-            $id_especialidad = (int)$_POST['id_especialidad'];
+            $id_especialidad = (int)$_POST['id'];
             
             // Verificar que existe
             $especialidad = $this->especialidadesModel->obtenerPorId($id_especialidad);
@@ -237,8 +296,8 @@ class EspecialidadesController {
             }
             
             // Verificar si tiene doctores asignados
-            $doctoresAsignados = $this->especialidadesModel->contarDoctores($id_especialidad);
-            if ($doctoresAsignados > 0) {
+            if (!$this->especialidadesModel->puedeEliminar($id_especialidad)) {
+                $doctoresAsignados = $this->especialidadesModel->contarDoctores($id_especialidad);
                 $this->responderJSON([
                     'success' => false,
                     'message' => "No se puede eliminar. La especialidad tiene $doctoresAsignados doctor(es) asignado(s)."
@@ -246,7 +305,7 @@ class EspecialidadesController {
                 return;
             }
             
-            // Eliminar especialidad
+            // Eliminar especialidad (esto también eliminará las asignaciones de sucursales)
             $resultado = $this->especialidadesModel->eliminar($id_especialidad);
             
             if ($resultado) {
@@ -269,23 +328,10 @@ class EspecialidadesController {
     
     // ===== CONSULTAS =====
     
-    private function obtenerTodas() {
-        try {
-            $especialidades = $this->especialidadesModel->obtenerTodas();
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $especialidades
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
-    private function obtenerPaginadas() {
+    /**
+     * Obtener especialidades paginadas con información de sucursales
+     */
+    private function obtenerEspecialidadesPaginadas() {
         try {
             $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
@@ -302,6 +348,7 @@ class EspecialidadesController {
                 'success' => true,
                 'data' => $especialidades,
                 'totalRegistros' => $totalRegistros,
+                'registrosPorPagina' => $limit,
                 'mostrando' => count($especialidades),
                 'paginaActual' => $pagina,
                 'totalPaginas' => $totalPaginas,
@@ -317,6 +364,28 @@ class EspecialidadesController {
         }
     }
     
+    /**
+     * Obtener todas las especialidades
+     */
+    private function obtenerTodas() {
+        try {
+            $especialidades = $this->especialidadesModel->obtenerTodas();
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $especialidades
+            ]);
+        } catch (Exception $e) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Obtener especialidad por ID con sucursales asignadas
+     */
     private function obtenerPorId() {
         if (empty($_GET['id'])) {
             $this->responderJSON([
@@ -331,6 +400,13 @@ class EspecialidadesController {
             $especialidad = $this->especialidadesModel->obtenerPorId($id_especialidad);
             
             if ($especialidad) {
+                // Obtener sucursales asignadas
+                $especialidad['sucursales'] = $this->especialidadesModel->obtenerSucursales($id_especialidad);
+                $especialidad['total_sucursales'] = count($especialidad['sucursales']);
+                
+                // Contar doctores
+                $especialidad['total_doctores'] = $this->especialidadesModel->contarDoctores($id_especialidad);
+                
                 $this->responderJSON([
                     'success' => true,
                     'data' => $especialidad
@@ -349,13 +425,80 @@ class EspecialidadesController {
         }
     }
     
+    /**
+     * Obtener estadísticas generales
+     */
     private function obtenerEstadisticas() {
         try {
             $estadisticas = $this->especialidadesModel->obtenerEstadisticas();
             
+            // Agregar estadísticas de sucursales
+            $estadisticas['sucursales_activas'] = $this->sucursalesModel->contarActivas();
+            
             $this->responderJSON([
                 'success' => true,
                 'data' => $estadisticas
+            ]);
+        } catch (Exception $e) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Obtener sucursales de una especialidad
+     */
+    private function obtenerSucursalesEspecialidad() {
+        if (empty($_GET['id_especialidad'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'ID de especialidad requerido'
+            ]);
+            return;
+        }
+        
+        try {
+            $id_especialidad = (int)$_GET['id_especialidad'];
+            $sucursales = $this->especialidadesModel->obtenerSucursales($id_especialidad);
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $sucursales
+            ]);
+        } catch (Exception $e) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    // ===== VALIDACIONES =====
+    
+    /**
+     * Verificar si un nombre de especialidad está disponible
+     */
+    private function verificarNombre() {
+        if (empty($_GET['nombre'])) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Nombre requerido'
+            ]);
+            return;
+        }
+        
+        try {
+            $nombre = trim($_GET['nombre']);
+            $id_excluir = isset($_GET['id_excluir']) ? (int)$_GET['id_excluir'] : null;
+            
+            $existe = $this->especialidadesModel->existePorNombre($nombre, $id_excluir);
+            
+            $this->responderJSON([
+                'success' => true,
+                'disponible' => !$existe,
+                'existe' => $existe
             ]);
         } catch (Exception $e) {
             $this->responderJSON([
@@ -390,10 +533,12 @@ class EspecialidadesController {
             
             // Obtener datos para la vista
             $especialidades = $this->especialidadesModel->obtenerTodas();
+            $sucursales = $this->sucursalesModel->obtenerTodas(true); // Solo activas
             
             // Pasar datos a la vista
             extract([
                 'especialidades' => $especialidades,
+                'sucursales' => $sucursales,
                 'permisos' => $permisos,
                 'id_submenu' => $id_submenu
             ]);

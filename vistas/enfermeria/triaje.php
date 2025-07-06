@@ -1,11 +1,7 @@
 <?php
 if (!isset($_SESSION)) session_start();
 
-// Verificar si es enfermero
-if (!isset($_SESSION['id_rol']) || $_SESSION['id_rol'] != 73) {
-    header('Location: ../../error_permisos.php');
-    exit();
-}
+
 
 $titulo_pagina = "Triaje - Enfermería";
 include_once '../../navbars/header.php';
