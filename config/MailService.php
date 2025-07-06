@@ -109,46 +109,47 @@ class MailService {
      * Enviar confirmación de cita
      */
     public function enviarConfirmacionCita($cita, $paciente) {
-        try {
-            $fecha = new DateTime($cita['fecha_hora']);
-            $fechaFormateada = $fecha->format('l, d \d\e F \d\e Y');
-            $horaFormateada = $fecha->format('H:i');
-            
-            $tipoTexto = $cita['id_tipo_cita'] == 2 ? 'Virtual' : 'Presencial';
-            $iconoTipo = $cita['id_tipo_cita'] == 2 ? '📹' : '🏥';
-            
-            $subject = "✅ Cita Médica Confirmada - MediSys";
-            
-            $htmlBody = $this->generarPlantillaCita([
-                'tipo' => 'confirmacion',
-                'paciente_nombre' => $paciente['nombres'] . ' ' . $paciente['apellidos'],
-                'fecha' => $fechaFormateada,
-                'hora' => $horaFormateada,
-                'doctor' => $cita['doctor_nombres'] . ' ' . $cita['doctor_apellidos'],
-                'especialidad' => $cita['nombre_especialidad'],
-                'sucursal' => $cita['nombre_sucursal'],
-                'direccion' => $cita['sucursal_direccion'] ?? '',
-                'tipo_cita' => $tipoTexto,
-                'icono_tipo' => $iconoTipo,
-                'motivo' => $cita['motivo'],
-                'enlace_virtual' => $cita['enlace_virtual'] ?? null,
-                'sala_virtual' => $cita['sala_virtual'] ?? null,
-                'id_cita' => $cita['id_cita']
-            ]);
-            
-            return $this->enviarEmail(
-                $paciente['correo'],
-                $paciente['nombres'] . ' ' . $paciente['apellidos'],
-                $subject,
-                $htmlBody
-            );
-            
-        } catch (Exception $e) {
-            error_log("Error enviando confirmación de cita: " . $e->getMessage());
-            return false;
-        }
+    try {
+        error_log("🔍 DEBUG: Iniciando enviarConfirmacionCita");
+        
+        $fecha = new DateTime($cita['fecha_hora']);
+        $fechaFormateada = $fecha->format('d/m/Y');
+        $horaFormateada = $fecha->format('H:i');
+        
+        $subject = "✅ Confirma tu Cita Médica - MediSys";
+        
+        $htmlBody = $this->generarPlantillaCita([
+            'tipo' => 'confirmacion',
+            'paciente_nombre' => $paciente['nombres'] . ' ' . $paciente['apellidos'],
+            'fecha' => $fechaFormateada,
+            'hora' => $horaFormateada,
+            'doctor' => ($cita['doctor_nombres'] ?? '') . ' ' . ($cita['doctor_apellidos'] ?? ''),
+            'especialidad' => $cita['nombre_especialidad'] ?? 'No especificada',
+            'sucursal' => $cita['nombre_sucursal'] ?? 'No especificada',
+            'tipo_cita' => $cita['id_tipo_cita'] == 2 ? 'Virtual' : 'Presencial',
+            'enlace_virtual' => $cita['enlace_virtual'] ?? null,
+            'sala_virtual' => $cita['sala_virtual'] ?? null,
+            'id_cita' => $cita['id_cita']
+        ]);
+        
+        error_log("🔍 DEBUG: Plantilla generada, enviando email...");
+        
+        $resultado = $this->enviarEmail(
+            $paciente['correo'],
+            $paciente['nombres'] . ' ' . $paciente['apellidos'],
+            $subject,
+            $htmlBody
+        );
+        
+        error_log("🔍 DEBUG: Resultado final: " . ($resultado ? 'TRUE' : 'FALSE'));
+        
+        return $resultado;
+        
+    } catch (Exception $e) {
+        error_log("❌ Error en enviarConfirmacionCita: " . $e->getMessage());
+        return false;
     }
-    
+}
     /**
      * Enviar recordatorio de cita
      */
@@ -290,7 +291,7 @@ class MailService {
                     </div>
                     
                     <center>
-                        <a href='http://localhost:8080/MenuDinamico/vistas/login.php' class='btn'>
+                        <a href='http://localhost/MenuDinamico/vistas/login.php' class='btn'>
                             🚀 Iniciar Sesión Ahora
                         </a>
                     </center>
@@ -330,7 +331,7 @@ class MailService {
         - Debes cambiarla en tu primer inicio de sesión
         - Tu cuenta está en estado 'Pendiente' hasta que cambies la contraseña
         
-        Accede al sistema en: http://localhost:8080/MenuDinamico/vistas/login.php
+        Accede al sistema en: http://localhost/MenuDinamico/vistas/login.php
         
         Si tienes problemas, contacta al administrador.
         
@@ -344,205 +345,248 @@ class MailService {
     /**
      * Generar plantilla HTML para emails de citas
      */
-    private function generarPlantillaCita($datos) {
-        $estilos = "
-        <style>
-            .email-container { max-width: 600px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            .header { background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 20px; text-align: center; }
-            .content { padding: 30px; background: #f8f9fa; }
-            .cita-card { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-            .info-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
-            .label { font-weight: bold; color: #333; }
-            .value { color: #666; }
-            .virtual-info { background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0; }
-            .footer { background: #333; color: white; padding: 20px; text-align: center; font-size: 12px; }
-            .btn-primary { background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 10px 5px; }
-            .warning-box { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 15px; margin: 15px 0; }
-        </style>";
-        
-        $tipoTexto = [
-            'confirmacion' => 'Confirmación de Cita',
-            'recordatorio' => 'Recordatorio de Cita',
-            'cancelacion' => 'Cancelación de Cita'
-        ];
-        
-        $html = "
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset='UTF-8'>
-            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-            <title>{$tipoTexto[$datos['tipo']]}</title>
-            {$estilos}
-        </head>
-        <body>
-            <div class='email-container'>
-                <div class='header'>
-                    <h1>{$datos['icono_tipo']} MediSys</h1>
-                    <h2>{$tipoTexto[$datos['tipo']]}</h2>
-                </div>
-                
-                <div class='content'>
-                    <p>Estimado/a <strong>{$datos['paciente_nombre']}</strong>,</p>";
-        
-        if ($datos['tipo'] == 'confirmacion') {
-            $html .= "<p>Su cita médica ha sido <strong>confirmada exitosamente</strong> con los siguientes detalles:</p>";
-        } elseif ($datos['tipo'] == 'recordatorio') {
-            $html .= "<p>Le recordamos que tiene una cita médica programada para <strong>mañana</strong>:</p>";
-        } elseif ($datos['tipo'] == 'cancelacion') {
-            $html .= "<p>Lamentamos informarle que su cita médica ha sido <strong>cancelada</strong>:</p>";
-        }
-        
-        $html .= "
-                    <div class='cita-card'>
-                        <h3>📋 Detalles de la Cita</h3>
-                        
-                        <div class='info-row'>
-                            <span class='label'>📅 Fecha:</span>
-                            <span class='value'>{$datos['fecha']}</span>
-                        </div>
-                        
-                        <div class='info-row'>
-                            <span class='label'>🕐 Hora:</span>
-                            <span class='value'>{$datos['hora']}</span>
-                        </div>
-                        
-                        <div class='info-row'>
-                            <span class='label'>👨‍⚕️ Doctor:</span>
-                            <span class='value'>Dr. {$datos['doctor']}</span>
-                        </div>
-                        
-                        <div class='info-row'>
-                            <span class='label'>🏥 Especialidad:</span>
-                            <span class='value'>{$datos['especialidad']}</span>
-                        </div>
-                        
-                        <div class='info-row'>
-                            <span class='label'>📍 Sucursal:</span>
-                            <span class='value'>{$datos['sucursal']}</span>
-                        </div>";
-        
-        if ($datos['direccion']) {
-            $html .= "
-                        <div class='info-row'>
-                            <span class='label'>🗺️ Dirección:</span>
-                            <span class='value'>{$datos['direccion']}</span>
-                        </div>";
-        }
-        
-        $html .= "
-                        <div class='info-row'>
-                            <span class='label'>💼 Tipo de Cita:</span>
-                            <span class='value'>{$datos['tipo_cita']}</span>
-                        </div>";
-        
-        if (isset($datos['motivo'])) {
-            $html .= "
-                        <div class='info-row'>
-                            <span class='label'>📝 Motivo:</span>
-                            <span class='value'>{$datos['motivo']}</span>
-                        </div>";
-        }
-        
-        $html .= "</div>";
-        
-        // Información adicional para citas virtuales
-        if ($datos['tipo_cita'] == 'Virtual' && ($datos['enlace_virtual'] || $datos['sala_virtual'])) {
-            $html .= "
-                    <div class='virtual-info'>
-                        <h4>📹 Información de la Cita Virtual</h4>";
-            
-            if ($datos['enlace_virtual']) {
-                $html .= "<p><strong>🔗 Enlace de acceso:</strong><br>
-                         <a href='{$datos['enlace_virtual']}' target='_blank'>{$datos['enlace_virtual']}</a></p>";
-            }
-            
-            if ($datos['sala_virtual']) {
-                $html .= "<p><strong>🆔 ID de Sala:</strong> {$datos['sala_virtual']}</p>";
-            }
-            
-            $html .= "
-                        <div class='warning-box'>
-                            <p><strong>💡 Consejos para su cita virtual:</strong></p>
-                            <ul>
-                                <li>Úsese 5 minutos antes de la hora programada</li>
-                                <li>Asegúrese de tener buena conexión a internet</li>
-                                <li>Busque un lugar tranquilo y bien iluminado</li>
-                                <li>Tenga sus documentos médicos a la mano</li>
-                            </ul>
-                        </div>
-                    </div>";
-        }
-        
-        // Mensaje específico según el tipo
-        if ($datos['tipo'] == 'confirmacion') {
-            $html .= "
-                    <p>Si necesita reprogramar o cancelar su cita, por favor contáctenos con al menos 24 horas de anticipación.</p>
-                    <div style='text-align: center; margin: 20px 0;'>
-                        <a href='tel:+593-2-XXX-XXXX' class='btn-primary'>📞 Llamar al Centro</a>
-                        <a href='mailto:citas@medisys.com' class='btn-primary'>✉️ Enviar Email</a>
-                    </div>";
-        } elseif ($datos['tipo'] == 'recordatorio') {
-            $html .= "
-                    <div class='warning-box'>
-                        <p><strong>⚠️ Importante:</strong> Si no puede asistir, por favor cancele su cita para permitir que otros pacientes puedan agendar.</p>
-                    </div>";
-        } elseif ($datos['tipo'] == 'cancelacion') {
-            $html .= "
-                    <p>Para reagendar su cita, puede contactarnos o usar nuestro sistema en línea.</p>
-                    <div style='text-align: center; margin: 20px 0;'>
-                        <a href='https://medisys.com/agendar' class='btn-primary'>📅 Reagendar Cita</a>
-                    </div>";
-        }
-        
-        $html .= "
-                    <p>Gracias por confiar en MediSys para su atención médica.</p>
+    /**
+ * Generar plantilla HTML para emails de citas
+ */
+/**
+ * Generar plantilla HTML para emails de citas
+ */
+private function generarPlantillaCita($datos) {
+    // Generar token seguro para confirmación
+    $token = $this->generarTokenConfirmacion($datos['id_cita']);
+    $enlaceConfirmacion = "http://localhost/MenuDinamico/vistas/confirmar_cita.php?token=" . $token;
+    
+    $html = '<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Cita - MediSys</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f7fb;">
+    <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb;">
+        <tr>
+            <td align="center" style="padding: 20px;">
+                <table width="600" border="0" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     
-                    <p><small>📧 ID de Cita: #{$datos['id_cita']}</small></p>
-                </div>
-                
-                <div class='footer'>
-                    <p><strong>MediSys - Sistema Médico Integral</strong></p>
-                    <p>📧 info@medisys.com | 📞 +593-2-XXX-XXXX</p>
-                    <p>🌐 www.medisys.com</p>
-                    <p><small>Este es un mensaje automático, por favor no responder a este email.</small></p>
-                </div>
-            </div>
-        </body>
-        </html>";
-        
-        return $html;
+                    <!-- Header -->
+                    <!-- Header -->
+<tr>
+    <td style="background-color: #007bff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">🏥 MediSys</h1>
+        <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Sistema de Gestión Hospitalaria</p>
+    </td>
+</tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h2 style="color: #333; margin-top: 0;">¡Hola ' . htmlspecialchars($datos['paciente_nombre']) . '!</h2>';
+    
+    // Contenido específico según el tipo
+    if ($datos['tipo'] === 'confirmacion') {
+        $html .= '<p style="color: #666; line-height: 1.6;">Te confirmamos que tu cita médica ha sido <strong>registrada exitosamente</strong>. Para completar el proceso, necesitamos que confirmes tu asistencia.</p>';
     }
     
+    $html .= '
+                            <!-- Detalles de la Cita -->
+                            <table width="100%" border="0" cellpadding="15" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td>
+                                        <h3 style="color: #333; margin-top: 0;">📅 Detalles de tu Cita</h3>
+                                        <table width="100%" border="0" cellpadding="8" cellspacing="0">
+                                            <tr>
+                                                <td style="border-bottom: 1px solid #dee2e6; font-weight: bold; color: #333;">📅 Fecha:</td>
+                                                <td style="border-bottom: 1px solid #dee2e6; color: #666;">' . htmlspecialchars($datos['fecha']) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="border-bottom: 1px solid #dee2e6; font-weight: bold; color: #333;">🕐 Hora:</td>
+                                                <td style="border-bottom: 1px solid #dee2e6; color: #666;">' . htmlspecialchars($datos['hora']) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="border-bottom: 1px solid #dee2e6; font-weight: bold; color: #333;">👨‍⚕️ Doctor:</td>
+                                                <td style="border-bottom: 1px solid #dee2e6; color: #666;">' . htmlspecialchars($datos['doctor']) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="border-bottom: 1px solid #dee2e6; font-weight: bold; color: #333;">🏥 Especialidad:</td>
+                                                <td style="border-bottom: 1px solid #dee2e6; color: #666;">' . htmlspecialchars($datos['especialidad']) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="border-bottom: 1px solid #dee2e6; font-weight: bold; color: #333;">📍 Sucursal:</td>
+                                                <td style="border-bottom: 1px solid #dee2e6; color: #666;">' . htmlspecialchars($datos['sucursal']) . '</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="font-weight: bold; color: #333;">📋 Tipo:</td>
+                                                <td style="color: #666;">' . htmlspecialchars($datos['tipo_cita']) . '</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>';
+    
+    // Información virtual si aplica
+    if (isset($datos['enlace_virtual']) && !empty($datos['enlace_virtual'])) {
+        $html .= '
+                            <!-- Información Virtual -->
+                            <table width="100%" border="0" cellpadding="15" cellspacing="0" style="background-color: #e3f2fd; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td>
+                                        <h4 style="color: #1976d2; margin-top: 0;">📹 Información de Cita Virtual</h4>
+                                        <p style="color: #333; margin: 10px 0;"><strong>Enlace de la videollamada:</strong></p>
+                                        <p style="margin: 10px 0;">
+                                            <a href="' . htmlspecialchars($datos['enlace_virtual']) . '" target="_blank" style="color: #007bff; font-weight: bold; text-decoration: none;">' . htmlspecialchars($datos['enlace_virtual']) . '</a>
+                                        </p>';
+        
+        if (isset($datos['sala_virtual'])) {
+            $html .= '<p style="color: #333; margin: 10px 0;"><strong>ID de Sala:</strong> ' . htmlspecialchars($datos['sala_virtual']) . '</p>';
+        }
+        
+        $html .= '<p style="color: #666; font-size: 14px; margin: 10px 0;">💡 <em>Guarda este enlace para unirte a tu cita virtual en la fecha programada.</em></p>
+                                    </td>
+                                </tr>
+                            </table>';
+    }
+    
+    // Sección de confirmación (solo para citas pendientes)
+    if ($datos['tipo'] === 'confirmacion') {
+        $html .= '
+                            <!-- Confirmación -->
+                            <table width="100%" border="0" cellpadding="20" cellspacing="0" style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <h3 style="color: #155724; margin-top: 0;">✅ Confirma tu Asistencia</h3>
+                                        <p style="color: #155724; margin: 15px 0;">Para asegurar tu cita, por favor confirma tu asistencia haciendo clic en el siguiente botón:</p>
+                                        
+                                        <table border="0" cellpadding="0" cellspacing="0" style="margin: 20px auto;">
+                                            <tr>
+                                                <td style="background-color: #28a745; border-radius: 8px;">
+                                                    <a href="' . $enlaceConfirmacion . '" style="display: inline-block; padding: 15px 30px; color: white; text-decoration: none; font-weight: bold; font-size: 16px;">✅ CONFIRMAR MI CITA</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <p style="color: #856404; font-size: 14px; margin: 15px 0;">
+                                            ⚠️ <strong>Importante:</strong> Este enlace expira en 48 horas.<br>
+                                            Si no confirmas tu cita, podría ser cancelada automáticamente.
+                                        </p>
+                                        <p style="color: #856404; font-size: 14px; margin: 10px 0;">
+                                            📱 También puedes confirmar llamando al: <strong>+593-2-XXX-XXXX</strong>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>';
+    }
+    
+    $html .= '
+                            <!-- Recomendaciones -->
+                            <table width="100%" border="0" cellpadding="20" cellspacing="0" style="background-color: #fff3cd; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td>
+                                        <h4 style="color: #856404; margin-top: 0;">📝 Recomendaciones antes de tu cita:</h4>
+                                        <ul style="color: #856404; margin: 10px 0; padding-left: 20px; line-height: 1.6;">
+                                            <li>Llega 15 minutos antes de tu cita</li>
+                                            <li>Trae tu cédula de identidad</li>
+                                            <li>Lleva el historial médico si tienes</li>';
+    
+    if (isset($datos['enlace_virtual'])) {
+        $html .= '<li>Verifica tu conexión a internet para citas virtuales</li>';
+    }
+    
+    $html .= '
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <p style="color: #666; line-height: 1.6;">Si tienes alguna pregunta o necesitas reprogramar tu cita, no dudes en contactarnos.</p>
+                            
+                            <p style="color: #999; font-size: 12px;">📧 ID de Cita: #' . htmlspecialchars($datos['id_cita']) . '</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #333; color: white; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px;">
+                            <p style="margin: 5px 0; font-weight: bold;">MediSys - Sistema Médico Integral</p>
+                            <p style="margin: 5px 0;">📧 info@medisys.com | 📞 +593-2-XXX-XXXX</p>
+                            <p style="margin: 5px 0;">🌐 www.medisys.com</p>
+                            <p style="margin: 5px 0; font-size: 11px;">Este es un mensaje automático, por favor no responder a este email.</p>
+                        </td>
+                    </tr>
+                    
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>';
+    
+    return $html;
+}
+
+/**
+ * Generar token seguro para confirmación de cita
+ */
+/**
+ * Generar token seguro para confirmación de cita
+ */
+private function generarTokenConfirmacion($id_cita) {
+    $data = [
+        'id_cita' => $id_cita,
+        'timestamp' => time(),
+        'random' => bin2hex(random_bytes(8))
+    ];
+    
+    // 🔍 DEBUG: Log temporal
+    error_log("🔍 DEBUG: Datos para token: " . json_encode($data));
+    
+    // Crear un hash seguro
+    $dataString = json_encode($data);
+    $hash = hash_hmac('sha256', $dataString, 'medisys_secret_key_2025');
+    
+    $token = base64_encode($dataString . '|' . $hash);
+    
+    // 🔍 DEBUG: Log temporal
+    error_log("🔍 DEBUG: Token final generado: " . $token);
+    
+    return $token;
+}
     // ===== MÉTODO AUXILIAR PARA ENVÍO GENÉRICO =====
     
     /**
      * Enviar email genérico
      */
-    private function enviarEmail($destinatario, $nombreDestinatario, $asunto, $contenidoHtml) {
-        try {
-            // Limpiar destinatarios anteriores
-            $this->mail->clearAddresses();
-            $this->mail->clearAttachments();
-            
-            // Configurar destinatario
-            $this->mail->addAddress($destinatario, $nombreDestinatario);
-            
-            // Contenido del email
-            $this->mail->isHTML(true);
-            $this->mail->Subject = $asunto;
-            $this->mail->Body = $contenidoHtml;
-            $this->mail->AltBody = strip_tags($contenidoHtml); // Versión texto plano
-            
-            $this->mail->send();
-            
-            error_log("✅ Email enviado exitosamente a: {$destinatario}");
+    /**
+ * Método genérico para enviar emails
+ */
+private function enviarEmail($destinatario, $nombreDestinatario, $asunto, $contenidoHTML) {
+    try {
+        // Limpiar destinatarios previos
+        $this->mail->clearAddresses();
+        $this->mail->clearAttachments();
+        
+        // Configurar destinatario
+        $this->mail->addAddress($destinatario, $nombreDestinatario);
+        
+        // Configurar contenido
+        $this->mail->isHTML(true);
+        $this->mail->Subject = $asunto;
+        $this->mail->Body = $contenidoHTML;
+        
+        // Enviar correo
+        $resultado = $this->mail->send();
+        
+        if ($resultado) {
+            error_log("✅ Email enviado exitosamente a: $destinatario");
             return true;
-            
-        } catch (Exception $e) {
-            error_log("❌ Error enviando email: " . $this->mail->ErrorInfo);
+        } else {
+            error_log("❌ Error enviando email a: $destinatario");
             return false;
         }
+        
+    } catch (Exception $e) {
+        error_log("❌ Error en enviarEmail: " . $e->getMessage());
+        return false;
     }
+}
 }
 ?>

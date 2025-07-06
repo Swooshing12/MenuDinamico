@@ -293,23 +293,23 @@ class RecepcionistaController {
         }
         
         // Registrar la cita
-        $id_cita = $this->citasModel->crear($datos_cita);
-        
-        if ($id_cita) {
-            // Enviar notificación si se solicitó
-            if (isset($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] === 'true') {
-                // Aquí puedes implementar el envío de notificaciones
-                // $this->enviarNotificacionCita($id_cita);
-            }
-            
-            $this->responderJSON([
-                'success' => true,
-                'message' => 'Cita registrada exitosamente',
-                'data' => [
-                    'id_cita' => $id_cita,
-                    'fecha_hora' => $fecha_hora
-                ]
-            ]);
+                    // Registrar la cita
+            $id_cita = $this->citasModel->crear($datos_cita);
+
+            if ($id_cita) {
+                // ✅ CORREGIR: Enviar notificación si se solicitó
+                if (isset($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] === 'true') {
+                    $this->enviarNotificacionCita($id_cita, 'confirmacion'); // ← DESCOMENTAR ESTA LÍNEA
+                }
+                
+                $this->responderJSON([
+                    'success' => true,
+                    'message' => 'Cita registrada exitosamente',
+                    'data' => [
+                        'id_cita' => $id_cita,
+                        'fecha_hora' => $fecha_hora
+                    ]
+                ]);
         } else {
             $this->responderJSON([
                 'success' => false,
@@ -1136,28 +1136,28 @@ class RecepcionistaController {
    
    private function enviarNotificacionCita($id_cita, $tipo) {
     try {
+        error_log("🔍 DEBUG: Iniciando envío de notificación para cita: $id_cita, tipo: $tipo");
+        
         // Obtener datos completos de la cita
         $cita = $this->citasModel->obtenerPorIdCompleto($id_cita);
         if (!$cita) {
             error_log("❌ Cita no encontrada para ID: $id_cita");
-            return [
-                'success' => false,
-                'message' => 'Cita no encontrada'
-            ];
+            return ['success' => false, 'message' => 'Cita no encontrada'];
         }
+        
+        error_log("🔍 DEBUG: Cita encontrada - Email paciente: " . ($cita['paciente_correo'] ?? 'NO DEFINIDO'));
         
         // Verificar que el paciente tenga email
         if (empty($cita['paciente_correo'])) {
             error_log("⚠️ Paciente sin email para cita ID: $id_cita");
-            return [
-                'success' => false,
-                'message' => 'El paciente no tiene email registrado'
-            ];
+            return ['success' => false, 'message' => 'El paciente no tiene email registrado'];
         }
         
         // ✅ USAR EL MAILSERVICE PARA ENVIAR EL EMAIL
         require_once __DIR__ . '/../../config/MailService.php';
         $mailService = new MailService();
+        
+        error_log("🔍 DEBUG: MailService instanciado correctamente");
         
         // Preparar datos del paciente
         $paciente = [
@@ -1166,18 +1166,29 @@ class RecepcionistaController {
             'correo' => $cita['paciente_correo']
         ];
         
+        error_log("🔍 DEBUG: Datos del paciente preparados: " . json_encode($paciente));
+        error_log("🔍 DEBUG: Datos de la cita: " . json_encode([
+            'fecha_hora' => $cita['fecha_hora'] ?? 'NO DEFINIDO',
+            'doctor_nombres' => $cita['doctor_nombres'] ?? 'NO DEFINIDO',
+            'id_tipo_cita' => $cita['id_tipo_cita'] ?? 'NO DEFINIDO'
+        ]));
+        
         // Enviar email según el tipo
         $emailEnviado = false;
         switch ($tipo) {
             case 'confirmacion':
+                error_log("🔍 DEBUG: Llamando a enviarConfirmacionCita...");
                 $emailEnviado = $mailService->enviarConfirmacionCita($cita, $paciente);
+                error_log("🔍 DEBUG: Resultado de enviarConfirmacionCita: " . ($emailEnviado ? 'TRUE' : 'FALSE'));
                 break;
                 
             case 'recordatorio':
+                error_log("🔍 DEBUG: Llamando a enviarRecordatorioCita...");
                 $emailEnviado = $mailService->enviarRecordatorioCita($cita, $paciente);
                 break;
                 
             case 'cancelacion':
+                error_log("🔍 DEBUG: Llamando a enviarCancelacionCita...");
                 $emailEnviado = $mailService->enviarCancelacionCita($cita, $paciente);
                 break;
         }
