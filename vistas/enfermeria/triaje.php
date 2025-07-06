@@ -18,276 +18,410 @@ include_once '../../navbars/sidebar.php';
 <link rel="stylesheet" href="../../estilos/triaje.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-<div class="container-fluid py-4">
-    <!-- Header de la página -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-0 text-primary">
-                        <i class="bi bi-clipboard2-pulse me-2"></i>
-                        Sistema de Triaje
-                    </h1>
-                    <p class="text-muted mb-0">Evaluación inicial de pacientes</p>
+<div class="container-fluid">
+    <!-- ✅ HEADER PROFESIONAL REDISEÑADO -->
+    <div class="triaje-header fade-in-up">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1>
+                    <i class="bi bi-clipboard2-pulse me-3"></i>
+                    Sistema de Triaje Médico
+                </h1>
+                <p class="mb-0">
+                    Evaluación inicial y clasificación de pacientes por prioridad médica
+                </p>
+                <div class="mt-3">
+                    <span class="badge bg-light text-dark me-2">
+                        <i class="bi bi-person-badge me-1"></i>
+                        Enfermero/a: <?php echo $_SESSION['nombres'] ?? 'Usuario'; ?>
+                    </span>
+                    <span class="badge bg-light text-dark">
+                        <i class="bi bi-calendar-check me-1"></i>
+                        <?php echo date('d/m/Y'); ?>
+                    </span>
                 </div>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-info" id="btnEstadisticas">
-                        <i class="bi bi-graph-up"></i> Estadísticas
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" id="btnRefrescar">
-                        <i class="bi bi-arrow-clockwise"></i> Refrescar
-                    </button>
-                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button type="button" class="btn btn-light me-2" id="btnEstadisticas">
+                    <i class="bi bi-graph-up me-1"></i>
+                    Estadísticas
+                </button>
+                <button type="button" class="btn btn-light" id="btnRefrescar">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Actualizar
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Selector de fecha -->
-    <div class="row mb-4">
-        <div class="col-12 col-md-6 col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <label for="fechaTriaje" class="form-label fw-bold">
-                        <i class="bi bi-calendar3 me-1"></i>Fecha de atención
-                    </label>
-                    <input type="date" class="form-control" id="fechaTriaje" value="<?= date('Y-m-d') ?>">
-                </div>
+    <!-- ✅ ESTADÍSTICAS PROFESIONALES REDISEÑADAS -->
+    <div class="estadisticas-container fade-in-up">
+        <div class="stat-card stat-primary">
+            <div class="stat-icon icon-primary">
+                <i class="bi bi-people-fill"></i>
             </div>
+            <div class="stat-number" id="totalCitas">0</div>
+            <div class="stat-label">Total de Citas</div>
+        </div>
+        
+        <div class="stat-card stat-warning">
+            <div class="stat-icon icon-warning">
+                <i class="bi bi-clock-fill"></i>
+            </div>
+            <div class="stat-number" id="citasPendientes">0</div>
+            <div class="stat-label">Triajes Pendientes</div>
+        </div>
+        
+        <div class="stat-card stat-success">
+            <div class="stat-icon icon-success">
+                <i class="bi bi-check-circle-fill"></i>
+            </div>
+            <div class="stat-number" id="triageCompletados">0</div>
+            <div class="stat-label">Triajes Completados</div>
+        </div>
+        
+        <div class="stat-card stat-danger">
+            <div class="stat-icon icon-danger">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div class="stat-number" id="urgentes">0</div>
+            <div class="stat-label">Casos Urgentes</div>
         </div>
     </div>
 
-    <!-- Estadísticas rápidas -->
-    <div class="row mb-4" id="estadisticasRapidas">
-        <div class="col-6 col-md-3">
-            <div class="card text-white bg-primary">
-                <div class="card-body text-center">
-                    <i class="bi bi-people-fill fs-2"></i>
-                    <h4 class="card-title" id="totalCitas">0</h4>
-                    <p class="card-text">Total Citas</p>
+    <!-- ✅ CARD PRINCIPAL PROFESIONAL -->
+    <div class="triaje-main-card fade-in-up">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check me-2"></i>
+                        Gestión de Triaje
+                    </h5>
+                    <small class="text-muted">Control de pacientes del día</small>
                 </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body text-center">
-                    <i class="bi bi-clock-fill fs-2"></i>
-                    <h4 class="card-title" id="citasPendientes">0</h4>
-                    <p class="card-text">Pendientes</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-white bg-success">
-                <div class="card-body text-center">
-                    <i class="bi bi-check-circle-fill fs-2"></i>
-                    <h4 class="card-title" id="triageCompletados">0</h4>
-                    <p class="card-text">Completados</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-white bg-danger">
-                <div class="card-body text-center">
-                    <i class="bi bi-exclamation-triangle-fill fs-2"></i>
-                    <h4 class="card-title" id="urgentes">0</h4>
-                    <p class="card-text">Urgentes</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tabla de citas -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow">
-                <div class="card-header bg-light">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="bi bi-list-check me-2"></i>
-                            Citas del Día
-                        </h5>
-                        <div class="d-flex gap-2">
-                            <select class="form-select form-select-sm" id="filtroEstado" style="width: auto;">
-                                <option value="">Todos los estados</option>
-                                <option value="Pendiente">Pendientes</option>
-                                <option value="Triaje Completado">Con Triaje</option>
-                                <option value="Triaje Urgente">Urgentes</option>
-                            </select>
+                <div class="col-md-9">
+                    <!-- ✅ CONTROLES PROFESIONALES -->
+                    <div class="controls-section">
+                        <div class="row g-3 align-items-end">
+                            <!-- Fecha -->
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    Fecha
+                                </label>
+                                <input type="date" id="fechaTriaje" class="form-control" 
+                                       value="<?php echo date('Y-m-d'); ?>">
+                            </div>
+                            
+                            <!-- ✅ BUSCADOR PROFESIONAL -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-search me-1"></i>
+                                    Buscar por Cédula
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-credit-card"></i>
+                                    </span>
+                                    <input type="text" id="buscarCedula" class="form-control" 
+                                           placeholder="Ingrese cédula del paciente" 
+                                           pattern="[0-9]*" 
+                                           maxlength="10"
+                                           autocomplete="off">
+                                    <div class="btn-search-group">
+                                        <button class="btn btn-search" type="button" id="btnBuscarCedula" title="Buscar paciente">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                        <button class="btn btn-clear" type="button" id="btnLimpiarBusqueda" title="Limpiar búsqueda">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Mínimo 3 dígitos para búsqueda
+                                </div>
+                            </div>
+                            
+                            <!-- Filtro Estado -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-funnel me-1"></i>
+                                    Filtrar Estado
+                                </label>
+                                <select id="filtroEstado" class="form-select">
+                                    <option value="">🔍 Todos los estados</option>
+                                    <option value="Pendiente">⏳ Pendientes de triaje</option>
+                                    <option value="Completado">✅ Triajes completados</option>
+                                    <option value="Urgente">🟠 Casos urgentes</option>
+                                    <option value="Critico">🔴 Casos críticos</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Botón Actualizar -->
+                            <div class="col-md-2">
+                                <button class="btn btn-refresh w-100" id="btnActualizarTabla">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>
+                                    Actualizar
+                                </button>
+                            </div>
+                            
+                            <!-- Contador profesional -->
+                            <div class="col-md-1">
+                                <div class="contador-container">
+                                    <div class="contador-badge" id="contadorResultados">0</div>
+                                    <div class="contador-label">resultados</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="card-body">
-                    <!-- Loading -->
-                    <div id="loadingCitas" class="text-center py-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Cargando...</span>
-                        </div>
-                        <p class="mt-2 text-muted">Cargando citas...</p>
-                    </div>
+            </div>
+            
+            <!-- ✅ ÁREA DE RESULTADOS PROFESIONAL -->
+            <div id="resultadosBusqueda" style="display: none;">
+                <!-- Se llena dinámicamente con alertas profesionales -->
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            <!-- ✅ LOADING PROFESIONAL -->
+            <div id="loadingCitas" class="loading-container">
+                <div class="spinner-medical"></div>
+                <h5 class="text-muted">Cargando información de pacientes...</h5>
+                <p class="text-muted">Por favor espere un momento</p>
+            </div>
 
-                    <!-- Tabla -->
-                    <div class="table-responsive d-none" id="tablaCitas">
-                        <table class="table table-hover table-striped">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th><i class="bi bi-clock"></i> Hora</th>
-                                    <th><i class="bi bi-person"></i> Paciente</th>
-                                    <th><i class="bi bi-credit-card"></i> Cédula</th>
-                                    <th><i class="bi bi-person-badge"></i> Doctor</th>
-                                    <th><i class="bi bi-hospital"></i> Especialidad</th>
-                                    <th><i class="bi bi-clipboard-pulse"></i> Estado Triaje</th>
-                                    <th><i class="bi bi-exclamation-circle"></i> Urgencia</th>
-                                    <th><i class="bi bi-tools"></i> Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cuerpoTablaCitas">
-                                <!-- Se llenará dinámicamente -->
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- ✅ TABLA PROFESIONAL -->
+            <div class="table-container d-none" id="tablaCitas">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th width="8%">
+                                <i class="bi bi-clock me-1"></i>
+                                Hora
+                            </th>
+                            <th width="20%">
+                                <i class="bi bi-person me-1"></i>
+                                Paciente
+                            </th>
+                            <th width="12%">
+                                <i class="bi bi-credit-card me-1"></i>
+                                Cédula
+                            </th>
+                            <th width="18%">
+                                <i class="bi bi-person-badge me-1"></i>
+                                Médico Asignado
+                            </th>
+                            <th width="15%">
+                                <i class="bi bi-hospital me-1"></i>
+                                Especialidad
+                            </th>
+                            <th width="12%">
+                                <i class="bi bi-clipboard-pulse me-1"></i>
+                                Estado Triaje
+                            </th>
+                            <th width="10%">
+                                <i class="bi bi-exclamation-circle me-1"></i>
+                                Urgencia
+                            </th>
+                            <th width="15%">
+                                <i class="bi bi-tools me-1"></i>
+                                Acciones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTablaCitas">
+                        <!-- Se llenará dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
 
-                    <!-- Sin datos -->
-                    <div id="sinCitas" class="text-center py-5 d-none">
-                        <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
-                        <h5 class="text-muted mt-3">No hay citas para esta fecha</h5>
-                        <p class="text-muted">Selecciona otra fecha o espera a que lleguen los pacientes.</p>
-                    </div>
-                </div>
+            <!-- ✅ MENSAJES PROFESIONALES -->
+            <div id="sinCitas" class="mensaje-vacio d-none">
+                <i class="bi bi-calendar-x"></i>
+                <h5>No hay citas programadas</h5>
+                <p>No se encontraron citas médicas para la fecha seleccionada.</p>
+                <button class="btn btn-outline-primary" onclick="$('#fechaTriaje').focus()">
+                    <i class="bi bi-calendar-plus me-1"></i>
+                    Seleccionar otra fecha
+                </button>
+            </div>
+
+            <div id="sinResultados" class="mensaje-vacio d-none">
+                <i class="bi bi-search"></i>
+                <h5>Sin resultados de búsqueda</h5>
+                <p>No se encontraron pacientes que coincidan con los criterios de búsqueda.</p>
+                <button class="btn btn-outline-primary" onclick="limpiarBusqueda()">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    Mostrar todos los pacientes
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal para realizar triaje -->
+<!-- ✅ MODAL PROFESIONAL PARA TRIAJE -->
 <div class="modal fade" id="modalTriaje" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-clipboard2-pulse me-2"></i>
-                    Realizar Triaje
-                </h5>
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0">
+                        <i class="bi bi-clipboard2-pulse me-2"></i>
+                        Evaluación de Triaje Médico
+                    </h5>
+                    <small class="text-light opacity-75">
+                        Clasificación inicial del paciente según prioridad médica
+                    </small>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             
             <form id="formTriaje">
                 <div class="modal-body">
-                    <!-- Información del paciente -->
+                    <!-- ✅ INFORMACIÓN DEL PACIENTE PROFESIONAL -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <div class="alert alert-info">
-                                <h6 class="alert-heading">
-                                    <i class="bi bi-person-fill me-2"></i>
-                                    Información del Paciente
-                                </h6>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <strong>Nombre:</strong> <span id="nombrePacienteTriaje"></span><br>
-                                        <strong>Cédula:</strong> <span id="cedulaPacienteTriaje"></span>
+                            <div class="alert alert-custom alert-info-custom">
+                                <div class="row align-items-center">
+                                    <div class="col-md-1 text-center">
+                                        <i class="bi bi-person-circle" style="font-size: 3rem;"></i>
                                     </div>
-                                    <div class="col-md-6">
-                                        <strong>Doctor:</strong> <span id="doctorTriaje"></span><br>
-                                        <strong>Especialidad:</strong> <span id="especialidadTriaje"></span>
+                                    <div class="col-md-11">
+                                        <h6 class="mb-2">
+                                            <i class="bi bi-person-badge me-2"></i>
+                                            Información del Paciente
+                                        </h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-2">
+                                                    <strong>Nombre Completo:</strong>
+                                                    <div id="nombrePacienteTriaje" class="fw-bold text-primary">-</div>
+                                                </div>
+                                                <div>
+                                                    <strong>Cédula de Identidad:</strong>
+                                                    <div id="cedulaPacienteTriaje" class="fw-bold">-</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-2">
+                                                    <strong>Médico Asignado:</strong>
+                                                    <div id="doctorTriaje" class="fw-bold text-secondary">-</div>
+                                                </div>
+                                                <div>
+                                                    <strong>Especialidad Médica:</strong>
+                                                    <div id="especialidadTriaje" class="fw-bold">-</div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Signos vitales -->
-                    <div class="row">
+                    <!-- ✅ SIGNOS VITALES PROFESIONALES -->
+                    <div class="row mb-4">
                         <div class="col-12">
-                            <h6 class="text-primary mb-3">
-                                <i class="bi bi-heart-pulse me-2"></i>
-                                Signos Vitales
-                            </h6>
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-3">
+                                    <div class="stat-icon icon-danger" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-heart-pulse"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">Signos Vitales y Medidas Antropométricas</h5>
+                                    <p class="text-muted mb-0">Registro de constantes vitales del paciente</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Primera fila de signos vitales -->
                     <div class="row mb-3">
-                        <!-- Temperatura -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-thermometer-half text-danger"></i>
-                                Temperatura (°C)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-thermometer-half text-danger me-1"></i>
+                                Temperatura Corporal
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="temperatura" name="temperatura" 
                                        step="0.1" min="30" max="45" placeholder="36.5">
                                 <span class="input-group-text">°C</span>
                             </div>
+                            <div class="form-text">Normal: 36.0 - 37.5°C</div>
                         </div>
 
-                        <!-- Presión Arterial -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-activity text-info"></i>
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-activity text-info me-1"></i>
                                 Presión Arterial
                             </label>
                             <input type="text" class="form-control" id="presionArterial" name="presion_arterial" 
                                    placeholder="120/80" pattern="[0-9]{2,3}/[0-9]{2,3}">
+                            <div class="form-text">Formato: 120/80 mmHg</div>
                         </div>
 
-                        <!-- Frecuencia Cardíaca -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-heart text-danger"></i>
-                                Freq. Cardíaca (lpm)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-heart text-danger me-1"></i>
+                                Frecuencia Cardíaca
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="frecuenciaCardiaca" name="frecuencia_cardiaca" 
                                        min="40" max="200" placeholder="80">
                                 <span class="input-group-text">lpm</span>
                             </div>
+                            <div class="form-text">Normal: 60-100 lpm</div>
                         </div>
 
-                        <!-- Frecuencia Respiratoria -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-lungs text-primary"></i>
-                                Freq. Respiratoria (rpm)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-lungs text-primary me-1"></i>
+                                Frecuencia Respiratoria
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="frecuenciaRespiratoria" name="frecuencia_respiratoria" 
                                        min="10" max="40" placeholder="18">
                                 <span class="input-group-text">rpm</span>
                             </div>
+                            <div class="form-text">Normal: 12-20 rpm</div>
                         </div>
                     </div>
 
+                    <!-- Segunda fila: medidas antropométricas y urgencia -->
                     <div class="row mb-4">
-                        <!-- Saturación Oxígeno -->
                         <div class="col-md-2">
-                            <label class="form-label">
-                                <i class="bi bi-droplet text-info"></i>
-                                Sat. O₂ (%)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-droplet text-info me-1"></i>
+                                Saturación O₂
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="saturacionOxigeno" name="saturacion_oxigeno" 
                                        min="70" max="100" placeholder="98">
                                 <span class="input-group-text">%</span>
                             </div>
+                            <div class="form-text">Normal: >95%</div>
                         </div>
 
-                        <!-- Peso -->
                         <div class="col-md-2">
-                            <label class="form-label">
-                                <i class="bi bi-speedometer2 text-warning"></i>
-                                Peso (kg)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-speedometer2 text-warning me-1"></i>
+                                Peso Corporal
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="peso" name="peso" 
-                                       step="0.1" min="1" max="300" placeholder="70">
+                                       step="0.1" min="1" max="300" placeholder="70.0">
                                 <span class="input-group-text">kg</span>
                             </div>
                         </div>
 
-                        <!-- Talla -->
                         <div class="col-md-2">
-                            <label class="form-label">
-                                <i class="bi bi-rulers text-success"></i>
-                                Talla (cm)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-rulers text-success me-1"></i>
+                                Talla/Estatura
                             </label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="talla" name="talla" 
@@ -296,58 +430,63 @@ include_once '../../navbars/sidebar.php';
                             </div>
                         </div>
 
-                        <!-- IMC (calculado automáticamente) -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-calculator text-info"></i>
-                                IMC (kg/m²)
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-calculator text-info me-1"></i>
+                                Índice de Masa Corporal
                             </label>
                             <div class="input-group">
-                                <input type="text" class="form-control bg-light" id="imc" readonly placeholder="Se calcula automáticamente">
-                                <span class="input-group-text" id="categoriaIMC">-</span>
+                                <input type="text" class="form-control bg-light" id="imc" readonly 
+                                       placeholder="Se calcula automáticamente">
+                                <span class="input-group-text fw-bold" id="categoriaIMC">-</span>
                             </div>
                         </div>
 
-                        <!-- Nivel de Urgencia -->
                         <div class="col-md-3">
-                            <label class="form-label">
-                                <i class="bi bi-exclamation-triangle text-danger"></i>
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-exclamation-triangle text-danger me-1"></i>
                                 Nivel de Urgencia *
                             </label>
                             <select class="form-select" id="nivelUrgencia" name="nivel_urgencia" required>
-                                <option value="">Seleccionar...</option>
-                                <option value="1" class="text-success">🟢 Bajo - No urgente</option>
-                                <option value="2" class="text-warning">🟡 Medio - Poco urgente</option>
-                                <option value="3" class="text-danger">🟠 Alto - Urgente</option>
-                                <option value="4" class="text-danger">🔴 Crítico - Muy urgente</option>
+                                <option value="">Evaluar y seleccionar...</option>
+                                <option value="1" class="text-success">🟢 Nivel 1 - No urgente</option>
+                                <option value="2" class="text-warning">🟡 Nivel 2 - Poco urgente</option>
+                                <option value="3" class="text-danger">🟠 Nivel 3 - Urgente</option>
+                                <option value="4" class="text-danger">🔴 Nivel 4 - Muy urgente</option>
                             </select>
                         </div>
                     </div>
 
-                    <!-- Observaciones -->
-                    <div class="row">
+                    <!-- ✅ OBSERVACIONES PROFESIONALES -->
+                    <div class="row mb-3">
                         <div class="col-12">
-                            <label class="form-label">
-                                <i class="bi bi-chat-left-text text-secondary"></i>
-                                Observaciones
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-chat-left-text text-secondary me-1"></i>
+                                Observaciones Clínicas y Síntomas
                             </label>
-                            <textarea class="form-control" id="observaciones" name="observaciones" rows="3" 
-                                      placeholder="Síntomas observados, comportamiento del paciente, alergias conocidas, etc."></textarea>
+                            <textarea class="form-control" id="observaciones" name="observaciones" rows="4" 
+                                      placeholder="Registre aquí: síntomas observados, comportamiento del paciente, alergias conocidas, medicamentos actuales, antecedentes relevantes, etc."></textarea>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Esta información será visible para el médico tratante
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Alertas de signos vitales -->
-                    <div id="alertasSignosVitales" class="mt-3"></div>
+                    <!-- ✅ ALERTAS DE SIGNOS VITALES -->
+                    <div id="alertasSignosVitales"></div>
 
                     <input type="hidden" id="idCitaTriaje" name="id_cita">
                 </div>
                 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Cancelar
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Cancelar Evaluación
                     </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Guardar Triaje
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Guardar Triaje
                     </button>
                 </div>
             </form>
@@ -355,50 +494,50 @@ include_once '../../navbars/sidebar.php';
     </div>
 </div>
 
-<!-- Modal para ver triaje -->
+<!-- ✅ MODALES ADICIONALES MANTENIDOS PERO MEJORADOS -->
 <div class="modal fade" id="modalVerTriaje" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-eye me-2"></i>
-                    Ver Triaje Completado
+                    Detalles del Triaje Completado
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            
             <div class="modal-body" id="contenidoTriaje">
                 <!-- Se llenará dinámicamente -->
             </div>
-            
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Cerrar
+                </button>
                 <button type="button" class="btn btn-warning" id="btnEditarTriaje">
-                    <i class="bi bi-pencil"></i> Editar Triaje
+                    <i class="bi bi-pencil me-1"></i>
+                    Editar Triaje
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de estadísticas -->
 <div class="modal fade" id="modalEstadisticas" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-graph-up me-2"></i>
-                    Estadísticas de Triaje
+                    Estadísticas y Métricas de Triaje
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            
             <div class="modal-body" id="contenidoEstadisticas">
                 <!-- Se llenará dinámicamente -->
             </div>
-            
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Cerrar
+                </button>
             </div>
         </div>
     </div>
@@ -407,17 +546,21 @@ include_once '../../navbars/sidebar.php';
 <!-- JavaScript -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
-   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.9.0/dist/sweetalert2.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.9.0/dist/sweetalert2.all.min.js"></script>
 
 <script>
-// Configuración global para JavaScript
+// ✅ CONFIGURACIÓN MEJORADA
 window.triajeConfig = <?= json_encode([
     'baseUrl' => '../../controladores/EnfermeriaControlador/EnfermeriaController.php',
     'permisos' => $permisos ?? [],
     'submenuId' => $id_submenu ?? null,
     'idEnfermero' => $_SESSION['id_usuario'] ?? null,
+    'nombreEnfermero' => ($_SESSION['nombres'] ?? '') . ' ' . ($_SESSION['apellidos'] ?? ''),
     'debug' => true
 ]) ?>;
+
+console.log('🏥 Sistema de triaje profesional cargado:', window.triajeConfig);
 </script>
 <script src="../../js/triaje.js"></script>
 
+</document_content>

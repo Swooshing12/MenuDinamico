@@ -9,11 +9,13 @@ if (!isset($_SESSION)) session_start();
 require_once __DIR__ . "/../../modelos/Triaje.php";
 require_once __DIR__ . "/../../modelos/Permisos.php";
 require_once __DIR__ . "/../../modelos/Citas.php";
+require_once __DIR__ . "/../../config/database.php";
 
 class EnfermeriaController {
     private $triajeModel;
     private $permisosModel;
     private $citasModel;
+    private $debug = true; // Para debugging
     
     public function __construct() {
         $this->triajeModel = new Triaje();
@@ -26,12 +28,21 @@ class EnfermeriaController {
     public function manejarSolicitud() {
         $action = $_GET['action'] ?? $_POST['action'] ?? 'index';
         
+        if ($this->debug) {
+            error_log("🏥 ENFERMERÍA - Acción: $action");
+            error_log("🏥 Usuario ID: " . ($_SESSION['id_usuario'] ?? 'NO SET'));
+            error_log("🏥 Rol ID: " . ($_SESSION['id_rol'] ?? 'NO SET'));
+        }
+        
         switch ($action) {
             case 'index':
                 $this->index();
                 break;
             case 'obtenerCitasPendientes':
                 $this->obtenerCitasPendientes();
+                break;
+            case 'buscarPorCedula': // ⭐ NUEVO
+                $this->buscarPorCedula();
                 break;
             case 'crearTriaje':
                 $this->crearTriaje();
@@ -48,10 +59,19 @@ class EnfermeriaController {
             case 'obtenerEstadisticas':
                 $this->obtenerEstadisticas();
                 break;
+            case 'obtenerContadoresRapidos': // ⭐ NUEVO
+                $this->obtenerContadoresRapidos();
+                break;
             default:
                 $this->responderJSON([
                     'success' => false,
-                    'message' => 'Acción no válida'
+                    'message' => 'Acción no válida: ' . $action,
+                    'debug' => [
+                        'action_recibida' => $action,
+                        'metodo' => $_SERVER['REQUEST_METHOD'],
+                        'get_params' => $_GET,
+                        'post_params' => array_keys($_POST)
+                    ]
                 ]);
                 break;
         }
@@ -61,40 +81,35 @@ class EnfermeriaController {
     
     public function index() {
         if (!isset($_SESSION['id_rol'])) {
-            $this->redirigir('../../vistas/login.php');
+            $this->redirigir('../../login.php');
             exit();
         }
         
-        // Verificar que sea enfermero
-        if ($_SESSION['id_rol'] != 73) { // ID rol enfermero
-            $this->redirigir('../../error_permisos.php');
-            exit();
-        }
-        
-        $id_rol = $_SESSION['id_rol'];
-        $id_submenu = $this->obtenerIdSubmenu();
-        
-        if (!$id_submenu) {
-            die("Error: No se pudo determinar el ID del submenú de triaje");
+        // Verificar que sea enfermero (rol ID 73)
+        if ($_SESSION['id_rol'] != 73) {
+            die("Error: Acceso denegado. Solo enfermeros pueden acceder. Tu rol: " . $_SESSION['id_rol']);
         }
         
         try {
-            $permisos = $this->permisosModel->obtenerPermisos($id_rol, $id_submenu);
+            // ✅ PERMISOS BÁSICOS PARA ENFERMERO
+            $permisos = [
+                'puede_crear' => 1,
+                'puede_editar' => 1,
+                'puede_eliminar' => 0
+            ];
             
-            if (!$permisos) {
-                $this->redirigir('../../error_permisos.php');
-                exit();
+            $id_submenu = 998; // Temporal para triaje
+            $id_enfermero = $_SESSION['id_usuario'];
+            
+            if ($this->debug) {
+                error_log("🏥 Variables para vista:");
+                error_log("- id_enfermero: " . $id_enfermero);
+                error_log("- permisos: " . json_encode($permisos));
             }
-            
-            // Pasar datos a la vista
-            extract([
-                'permisos' => $permisos,
-                'id_submenu' => $id_submenu,
-                'id_enfermero' => $_SESSION['id_usuario']
-            ]);
             
             // Incluir la vista
             include __DIR__ . '/../../vistas/enfermeria/triaje.php';
+            
         } catch (Exception $e) {
             die("Error al cargar la página de triaje: " . $e->getMessage());
         }
@@ -105,26 +120,128 @@ class EnfermeriaController {
     private function obtenerCitasPendientes() {
         try {
             $fecha = $_GET['fecha'] ?? date('Y-m-d');
+            $buscar_cedula = $_GET['cedula'] ?? null; // ⭐ NUEVO PARÁMETRO
             
-            $citas = $this->triajeModel->obtenerCitasPendientesTriaje($fecha);
+            if ($this->debug) {
+                error_log("🏥 Obteniendo citas - Fecha: $fecha, Cédula: " . ($buscar_cedula ?: 'ninguna'));
+            }
             
-            // Agregar información adicional a cada cita
+            // ✅ USAR BÚSQUEDA POR CÉDULA SI SE PROPORCIONA
+            if (!empty($buscar_cedula)) {
+                $citas = $this->triajeModel->buscarPorCedula($buscar_cedula, $fecha);
+            } else {
+                $citas = $this->triajeModel->obtenerCitasPendientesTriaje($fecha);
+            }
+            
+            // ✅ PROCESAR DATOS CON ESTADO_TRIAJE
             foreach ($citas as &$cita) {
                 $cita['tiene_triaje'] = !is_null($cita['id_triage']);
-                $cita['estado_triaje'] = $cita['tiene_triaje'] ? 'Completado' : 'Pendiente';
+                
+                // Usar estado_triaje de la base de datos o calcular
+                if ($cita['tiene_triaje']) {
+                    $cita['estado_triaje_display'] = $cita['estado_triaje'] ?? 'Completado';
+                } else {
+                    $cita['estado_triaje_display'] = 'Pendiente';
+                }
+                
                 $cita['puede_hacer_triaje'] = !$cita['tiene_triaje'];
+                $cita['es_urgente'] = $cita['tiene_triaje'] && ($cita['nivel_urgencia'] >= 3);
+            }
+            
+            if ($this->debug) {
+                error_log("🏥 Citas encontradas: " . count($citas));
             }
             
             $this->responderJSON([
                 'success' => true,
                 'data' => $citas,
                 'total' => count($citas),
-                'fecha' => $fecha
+                'fecha' => $fecha,
+                'busqueda_cedula' => $buscar_cedula,
+                'debug' => [
+                    'tiene_busqueda' => !empty($buscar_cedula),
+                    'citas_con_triaje' => count(array_filter($citas, fn($c) => $c['tiene_triaje'])),
+                    'citas_pendientes' => count(array_filter($citas, fn($c) => !$c['tiene_triaje']))
+                ]
             ]);
+            
         } catch (Exception $e) {
+            if ($this->debug) {
+                error_log("🏥 Error en obtenerCitasPendientes: " . $e->getMessage());
+            }
+            
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'Error: ' . $e->getMessage(),
+                'debug' => [
+                    'fecha' => $fecha ?? 'no definida',
+                    'cedula' => $buscar_cedula ?? 'no definida'
+                ]
+            ]);
+        }
+    }
+    
+    // ===== ⭐ NUEVO: BUSCAR POR CÉDULA =====
+    
+    private function buscarPorCedula() {
+        try {
+            $cedula = $_GET['cedula'] ?? '';
+            $fecha = $_GET['fecha'] ?? date('Y-m-d');
+            
+            if (empty($cedula)) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Cédula requerida para búsqueda'
+                ]);
+                return;
+            }
+            
+            if (strlen($cedula) < 3) {
+                $this->responderJSON([
+                    'success' => false,
+                    'message' => 'Ingrese al menos 3 dígitos de la cédula'
+                ]);
+                return;
+            }
+            
+            if ($this->debug) {
+                error_log("🔍 Buscando por cédula: $cedula, fecha: $fecha");
+            }
+            
+            $citas = $this->triajeModel->buscarPorCedula($cedula, $fecha);
+            
+            // Procesar resultados
+            foreach ($citas as &$cita) {
+                $cita['tiene_triaje'] = !is_null($cita['id_triage']);
+                $cita['estado_triaje_display'] = $cita['tiene_triaje'] ? 
+                    ($cita['estado_triaje'] ?? 'Completado') : 'Pendiente';
+                $cita['puede_hacer_triaje'] = !$cita['tiene_triaje'];
+                $cita['es_urgente'] = $cita['tiene_triaje'] && ($cita['nivel_urgencia'] >= 3);
+            }
+            
+            if ($this->debug) {
+                error_log("🔍 Resultados búsqueda: " . count($citas));
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $citas,
+                'total' => count($citas),
+                'cedula_buscada' => $cedula,
+                'fecha' => $fecha,
+                'message' => count($citas) > 0 ? 
+                    "Se encontraron " . count($citas) . " resultado(s)" : 
+                    "No se encontraron pacientes con esa cédula"
+            ]);
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                error_log("🔍 Error en buscarPorCedula: " . $e->getMessage());
+            }
+            
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error en la búsqueda: ' . $e->getMessage()
             ]);
         }
     }
@@ -154,6 +271,11 @@ class EnfermeriaController {
             }
             
             $id_cita = (int)$_POST['id_cita'];
+            
+            if ($this->debug) {
+                error_log("🏥 Creando triaje para cita: $id_cita");
+                error_log("🏥 Datos POST: " . json_encode($_POST));
+            }
             
             // Verificar que la cita no tenga triaje ya
             if ($this->triajeModel->citaTieneTriaje($id_cita)) {
@@ -192,33 +314,38 @@ class EnfermeriaController {
             // Validar signos vitales
             $alertas = $this->triajeModel->validarSignosVitales($datos_triaje);
             
-            // Crear el triaje
-            $id_triaje = $this->triajeModel->crear($datos_triaje);
+            // ✅ CREAR EL TRIAJE (que devuelve array con estado_triaje)
+            $resultado = $this->triajeModel->crear($datos_triaje);
             
-            // Actualizar estado de la cita si es necesario
-            if ($datos_triaje['nivel_urgencia'] >= 3) {
-                // Si es urgencia alta o crítica, marcar la cita como prioritaria
-                $this->citasModel->actualizarEstado($id_cita, 'Triaje Urgente');
-            } else {
-                $this->citasModel->actualizarEstado($id_cita, 'Triaje Completado');
-            }
+            // ✅ NO CAMBIAR EL ESTADO DE LA CITA
+            // La cita mantiene su estado original (Confirmada/Pendiente)
             
             $response = [
                 'success' => true,
                 'message' => 'Triaje realizado exitosamente',
-                'id_triaje' => $id_triaje,
+                'id_triaje' => $resultado['id_triage'],
+                'estado_triaje' => $resultado['estado_triaje'],
                 'imc' => $imc,
                 'categoria_imc' => $imc ? $this->triajeModel->categorizarIMC($imc) : null
             ];
             
             if (!empty($alertas)) {
                 $response['alertas'] = $alertas;
-                $response['message'] .= '. ATENCIÓN: Se detectaron signos vitales fuera del rango normal.';
+                $response['tiene_alertas'] = true;
+                $response['message'] .= ' ATENCIÓN: Se detectaron signos vitales fuera del rango normal.';
+            }
+            
+            if ($this->debug) {
+                error_log("🏥 Triaje creado exitosamente: " . json_encode($response));
             }
             
             $this->responderJSON($response);
             
         } catch (Exception $e) {
+            if ($this->debug) {
+                error_log("🏥 Error creando triaje: " . $e->getMessage());
+            }
+            
             $this->responderJSON([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -290,6 +417,10 @@ class EnfermeriaController {
                 return;
             }
             
+            if ($this->debug) {
+                error_log("🏥 Actualizando triaje ID: $id_triaje");
+            }
+            
             // Preparar datos de actualización
             $peso = !empty($_POST['peso']) ? (float)$_POST['peso'] : null;
             $talla = !empty($_POST['talla']) ? (int)$_POST['talla'] : null;
@@ -330,6 +461,10 @@ class EnfermeriaController {
             }
             
         } catch (Exception $e) {
+            if ($this->debug) {
+                error_log("🏥 Error actualizando triaje: " . $e->getMessage());
+            }
+            
             $this->responderJSON([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -344,7 +479,8 @@ class EnfermeriaController {
             $signos = [
                 'temperatura' => $_POST['temperatura'] ?? null,
                 'frecuencia_cardiaca' => $_POST['frecuencia_cardiaca'] ?? null,
-                'saturacion_oxigeno' => $_POST['saturacion_oxigeno'] ?? null
+                'saturacion_oxigeno' => $_POST['saturacion_oxigeno'] ?? null,
+                'presion_arterial' => $_POST['presion_arterial'] ?? null
             ];
             
             $alertas = $this->triajeModel->validarSignosVitales($signos);
@@ -385,6 +521,36 @@ class EnfermeriaController {
         }
     }
     
+    // ===== ⭐ NUEVO: CONTADORES RÁPIDOS =====
+    
+    private function obtenerContadoresRapidos() {
+        try {
+            $fecha = $_GET['fecha'] ?? date('Y-m-d');
+            
+            $contadores = $this->triajeModel->obtenerContadoresRapidos($fecha);
+            
+            if ($this->debug) {
+                error_log("🏥 Contadores rápidos: " . json_encode($contadores));
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $contadores,
+                'fecha' => $fecha
+            ]);
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                error_log("🏥 Error contadores rápidos: " . $e->getMessage());
+            }
+            
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
     // ===== MÉTODOS AUXILIARES =====
     
     private function obtenerIdSubmenu(): ?int {
@@ -407,7 +573,13 @@ class EnfermeriaController {
     }
     
     private function responderJSON(array $data): void {
-        header('Content-Type: application/json');
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        
+        if ($this->debug && isset($data['success']) && !$data['success']) {
+            error_log("🏥 RESPUESTA ERROR: " . json_encode($data));
+        }
+        
         echo json_encode($data, JSON_UNESCAPED_UNICODE);
         exit();
     }

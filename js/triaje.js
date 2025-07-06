@@ -69,6 +69,183 @@ function inicializarFlatpickr() {
     });
 }
 
+// ===== BUSCADOR POR CÉDULA CORREGIDO =====
+function buscarPorCedula(cedula) {
+    console.log('🔍 Buscando por cédula:', cedula);
+    
+    // Limpiar espacios y validar
+    cedula = cedula.trim();
+    
+    if (!cedula) {
+        mostrarTodasLasCitas();
+        ocultarResultadosBusqueda();
+        return;
+    }
+    
+    if (cedula.length < 3) {
+        mostrarAlerta('Ingrese al menos 3 dígitos para buscar', 'warning');
+        return;
+    }
+    
+    // Validar que solo sean números
+    if (!/^\d+$/.test(cedula)) {
+        mostrarAlerta('La cédula debe contener solo números', 'warning');
+        return;
+    }
+    
+    // ✅ CORRECCIÓN: Convertir cedula_paciente a string antes de usar includes
+    const citasEncontradas = citasDelDia.filter(cita => {
+        if (!cita.cedula_paciente) return false;
+        
+        // Convertir a string para poder usar includes
+        const cedulaString = String(cita.cedula_paciente);
+        return cedulaString.includes(cedula);
+    });
+    
+    console.log('🔍 Citas encontradas:', citasEncontradas.length);
+    
+    if (citasEncontradas.length > 0) {
+        mostrarCitas(citasEncontradas);
+        mostrarResultadosBusqueda(citasEncontradas.length, cedula);
+    } else {
+        mostrarCitasVacias();
+        mostrarResultadosBusqueda(0, cedula);
+    }
+}
+
+// ===== FUNCIÓN DE FILTROS CORREGIDA =====
+function filtrarCitas() {
+    const estadoSeleccionado = $('#filtroEstado').val();
+    const cedulaBusqueda = $('#buscarCedula').val();
+    
+    let citasFiltradas = citasDelDia;
+    
+    // Primero filtrar por cédula si existe búsqueda
+    if (cedulaBusqueda && cedulaBusqueda.length >= 3) {
+        citasFiltradas = citasFiltradas.filter(cita => {
+            if (!cita.cedula_paciente) return false;
+            
+            // ✅ CORRECCIÓN: Convertir a string
+            const cedulaString = String(cita.cedula_paciente);
+            return cedulaString.includes(cedulaBusqueda);
+        });
+    }
+    
+    // Luego filtrar por estado
+    if (estadoSeleccionado) {
+        if (estadoSeleccionado === 'Pendiente') {
+            citasFiltradas = citasFiltradas.filter(c => !c.tiene_triaje);
+        } else if (estadoSeleccionado === 'Completado') {
+            citasFiltradas = citasFiltradas.filter(c => c.tiene_triaje && c.estado_triaje === 'Completado');
+        } else if (estadoSeleccionado === 'Urgente') {
+            citasFiltradas = citasFiltradas.filter(c => c.tiene_triaje && c.estado_triaje === 'Urgente');
+        } else if (estadoSeleccionado === 'Critico') {
+            citasFiltradas = citasFiltradas.filter(c => c.tiene_triaje && c.estado_triaje === 'Critico');
+        }
+    }
+    
+    mostrarCitas(citasFiltradas);
+    
+    // Mostrar resultados si hay búsqueda activa
+    if (cedulaBusqueda && cedulaBusqueda.length >= 3) {
+        mostrarResultadosBusqueda(citasFiltradas.length, cedulaBusqueda);
+    }
+}
+
+// ===== FUNCIÓN AUXILIAR PARA BÚSQUEDA MEJORADA =====
+function buscarEnCitas(termino) {
+    if (!termino || termino.length < 3) {
+        return citasDelDia;
+    }
+    
+    const terminoLower = termino.toLowerCase();
+    
+    return citasDelDia.filter(cita => {
+        // Búsqueda por cédula (convertir a string)
+        if (cita.cedula_paciente) {
+            const cedulaString = String(cita.cedula_paciente);
+            if (cedulaString.includes(termino)) {
+                return true;
+            }
+        }
+        
+        // Búsqueda por nombre
+        if (cita.nombres_paciente && cita.nombres_paciente.toLowerCase().includes(terminoLower)) {
+            return true;
+        }
+        
+        // Búsqueda por apellido
+        if (cita.apellidos_paciente && cita.apellidos_paciente.toLowerCase().includes(terminoLower)) {
+            return true;
+        }
+        
+        // Búsqueda por motivo
+        if (cita.motivo && cita.motivo.toLowerCase().includes(terminoLower)) {
+            return true;
+        }
+        
+        return false;
+    });
+}
+
+// ===== EVENTO DE BÚSQUEDA MEJORADO =====
+$(document).ready(function() {
+    // Búsqueda en tiempo real con debounce
+    let timeoutBusqueda;
+    $('#buscarCedula').on('input', function() {
+        const cedula = $(this).val();
+        
+        clearTimeout(timeoutBusqueda);
+        timeoutBusqueda = setTimeout(() => {
+            if (cedula.length >= 3) {
+                buscarPorCedula(cedula);
+            } else if (cedula.length === 0) {
+                limpiarBusqueda();
+            }
+        }, 500); // 500ms de delay
+    });
+    
+    // Botón de búsqueda manual
+    $('#btnBuscarCedula').on('click', function() {
+        const cedula = $('#buscarCedula').val();
+        buscarPorCedula(cedula);
+    });
+    
+    // Botón limpiar
+    $('#btnLimpiarBusqueda').on('click', limpiarBusqueda);
+    
+    // Búsqueda con Enter
+    $('#buscarCedula').on('keypress', function(e) {
+        if (e.which === 13) { // Enter
+            e.preventDefault();
+            buscarPorCedula($(this).val());
+        }
+    });
+    
+    // Solo permitir números en el campo cédula
+    $('#buscarCedula').on('keypress', function(e) {
+        // Permitir: backspace, delete, tab, escape, enter, y números
+        if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+            // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+            (e.keyCode === 65 && e.ctrlKey === true) ||
+            (e.keyCode === 67 && e.ctrlKey === true) ||
+            (e.keyCode === 86 && e.ctrlKey === true) ||
+            (e.keyCode === 88 && e.ctrlKey === true)) {
+            return;
+        }
+        // Asegurar que sea solo números (0-9)
+        if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+            e.preventDefault();
+        }
+    });
+    
+    // ✅ CORREGIR COMBINAR BÚSQUEDA CON FILTROS
+    $('#filtroEstado').on('change', function() {
+        // Siempre aplicar filtros
+        filtrarCitas();
+    });
+});
+
 // ===== CARGAR DATOS =====
 function cargarCitasDelDia() {
     const fecha = $('#fechaTriaje').val();
@@ -116,32 +293,128 @@ function cargarCitasDelDia() {
     });
 }
 
+// ===== FUNCIONES AUXILIARES PARA BÚSQUEDA =====
+
+function mostrarTodasLasCitas() {
+    mostrarCitas(citasDelDia);
+    ocultarResultadosBusqueda();
+    $('#contadorResultados').text(citasDelDia.length);
+}
+
+function mostrarResultadosBusqueda(cantidad, cedula) {
+    const contenedor = $('#resultadosBusqueda');
+    
+    if (cantidad > 0) {
+        const html = `
+            <div class="alert alert-success alert-sm">
+                <i class="bi bi-check-circle me-2"></i>
+                <strong>✅ ${cantidad} paciente(s) encontrado(s)</strong> con cédula que contiene "${cedula}"
+                <button type="button" class="btn-close btn-sm ms-2" onclick="limpiarBusqueda()"></button>
+            </div>
+        `;
+        contenedor.html(html).show();
+    } else {
+        const html = `
+            <div class="alert alert-warning alert-sm">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>❌ No se encontraron pacientes</strong> con cédula que contiene "${cedula}"
+                <button type="button" class="btn-close btn-sm ms-2" onclick="limpiarBusqueda()"></button>
+            </div>
+        `;
+        contenedor.html(html).show();
+    }
+    
+    // Actualizar contador
+    $('#contadorResultados').text(cantidad);
+}
+
+function ocultarResultadosBusqueda() {
+    $('#resultadosBusqueda').hide().empty();
+}
+
+function limpiarBusqueda() {
+    $('#buscarCedula').val('');
+    $('#filtroEstado').val('');
+    mostrarTodasLasCitas();
+    console.log('🧹 Búsqueda limpiada');
+}
+
+function mostrarCitasVacias() {
+    $('#sinCitas').removeClass('d-none');
+    $('#tablaCitas').addClass('d-none');
+    $('#sinResultados').removeClass('d-none');
+    
+    $('#sinResultados').html(`
+        <div class="text-center py-5">
+            <i class="bi bi-search fs-1 text-muted mb-3"></i>
+            <h5 class="text-muted">No se encontraron resultados</h5>
+            <p class="text-muted">No hay pacientes con esa cédula para la fecha seleccionada</p>
+            <button class="btn btn-outline-primary" onclick="limpiarBusqueda()">
+                <i class="bi bi-arrow-left me-1"></i>
+                Ver todas las citas
+            </button>
+        </div>
+    `);
+}
+
+function mostrarAlerta(mensaje, tipo = 'info') {
+    const iconos = {
+        'success': 'bi-check-circle',
+        'warning': 'bi-exclamation-triangle',
+        'error': 'bi-x-circle',
+        'info': 'bi-info-circle'
+    };
+    
+    const html = `
+        <div class="alert alert-${tipo} alert-dismissible fade show alert-sm">
+            <i class="${iconos[tipo]} me-2"></i>
+            ${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('#resultadosBusqueda').html(html).show();
+    
+    // Auto-ocultar después de 3 segundos
+    setTimeout(() => {
+        $('#resultadosBusqueda .alert').fadeOut();
+    }, 3000);
+}
+
+// ===== FUNCIÓN MOSTRAR CITAS MEJORADA =====
 function mostrarCitas(citas) {
     const tbody = $('#cuerpoTablaCitas');
-    const tablaCitas = $('#tablaCitas');
-    const sinCitas = $('#sinCitas');
     
-    tbody.empty();
-    
-    if (citas.length === 0) {
-        tablaCitas.addClass('d-none');
-        sinCitas.removeClass('d-none');
+    if (!citas || citas.length === 0) {
+        $('#tablaCitas').addClass('d-none');
+        $('#sinCitas').removeClass('d-none');
+        $('#contadorResultados').text('0');
         return;
     }
     
-    sinCitas.addClass('d-none');
-    tablaCitas.removeClass('d-none');
+    // Mostrar tabla y ocultar mensaje vacío
+    $('#tablaCitas').removeClass('d-none');
+    $('#sinCitas').addClass('d-none');
+    $('#sinResultados').addClass('d-none');
     
-    citas.forEach(function(cita) {
-        const fila = crearFilaCita(cita);
-        tbody.append(fila);
+    let html = '';
+    
+    citas.forEach(cita => {
+        html += crearFilaCita(cita);
     });
+    
+    tbody.html(html);
+    $('#contadorResultados').text(citas.length);
+    
+    if (config.debug) {
+        console.log('✅ Mostrando', citas.length, 'citas en la tabla');
+    }
 }
 
 function crearFilaCita(cita) {
-    const hora = new Date(cita.fecha_hora).toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit'
+    const hora = new Date(cita.fecha_hora).toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
     });
     
     const nombreCompleto = `${cita.nombres_paciente} ${cita.apellidos_paciente}`;
@@ -151,7 +424,9 @@ function crearFilaCita(cita) {
     let estadoTriaje, badgeClass, urgenciaInfo;
     
     if (cita.tiene_triaje) {
-        estadoTriaje = '<span class="badge badge-completado">✅ Completado</span>';
+        // Usar estado_triaje de la base de datos
+        const estado = cita.estado_triaje_display || cita.estado_triaje || 'Completado';
+        estadoTriaje = `<span class="badge badge-completado">✅ ${estado}</span>`;
         badgeClass = 'estado-completado';
         urgenciaInfo = obtenerInfoUrgencia(cita.nivel_urgencia || 1);
     } else {
@@ -193,6 +468,53 @@ function crearFilaCita(cita) {
     `;
 }
 
+function obtenerInfoUrgencia(nivel) {
+    const niveles = {
+        1: '<span class="urgencia-1">🟢 Bajo</span>',
+        2: '<span class="urgencia-2">🟡 Medio</span>',
+        3: '<span class="urgencia-3">🟠 Alto</span>',
+        4: '<span class="urgencia-4">🔴 Crítico</span>'
+    };
+    
+    return niveles[nivel] || '<span class="text-muted">-</span>';
+}
+
+// ===== FUNCIÓN PARA ACTUALIZAR CONTADORES =====
+function actualizarContadoresRapidos(citas) {
+    const total = citas.length;
+    const pendientes = citas.filter(c => !c.tiene_triaje).length;
+    const completados = citas.filter(c => c.tiene_triaje).length;
+    const urgentes = citas.filter(c => c.tiene_triaje && (c.nivel_urgencia >= 3)).length;
+    
+    $('#totalCitas').text(total);
+    $('#citasPendientes').text(pendientes);
+    $('#triageCompletados').text(completados);
+    $('#urgentes').text(urgentes);
+    
+    if (config.debug) {
+        console.log(`📊 Contadores - Total: ${total}, Pendientes: ${pendientes}, Completados: ${completados}, Urgentes: ${urgentes}`);
+    }
+}
+
+// ===== AGREGAR CSS PARA LOS ESTADOS =====
+const estilosAdicionales = `
+<style>
+.badge-completado { background-color: #28a745 !important; color: white; }
+.badge-pendiente { background-color: #ffc107 !important; color: black; }
+.estado-completado { background-color: rgba(40, 167, 69, 0.1); }
+.estado-pendiente { background-color: rgba(255, 193, 7, 0.1); }
+.urgencia-1 { color: #28a745; font-weight: bold; }
+.urgencia-2 { color: #ffc107; font-weight: bold; }
+.urgencia-3 { color: #fd7e14; font-weight: bold; }
+.urgencia-4 { color: #dc3545; font-weight: bold; }
+.alert-sm { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+</style>
+`;
+
+// Agregar estilos al head
+$(document).ready(function() {
+    $('head').append(estilosAdicionales);
+});
 function obtenerInfoUrgencia(nivel) {
     const niveles = {
         1: '<span class="urgencia-1">🟢 Bajo</span>',
