@@ -818,5 +818,28 @@ public function tieneCitasActivas($id_doctor) {
         return 0;
     }
 }
+/**
+ * Obtener doctor por ID de usuario
+ */
+public function obtenerDoctorPorUsuario($id_usuario) {
+    try {
+        $query = "SELECT d.id_doctor, d.titulo_profesional,
+                         u.nombres, u.apellidos, u.correo,
+                         e.nombre_especialidad, e.id_especialidad
+                  FROM doctores d
+                  INNER JOIN usuarios u ON d.id_usuario = u.id_usuario
+                  INNER JOIN especialidades e ON d.id_especialidad = e.id_especialidad
+                  WHERE d.id_usuario = :id_usuario AND u.id_estado = 1";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_usuario' => $id_usuario]);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+        
+    } catch (PDOException $e) {
+        error_log("Error obteniendo doctor por usuario: " . $e->getMessage());
+        throw new Exception("Error al obtener información del doctor");
+    }
+}
 }
 ?>

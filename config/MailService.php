@@ -14,7 +14,7 @@ class MailService {
             'host' => 'smtp.gmail.com',
             'port' => 587,
             'username' => 'swooshing14@gmail.com', // Tu correo
-            'password' => 'tu_clave',   // Tu contraseña de aplicación
+            'password' => 'afuw rcsw mvxs qwbq',   // Tu contraseña de aplicación
             'from_email' => 'swooshing14@gmail.com',
             'from_name' => 'MediSys - Sistema Hospitalario'
         ];
