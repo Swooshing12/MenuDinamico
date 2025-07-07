@@ -10,16 +10,16 @@ if (!isset($_SESSION['id_rol'])) {
 
 $id_rol = $_SESSION['id_rol'];
 
-// Cargar menús según el rol
+// ✅ CAMBIO: Variables con prefijo para evitar conflictos
 $rolModel = new Roles();
-$menus = $rolModel->obtenerMenusPorRol($id_rol);
+$sidebar_menus = $rolModel->obtenerMenusPorRol($id_rol);
 
 // Organizar menús y submenús
-$menuItems = [];
-foreach ($menus as $menu) {
+$sidebar_menuItems = [];
+foreach ($sidebar_menus as $menu) {
     $menuId = $menu['id_menu'];
-    if (!isset($menuItems[$menuId])) {
-        $menuItems[$menuId] = [
+    if (!isset($sidebar_menuItems[$menuId])) {
+        $sidebar_menuItems[$menuId] = [
             'id_menu' => $menuId,
             'nombre_menu' => $menu['nombre_menu'],
             'icono' => $menu['icono'] ?? 'bi-grid',
@@ -27,7 +27,7 @@ foreach ($menus as $menu) {
         ];
     }
     if (!empty($menu['id_submenu'])) {
-        $menuItems[$menuId]['submenus'][] = [
+        $sidebar_menuItems[$menuId]['submenus'][] = [
             'id_submenu' => $menu['id_submenu'],
             'nombre_submenu' => $menu['nombre_submenu'],
             'url_submenu' => $menu['url_submenu'],
@@ -41,7 +41,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $current_submenu_id = $_GET['submenu_id'] ?? null;
 
 // Función para determinar si algún submenú está activo
-function submenuEstaActivo($submenus, $current_submenu_id) {
+function sidebarSubmenuEstaActivo($submenus, $current_submenu_id) {
     if (!$current_submenu_id) return false;
     
     foreach ($submenus as $submenu) {
@@ -84,19 +84,19 @@ function submenuEstaActivo($submenus, $current_submenu_id) {
         </div>
         
         <!-- Menús Dinámicos -->
-        <?php if (!empty($menuItems)): ?>
+        <?php if (!empty($sidebar_menuItems)): ?>
         <div class="sidebar-menu">
             <div class="menu-label">Menú del Sistema</div>
             <ul class="menu-items">
-                <?php foreach ($menuItems as $menu): ?>
+                <?php foreach ($sidebar_menuItems as $menu): ?>
                     <?php if (!empty($menu['submenus'])): ?>
-                        <li class="menu-item has-submenu <?= submenuEstaActivo($menu['submenus'], $current_submenu_id) ? 'open' : '' ?>">
+                        <li class="menu-item has-submenu <?= sidebarSubmenuEstaActivo($menu['submenus'], $current_submenu_id) ? 'open' : '' ?>">
                             <a href="#submenu-<?= $menu['id_menu'] ?>" class="menu-link submenu-toggle" data-bs-toggle="collapse">
                                 <i class="bi <?= $menu['icono'] ?>"></i>
                                 <span><?= htmlspecialchars($menu['nombre_menu']) ?></span>
                                 <i class="bi bi-chevron-down toggle-icon"></i>
                             </a>
-                            <ul class="submenu collapse <?= submenuEstaActivo($menu['submenus'], $current_submenu_id) ? 'show' : '' ?>" id="submenu-<?= $menu['id_menu'] ?>">
+                            <ul class="submenu collapse <?= sidebarSubmenuEstaActivo($menu['submenus'], $current_submenu_id) ? 'show' : '' ?>" id="submenu-<?= $menu['id_menu'] ?>">
                                 <?php foreach ($menu['submenus'] as $submenu): ?>
                                     <li class="menu-item <?= ($current_submenu_id == $submenu['id_submenu']) ? 'active' : '' ?>">
                                         <a href="<?= htmlspecialchars($submenu['url_submenu']) ?>?submenu_id=<?= $submenu['id_submenu'] ?>" class="menu-link">

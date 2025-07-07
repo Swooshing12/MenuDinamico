@@ -1,0 +1,407 @@
+/* ===== VARIABLES CSS ===== */
+:root {
+    --primary: #2e7d32;
+    --primary-light: #4caf50;
+    --secondary: #1976d2;
+    --success: #388e3c;
+    --info: #0288d1;
+    --warning: #f57c00;
+    --danger: #d32f2f;
+    --light: #f8f9fa;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --border-radius: 12px;
+}
+
+/* ===== LAYOUT PRINCIPAL ===== */
+.dashboard-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    min-height: 100vh;
+    padding-top: 20px;
+}
+
+/* ===== TARJETAS DE ESTADÍSTICAS ===== */
+.estadistica-card {
+    transition: all var(--transition);
+    border: none;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    position: relative;
+    border-left: 4px solid transparent;
+}
+
+.estadistica-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+}
+
+.estadistica-card:nth-child(1) { border-left-color: var(--primary); }
+.estadistica-card:nth-child(2) { border-left-color: var(--success); }
+.estadistica-card:nth-child(3) { border-left-color: var(--info); }
+.estadistica-card:nth-child(4) { border-left-color: var(--warning); }
+
+.estadistica-icon {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    border-radius: 50%;
+    transition: all var(--transition);
+}
+
+.estadistica-card:hover .estadistica-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.estadistica-numero {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    transition: all var(--transition);
+}
+
+/* ===== TABLA MODERNA ===== */
+.table {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: 0 4px 20px var(--shadow);
+}
+
+.table thead th {
+    background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    padding: 1rem 0.75rem;
+}
+
+.table tbody tr {
+    transition: all var(--transition);
+    border: none;
+}
+
+.table tbody tr:hover {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    position: relative;
+}
+
+.table td {
+    border: none;
+    border-bottom: 1px solid #f1f3f4;
+    padding: 1rem 0.75rem;
+    vertical-align: middle;
+}
+
+/* ===== ICONOS ESPECIALIZADOS ===== */
+.especialidad-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    border-radius: 50%;
+    transition: all var(--transition);
+}
+
+.sucursal-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border-radius: 50%;
+    transition: all var(--transition);
+}
+
+/* ===== TARJETAS DE SUCURSALES ===== */
+.sucursal-card {
+    transition: all var(--transition);
+    border: 2px solid transparent;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.sucursal-card:hover {
+    border-color: var(--primary);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(46, 125, 50, 0.2);
+}
+
+.form-check-input:checked + .form-check-label .sucursal-card {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(46, 125, 50, 0.05) 0%, rgba(76, 175, 80, 0.05) 100%);
+}
+
+.form-check-input:checked + .form-check-label .sucursal-icon {
+    background: var(--primary) !important;
+    color: white !important;
+    transform: scale(1.1);
+}
+
+/* ===== MODALES MEJORADOS ===== */
+.modal-content {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.modal-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border: none;
+    padding: 1.5rem;
+}
+
+.modal-header.bg-warning {
+    background: linear-gradient(135deg, var(--warning) 0%, #ff9800 100%);
+}
+
+.modal-header.bg-info {
+    background: linear-gradient(135deg, var(--info) 0%, #29b6f6 100%);
+}
+
+.modal-header.bg-danger {
+    background: linear-gradient(135deg, var(--danger) 0%, #f44336 100%);
+}
+
+.modal-title i {
+    background: rgba(255, 255, 255, 0.2);
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    border: none;
+    padding: 1rem 2rem 1.5rem;
+}
+
+/* ===== FORMULARIOS MODERNOS ===== */
+.form-floating > label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.form-control, .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    transition: all var(--transition);
+    font-size: 0.95rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.25rem rgba(46, 125, 50, 0.15);
+    transform: translateY(-2px);
+}
+
+.form-control.is-valid, .form-select.is-valid {
+    border-color: var(--success);
+}
+
+.form-control.is-invalid, .form-select.is-invalid {
+    border-color: var(--danger);
+}
+
+/* ===== BOTONES MODERNOS ===== */
+.btn {
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 0.6rem 1.5rem;
+    transition: all var(--transition);
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, var(--warning) 0%, #ff9800 100%);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, var(--info) 0%, #29b6f6 100%);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger) 0%, #f44336 100%);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success) 0%, #4caf50 100%);
+}
+
+.btn-outline-primary, .btn-outline-warning, .btn-outline-info, 
+.btn-outline-danger, .btn-outline-success {
+    border: 2px solid currentColor;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-outline-primary::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background: var(--primary);
+    transition: width var(--transition);
+    z-index: -1;
+}
+
+.btn-outline-primary:hover::after {
+    width: 100%;
+}
+
+/* ===== BADGES ANIMADOS ===== */
+.badge {
+    border-radius: 20px;
+    font-weight: 600;
+    padding: 0.5em 1em;
+    transition: all var(--transition);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.badge:hover {
+    transform: scale(1.05);
+}
+
+/* ===== PAGINACIÓN MODERNA ===== */
+.pagination {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: 0 4px 15px var(--shadow);
+}
+
+.page-link {
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    transition: all var(--transition);
+    margin: 0 2px;
+    border-radius: 8px;
+}
+
+.page-link:hover {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.page-item.active .page-link {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border: none;
+    transform: scale(1.1);
+}
+
+/* ===== ANIMACIONES GLOBALES ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
+    40%, 43% { transform: translateY(-10px); }
+    70% { transform: translateY(-5px); }
+    90% { transform: translateY(-2px); }
+}
+
+/* ===== APLICAR ANIMACIONES ===== */
+.card, .modal-content, .table {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.estadistica-card:nth-child(1) { animation-delay: 0.1s; }
+.estadistica-card:nth-child(2) { animation-delay: 0.2s; }
+.estadistica-card:nth-child(3) { animation-delay: 0.3s; }
+.estadistica-card:nth-child(4) { animation-delay: 0.4s; }
+
+.table tbody tr:nth-child(odd) { animation-delay: 0.05s; }
+.table tbody tr:nth-child(even) { animation-delay: 0.1s; }
+
+/* ===== LOADING STATES ===== */
+.spinner-border {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .estadistica-card {
+        margin-bottom: 1rem;
+    }
+    
+    .table {
+        font-size: 0.9rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .modal-body {
+        padding: 1rem;
+    }
+    
+    .sucursal-card {
+        margin-bottom: 0.5rem;
+    }
+}
+
