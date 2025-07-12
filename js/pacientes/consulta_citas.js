@@ -834,12 +834,12 @@ generarPDFCita(idCita) {
         });
     }, 3000);
 }
-   /**
- * Cargar estadísticas del paciente - CON DEBUG
+ /**
+ * Cargar estadísticas del paciente - CORREGIDO CON ESTRUCTURA CORRECTA
  */
 async cargarEstadisticas() {
     try {
-        console.log('Iniciando carga de estadísticas...'); // Debug
+        console.log('🔄 Iniciando carga de estadísticas...');
         
         const response = await $.ajax({
             url: '../../controladores/PacientesControlador/PacientesController.php',
@@ -850,18 +850,21 @@ async cargarEstadisticas() {
             dataType: 'json'
         });
         
-        console.log('Respuesta completa de estadísticas:', response); // Debug
+        console.log('📥 Respuesta completa:', response);
         
-        if (response.success) {
-            this.renderizarEstadisticas(response.data.estadisticas);
-            // Comentado temporalmente hasta implementar el widget
-            // this.renderizarEspecialidadesWidget(response.data.especialidades_visitadas);
+        if (response.success && response.data && response.data.estadisticas) {
+            // ✅ ACCEDER CORRECTAMENTE A LOS DATOS
+            const stats = response.data.estadisticas;  // ← Esta es la clave
+            console.log('📊 Datos de estadísticas extraídos:', stats);
+            
+            this.renderizarEstadisticas(stats);
         } else {
-            console.error('Error en respuesta de estadísticas:', response.error);
+            console.error('❌ Error en respuesta:', response.error || 'Estructura incorrecta');
         }
         
     } catch (error) {
-        console.error('Error cargando estadísticas:', error);
+        console.error('❌ Error cargando estadísticas:', error);
+        this.mostrarError('Error al cargar las estadísticas');
     }
 }
 
@@ -955,30 +958,87 @@ async cargarEstadisticas() {
     }
     
 /**
- * Renderizar estadísticas - CORREGIDO CON DEBUG
+ * Renderizar estadísticas - VERSIÓN SIMPLE Y FUNCIONAL
  */
 renderizarEstadisticas(stats) {
-    console.log('Estadísticas recibidas:', stats); // Debug
+    console.log('📊 Renderizando estadísticas:', stats);
     
-    // Actualizar contadores con validación
+    // Actualizar valores directamente
     $('#totalCitas').text(stats.total_citas || 0);
     $('#citasCompletadas').text(stats.citas_completadas || 0);
     $('#citasPendientes').text(stats.citas_pendientes || 0);
     $('#citasVirtuales').text(stats.citas_virtuales || 0);
     
-    // Actualizar porcentajes con animación
-    this.animarPorcentaje('#porcentajeCompletadas', stats.porcentaje_completadas || 0);
-    this.animarPorcentaje('#porcentajePendientes', stats.porcentaje_pendientes || 0);
-    this.animarPorcentaje('#porcentajeVirtuales', stats.porcentaje_virtuales || 0);
+    // Verificar que se actualizaron
+    console.log('✅ Valores actualizados:', {
+        total: $('#totalCitas').text(),
+        completadas: $('#citasCompletadas').text(),
+        pendientes: $('#citasPendientes').text(),
+        virtuales: $('#citasVirtuales').text()
+    });
     
     // Actualizar barras de progreso
-    this.actualizarBarraProgreso('#progressCompletadas', stats.porcentaje_completadas || 0);
-    this.actualizarBarraProgreso('#progressPendientes', stats.porcentaje_pendientes || 0);
-    this.actualizarBarraProgreso('#progressVirtuales', stats.porcentaje_virtuales || 0);
+    $('#progressCompletadas').css('width', (stats.porcentaje_completadas || 0) + '%');
+    $('#progressPendientes').css('width', (stats.porcentaje_pendientes || 0) + '%');
+    $('#progressVirtuales').css('width', (stats.porcentaje_virtuales || 0) + '%');
     
-    console.log('Estadísticas renderizadas correctamente');
+    console.log('🎯 Estadísticas renderizadas correctamente');
+}
+/**
+ * Animar estadísticas con efectos visuales
+ */
+animarEstadisticasConAnimacion(stats) {
+    // Animar contadores principales
+    this.animarContador('#totalCitas', stats.total_citas || 0);
+    this.animarContador('#citasCompletadas', stats.citas_completadas || 0); 
+    this.animarContador('#citasPendientes', stats.citas_pendientes || 0);
+    this.animarContador('#citasVirtuales', stats.citas_virtuales || 0);
+    
+    // Animar porcentajes
+    if ($('#porcentajeCompletadas').length > 0) {
+        this.animarPorcentaje('#porcentajeCompletadas', stats.porcentaje_completadas || 0);
+    }
+    
+    if ($('#porcentajePendientes').length > 0) {
+        this.animarPorcentaje('#porcentajePendientes', stats.porcentaje_pendientes || 0);
+    }
+    
+    if ($('#porcentajeVirtuales').length > 0) {
+        this.animarPorcentaje('#porcentajeVirtuales', stats.porcentaje_virtuales || 0);
+    }
+    
+    // Animar barras de progreso
+    if ($('#progressCompletadas').length > 0) {
+        this.actualizarBarraProgreso('#progressCompletadas', stats.porcentaje_completadas || 0);
+    }
+    
+    if ($('#progressPendientes').length > 0) {
+        this.actualizarBarraProgreso('#progressPendientes', stats.porcentaje_pendientes || 0);
+    }
+    
+    if ($('#progressVirtuales').length > 0) {
+        this.actualizarBarraProgreso('#progressVirtuales', stats.porcentaje_virtuales || 0);
+    }
 }
 
+/**
+ * Animar contador simple
+ */
+animarContador(selector, valorFinal) {
+    const elemento = $(selector);
+    if (elemento.length === 0) return;
+    
+    $({numero: 0}).animate({numero: valorFinal}, {
+        duration: 1500,
+        easing: 'swing',
+        step: function() {
+            elemento.text(Math.ceil(this.numero));
+        },
+        complete: function() {
+            elemento.text(valorFinal);
+        }
+    });
+}
 
     
     // ===== MÉTODOS AUXILIARES =====
