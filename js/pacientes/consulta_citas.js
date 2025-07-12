@@ -1105,8 +1105,7 @@ renderizarEstadisticas(stats) {
                <!-- Consultas Médicas -->
                ${cita.consultas && cita.consultas.length > 0 ? this.getTemplateConsultas(cita.consultas) : ''}
 
-               <!-- Recetas Médicas -->
-               ${cita.recetas && cita.recetas.length > 0 ? this.getTemplateRecetas(cita.recetas) : ''}
+
 
                <!-- Acciones adicionales -->
                <div class="acciones-detalle mt-4 pt-3 border-top">
@@ -1437,32 +1436,7 @@ getTemplateNoConsultas(estado) {
     `;
 }
 
-/**
- * Template cuando no hay recetas
- */
-getTemplateNoRecetas(estado) {
-    if (estado === 'Pendiente' || estado === 'Confirmada') {
-        return `
-            <div class="card border-0 bg-light mb-4">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-prescription2 text-info" style="font-size: 2rem;"></i>
-                    <h6 class="mt-2 text-muted">Recetas Pendientes</h6>
-                    <p class="text-muted mb-0">Las recetas se generarán durante la consulta</p>
-                </div>
-        </div>
-        `;
-    }
-    
-    return `
-        <div class="card border-0 bg-light mb-4">
-            <div class="card-body text-center py-4">
-                <i class="bi bi-prescription text-muted" style="font-size: 2rem;"></i>
-                <h6 class="mt-2 text-muted">Sin Recetas</h6>
-                <p class="text-muted mb-0">No se prescribieron medicamentos en esta cita</p>
-            </div>
-        </div>
-    `;
-}
+
 
 /**
  * Template específico según el estado de la cita
@@ -1526,7 +1500,6 @@ getTemplateEstadoEspecifico(cita) {
                             <ul class="mb-0 mt-2">
                                 <li>Consulta médica realizada</li>
                                 <li>Diagnóstico y tratamiento registrado</li>
-                                <li>Recetas médicas (si aplica)</li>
                                 <li>Seguimiento programado (si aplica)</li>
                             </ul>
                         </div>
@@ -1751,8 +1724,6 @@ getTemplateDetalleCita(cita) {
             <!-- Consultas Médicas (solo si existen) -->
             ${cita.consultas && cita.consultas.length > 0 ? this.getTemplateConsultas(cita.consultas) : this.getTemplateNoConsultas(cita.estado)}
 
-            <!-- Recetas Médicas (solo si existen) -->
-            ${cita.recetas && cita.recetas.length > 0 ? this.getTemplateRecetas(cita.recetas) : this.getTemplateNoRecetas(cita.estado)}
 
             <!-- Estado específico de la cita -->
             ${this.getTemplateEstadoEspecifico(cita)}
