@@ -522,158 +522,191 @@ $(document).ready(function() {
         });
     }
     
-    // Mostrar estructura de permisos
-    function mostrarEstructuraPermisos(estructura, containerId, permisosActuales = {}) {
-        const container = $(`#${containerId}`);
-        let html = '';
+    // Función corregida para mostrar estructura de permisos
+function mostrarEstructuraPermisos(estructura, containerId, permisosActuales = {}) {
+    const container = $(`#${containerId}`);
+    let html = '';
+    
+    estructura.forEach(menu => {
+        // Verificar si algún submenú de este menú tiene permisos
+        const menuTienePermisos = menu.submenus && menu.submenus.some(submenu => {
+            const permisos = permisosActuales[submenu.id_submenu] || {};
+            return permisos.tiene_acceso || permisos.puede_crear || permisos.puede_editar || permisos.puede_eliminar;
+        });
         
-        estructura.forEach(menu => {
-            html += `
-                <div class="menu-section mb-4">
-                    <div class="form-check menu-check">
-                        <input class="form-check-input menu-toggle" type="checkbox" 
-                               id="menu_${menu.id_menu}" data-menu-id="${menu.id_menu}">
-                        <label class="form-check-label fw-bold text-success fs-5" for="menu_${menu.id_menu}">
-                            <i class="bi bi-folder-fill me-2"></i>${escapeHtml(menu.nombre_menu)}
-                        </label>
-                    </div>
-                    
-                    <div class="submenu-section ms-4 mt-3 d-none" id="submenus_${menu.id_menu}">
-            `;
-            
-            if (menu.submenus && menu.submenus.length > 0) {
-                menu.submenus.forEach(submenu => {
-                    const permisosSubmenu = permisosActuales[submenu.id_submenu] || {};
-                    
-                    html += `
-                        <div class="submenu-item mb-3 p-3 border rounded bg-light">
-                            <div class="form-check">
-                                <input class="form-check-input submenu-toggle" type="checkbox" 
-                                       id="submenu_${submenu.id_submenu}" 
-                                       data-submenu-id="${submenu.id_submenu}"
-                                       ${permisosSubmenu.tiene_acceso ? 'checked' : ''}>
-                                <label class="form-check-label fw-semibold text-primary" 
-                                       for="submenu_${submenu.id_submenu}">
-                                    <i class="bi bi-diagram-3 me-2"></i>${escapeHtml(submenu.nombre_submenu)}
-                                </label>
-                            </div>
-                            
-                            <div class="permisos-actions ms-4 mt-2 ${permisosSubmenu.tiene_acceso ? '' : 'd-none'}" 
-                                 id="actions_${submenu.id_submenu}">
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" 
-                                                   name="permisos[${submenu.id_submenu}][]" 
-                                                   value="crear" 
-                                                   id="crear_${submenu.id_submenu}"
-                                                   ${permisosSubmenu.puede_crear ? 'checked' : ''}>
-                                            <label class="form-check-label text-success" 
-                                                   for="crear_${submenu.id_submenu}">
-                                                <i class="bi bi-plus-circle me-1"></i>Crear
-                                            </label>
-                                        </div>
+        html += `
+            <div class="menu-section mb-4">
+                <div class="form-check menu-check">
+                    <input class="form-check-input menu-toggle" type="checkbox" 
+                           id="menu_${menu.id_menu}" data-menu-id="${menu.id_menu}"
+                           ${menuTienePermisos ? 'checked' : ''}>
+                    <label class="form-check-label fw-bold text-success fs-5" for="menu_${menu.id_menu}">
+                        <i class="bi bi-folder-fill me-2"></i>${escapeHtml(menu.nombre_menu)}
+                    </label>
+                </div>
+                
+                <div class="submenu-section ms-4 mt-3 ${menuTienePermisos ? '' : 'd-none'}" id="submenus_${menu.id_menu}">
+        `;
+        
+        if (menu.submenus && menu.submenus.length > 0) {
+            menu.submenus.forEach(submenu => {
+                const permisosSubmenu = permisosActuales[submenu.id_submenu] || {};
+                const tieneAcceso = permisosSubmenu.tiene_acceso || 
+                                  permisosSubmenu.puede_crear || 
+                                  permisosSubmenu.puede_editar || 
+                                  permisosSubmenu.puede_eliminar;
+                
+                html += `
+                    <div class="submenu-item mb-3 p-3 border rounded bg-light">
+                        <div class="form-check">
+                            <input class="form-check-input submenu-toggle" type="checkbox" 
+                                   id="submenu_${submenu.id_submenu}" 
+                                   data-submenu-id="${submenu.id_submenu}"
+                                   ${tieneAcceso ? 'checked' : ''}>
+                            <label class="form-check-label fw-semibold text-primary" 
+                                   for="submenu_${submenu.id_submenu}">
+                                <i class="bi bi-diagram-3 me-2"></i>${escapeHtml(submenu.nombre_submenu)}
+                            </label>
+                        </div>
+                        
+                        <div class="permisos-actions ms-4 mt-2 ${tieneAcceso ? '' : 'd-none'}" 
+                             id="actions_${submenu.id_submenu}">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="permisos[${submenu.id_submenu}][]" 
+                                               value="crear" 
+                                               id="crear_${submenu.id_submenu}"
+                                               ${permisosSubmenu.puede_crear ? 'checked' : ''}>
+                                        <label class="form-check-label text-success" 
+                                               for="crear_${submenu.id_submenu}">
+                                            <i class="bi bi-plus-circle me-1"></i>Crear
+                                        </label>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" 
-                                                   name="permisos[${submenu.id_submenu}][]" 
-                                                   value="editar" 
-                                                   id="editar_${submenu.id_submenu}"
-                                                   ${permisosSubmenu.puede_editar ? 'checked' : ''}>
-                                            <label class="form-check-label text-warning" 
-                                                   for="editar_${submenu.id_submenu}">
-                                                <i class="bi bi-pencil me-1"></i>Editar
-                                            </label>
-                                        </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="permisos[${submenu.id_submenu}][]" 
+                                               value="editar" 
+                                               id="editar_${submenu.id_submenu}"
+                                               ${permisosSubmenu.puede_editar ? 'checked' : ''}>
+                                        <label class="form-check-label text-warning" 
+                                               for="editar_${submenu.id_submenu}">
+                                            <i class="bi bi-pencil me-1"></i>Editar
+                                        </label>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" 
-                                                   name="permisos[${submenu.id_submenu}][]" 
-                                                   value="eliminar" 
-                                                   id="eliminar_${submenu.id_submenu}"
-                                                   ${permisosSubmenu.puede_eliminar ? 'checked' : ''}>
-                                            <label class="form-check-label text-danger" 
-                                                   for="eliminar_${submenu.id_submenu}">
-                                                <i class="bi bi-trash me-1"></i>Eliminar
-                                            </label>
-                                        </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="permisos[${submenu.id_submenu}][]" 
+                                               value="eliminar" 
+                                               id="eliminar_${submenu.id_submenu}"
+                                               ${permisosSubmenu.puede_eliminar ? 'checked' : ''}>
+                                        <label class="form-check-label text-danger" 
+                                               for="eliminar_${submenu.id_submenu}">
+                                            <i class="bi bi-trash me-1"></i>Eliminar
+                                        </label>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    `;
-                });
-            } else {
-                html += `
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Este menú no tiene submenús configurados.
                     </div>
                 `;
-            }
-            
+            });
+        } else {
             html += `
-                    </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Este menú no tiene submenús configurados.
                 </div>
             `;
-        });
+        }
         
-        container.html(html);
-        
-        // Configurar eventos de checkboxes
-        configurarEventosPermisos(containerId);
-    }
+        html += `
+                </div>
+            </div>
+        `;
+    });
     
-    // Configurar eventos para checkboxes de permisos
-    function configurarEventosPermisos(containerId) {
-        const container = $(`#${containerId}`);
+    container.html(html);
+    
+    // Configurar eventos de checkboxes
+    configurarEventosPermisos(containerId);
+}
+
+// Función corregida para configurar eventos
+function configurarEventosPermisos(containerId) {
+    const container = $(`#${containerId}`);
+    
+    // Toggle menús
+    container.find('.menu-toggle').on('change', function() {
+        const menuId = $(this).data('menu-id');
+        const submenuSection = $(`#submenus_${menuId}`);
         
-        // Toggle menús
-        container.find('.menu-toggle').on('change', function() {
-            const menuId = $(this).data('menu-id');
-            const submenuSection = $(`#submenus_${menuId}`);
-            
-            if ($(this).is(':checked')) {
-                submenuSection.removeClass('d-none');
-            } else {
-                submenuSection.addClass('d-none');
-                // Desmarcar todos los submenús de este menú
-                submenuSection.find('.submenu-toggle').prop('checked', false).trigger('change');
-            }
-        });
+        if ($(this).is(':checked')) {
+            submenuSection.removeClass('d-none');
+        } else {
+            submenuSection.addClass('d-none');
+            // Desmarcar todos los submenús de este menú
+            submenuSection.find('.submenu-toggle').prop('checked', false).trigger('change');
+        }
+    });
+    
+    // Toggle submenús
+    container.find('.submenu-toggle').on('change', function() {
+        const submenuId = $(this).data('submenu-id');
+        const actionsSection = $(`#actions_${submenuId}`);
         
-        // Toggle submenús
-        container.find('.submenu-toggle').on('change', function() {
-            const submenuId = $(this).data('submenu-id');
-            const actionsSection = $(`#actions_${submenuId}`);
-            
-            if ($(this).is(':checked')) {
-                actionsSection.removeClass('d-none');
-            } else {
-                actionsSection.addClass('d-none');
-                // Desmarcar todas las acciones de este submenú
-                actionsSection.find('input[type="checkbox"]').prop('checked', false);
-            }
-        });
+        if ($(this).is(':checked')) {
+            actionsSection.removeClass('d-none');
+        } else {
+            actionsSection.addClass('d-none');
+            // Desmarcar todas las acciones de este submenú
+            actionsSection.find('input[type="checkbox"]').prop('checked', false);
+        }
+    });
+    
+    // Verificar menús padre cuando se marcan/desmarcan submenús
+    container.find('.submenu-toggle').on('change', function() {
+        const menuSection = $(this).closest('.menu-section');
+        const menuToggle = menuSection.find('.menu-toggle');
+        const submenuToggles = menuSection.find('.submenu-toggle');
+        const checkedSubmenus = submenuToggles.filter(':checked');
         
-        // Verificar menús padre cuando se marcan submenús
-        container.find('.submenu-toggle').on('change', function() {
-            const menuSection = $(this).closest('.menu-section');
-            const menuToggle = menuSection.find('.menu-toggle');
-            const submenuToggles = menuSection.find('.submenu-toggle');
-            const checkedSubmenus = submenuToggles.filter(':checked');
-            
-            if (checkedSubmenus.length > 0) {
-                menuToggle.prop('checked', true);
-                menuSection.find('.submenu-section').removeClass('d-none');
-            } else if (checkedSubmenus.length === 0) {
-                // Solo desmarcar el menú si no hay submenús marcados
-                // menuToggle.prop('checked', false);
-            }
-        });
-    }
+        if (checkedSubmenus.length > 0) {
+            // Si hay submenús marcados, marcar el menú padre y mostrar la sección
+            menuToggle.prop('checked', true);
+            menuSection.find('.submenu-section').removeClass('d-none');
+        } else {
+            // Si no hay submenús marcados, desmarcar el menú padre (pero no ocultar)
+            menuToggle.prop('checked', false);
+            // Mantener visible la sección para permitir seleccionar
+            // menuSection.find('.submenu-section').addClass('d-none');
+        }
+    });
+    
+    // Verificar acciones individuales para mantener consistencia
+    container.find('input[name^="permisos"]').on('change', function() {
+        const submenuId = $(this).closest('.permisos-actions').attr('id').replace('actions_', '');
+        const submenuToggle = $(`#submenu_${submenuId}`);
+        const accionesCheckbox = $(`#actions_${submenuId} input[type="checkbox"]`);
+        const accionesChecked = accionesCheckbox.filter(':checked');
+        
+        // Si no hay acciones marcadas, desmarcar el submenú
+        if (accionesChecked.length === 0) {
+            submenuToggle.prop('checked', false).trigger('change');
+        } else if (!submenuToggle.is(':checked')) {
+            // Si hay acciones marcadas pero el submenú no está marcado, marcarlo
+            submenuToggle.prop('checked', true);
+            $(`#actions_${submenuId}`).removeClass('d-none');
+        }
+    });
+}
+
+
     
     // Crear rol
     function crearRol(e) {
@@ -880,34 +913,7 @@ $(document).ready(function() {
            }
        });
    }
-   
-   // Cargar datos en modal de edición
-   function cargarDatosEdicion(e) {
-       const btn = e.relatedTarget;
-       if (!btn) return;
-       
-       try {
-           const modal = $(this);
-           const idRol = btn.dataset.id;
-           const nombreRol = btn.dataset.nombre;
-           
-           modal.find('#edit_id').val(idRol);
-           modal.find('#edit_nombre_rol').val(nombreRol);
-           
-           // Cargar permisos actuales del rol
-           cargarPermisosParaEdicion(idRol);
-           
-           if (config.debug) {
-               console.log('📝 Datos cargados para edición:', {
-                   id: idRol,
-                   nombre: nombreRol
-               });
-           }
-       } catch (error) {
-           console.error('❌ Error cargando datos de edición:', error);
-       }
-   }
-   
+
    // Cargar permisos actuales para edición
    function cargarPermisosParaEdicion(idRol) {
        const container = $('#edit-permisos-container');
@@ -966,6 +972,100 @@ $(document).ready(function() {
            }
        });
    }
+   
+  // Función corregida para cargar datos de edición
+function cargarDatosEdicion(e) {
+    const btn = e.relatedTarget;
+    if (!btn) return;
+    
+    const modal = $(this);
+    const container = modal.find('#edit-permisos-container');
+    
+    // Mostrar loading
+    container.html(`
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando permisos...</span>
+            </div>
+            <p class="mt-2 text-muted">Cargando permisos del rol...</p>
+        </div>
+    `);
+    
+    try {
+        const idRol = btn.dataset.id;
+        const nombreRol = btn.dataset.nombre;
+        
+        console.log('Cargando permisos para rol ID:', idRol); // Debug
+        
+        // Llenar datos básicos
+        modal.find('#edit_id').val(idRol);
+        modal.find('#edit_nombre_rol').val(nombreRol);
+        
+        // Cargar permisos actuales usando GET
+        $.ajax({
+            url: '../../controladores/RolesControlador/RolesController.php',
+            method: 'GET', // Cambiado a GET
+            data: {
+                action: 'obtenerPermisosPorRol',
+                id_rol: idRol,
+                submenu_id: config.submenuId
+            },
+            dataType: 'json',
+            success: function(response) {
+                console.log('Respuesta del servidor:', response); // Debug
+                
+                if (response.success) {
+                    // Convertir los permisos a formato esperado
+                    const permisosActuales = {};
+                    response.data.forEach(menu => {
+                        menu.submenus.forEach(submenu => {
+                            permisosActuales[submenu.id_submenu] = {
+                                tiene_acceso: Boolean(submenu.puede_crear || submenu.puede_editar || submenu.puede_eliminar),
+                                puede_crear: Boolean(submenu.puede_crear),
+                                puede_editar: Boolean(submenu.puede_editar),
+                                puede_eliminar: Boolean(submenu.puede_eliminar)
+                            };
+                        });
+                    });
+                    
+                    console.log('Permisos procesados:', permisosActuales); // Debug
+                    
+                    // Mostrar la estructura con permisos
+                    mostrarEstructuraPermisos(response.data, 'edit-permisos-container', permisosActuales);
+                } else {
+                    console.error('Error en respuesta:', response.message);
+                    container.html(`
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error al cargar permisos: ${response.message}
+                        </div>
+                    `);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error AJAX:', {xhr, status, error});
+                console.error('Respuesta del servidor:', xhr.responseText);
+                
+                container.html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Error de conexión al cargar permisos. Revisa la consola para más detalles.
+                    </div>
+                `);
+            }
+        });
+    } catch (error) {
+        console.error('Error en cargarDatosEdicion:', error);
+        container.html(`
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Error inesperado al cargar los datos
+            </div>
+        `);
+    }
+}
+   
+   
    
    // Cargar datos en modal de eliminación
    function cargarDatosEliminacion(e) {
