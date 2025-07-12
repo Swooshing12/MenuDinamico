@@ -290,32 +290,51 @@ public function obtenerDetalleCita($id_cita, $id_paciente) {
     }
     
     /**
-     * Obtener estadísticas del paciente
-     */
-    public function obtenerEstadisticasPaciente($id_paciente) {
-        try {
-            $query = "
-                SELECT 
-                    COUNT(*) as total_citas,
-                    SUM(CASE WHEN estado = 'Completada' THEN 1 ELSE 0 END) as citas_completadas,
-                    SUM(CASE WHEN estado = 'Pendiente' THEN 1 ELSE 0 END) as citas_pendientes,
-                    SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as citas_canceladas,
-                    SUM(CASE WHEN tipo_cita = 'virtual' THEN 1 ELSE 0 END) as citas_virtuales,
-                    SUM(CASE WHEN tipo_cita = 'presencial' THEN 1 ELSE 0 END) as citas_presenciales
-                FROM citas 
-                WHERE id_paciente = :id_paciente
-            ";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([':id_paciente' => $id_paciente]);
-            
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-            
-        } catch (PDOException $e) {
-            error_log("Error obteniendo estadísticas: " . $e->getMessage());
-            throw new Exception("Error al obtener estadísticas");
+ * Obtener estadísticas del paciente - CORREGIDO
+ */
+public function obtenerEstadisticasPaciente($id_paciente) {
+    try {
+        $query = "
+            SELECT 
+                COUNT(*) as total_citas,
+                SUM(CASE WHEN estado = 'Completada' THEN 1 ELSE 0 END) as citas_completadas,
+                SUM(CASE WHEN estado = 'Pendiente' THEN 1 ELSE 0 END) as citas_pendientes,
+                SUM(CASE WHEN estado = 'Confirmada' THEN 1 ELSE 0 END) as citas_confirmadas,
+                SUM(CASE WHEN estado = 'Cancelada' THEN 1 ELSE 0 END) as citas_canceladas,
+                SUM(CASE WHEN estado = 'No Asistio' THEN 1 ELSE 0 END) as citas_no_asistio,
+                SUM(CASE WHEN tipo_cita = 'virtual' THEN 1 ELSE 0 END) as citas_virtuales,
+                SUM(CASE WHEN tipo_cita = 'presencial' THEN 1 ELSE 0 END) as citas_presenciales
+            FROM citas 
+            WHERE id_paciente = :id_paciente
+        ";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_paciente' => $id_paciente]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Debug - Log para ver qué devuelve la consulta
+        error_log("Estadísticas para paciente $id_paciente: " . print_r($resultado, true));
+        
+        // Asegurar que todos los valores sean números enteros
+        if ($resultado) {
+            $resultado['total_citas'] = (int)$resultado['total_citas'];
+            $resultado['citas_completadas'] = (int)$resultado['citas_completadas'];
+            $resultado['citas_pendientes'] = (int)$resultado['citas_pendientes'];
+            $resultado['citas_confirmadas'] = (int)$resultado['citas_confirmadas'];
+            $resultado['citas_canceladas'] = (int)$resultado['citas_canceladas'];
+            $resultado['citas_no_asistio'] = (int)$resultado['citas_no_asistio'];
+            $resultado['citas_virtuales'] = (int)$resultado['citas_virtuales'];
+            $resultado['citas_presenciales'] = (int)$resultado['citas_presenciales'];
         }
+        
+        return $resultado;
+        
+    } catch (PDOException $e) {
+        error_log("Error obteniendo estadísticas: " . $e->getMessage());
+        throw new Exception("Error al obtener estadísticas");
     }
+}
     
     /**
      * Buscar citas por rango de fechas

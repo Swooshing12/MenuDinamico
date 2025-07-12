@@ -242,42 +242,47 @@ class PacientesController {
     }
     
     /**
-     * Obtener estadísticas del paciente
-     */
-    private function obtenerEstadisticas() {
-        try {
-            $id_paciente = $this->obtenerIdPaciente();
-            
-            $estadisticas = $this->pacienteCitas->obtenerEstadisticasPaciente($id_paciente);
-            $especialidades = $this->pacienteCitas->obtenerEspecialidadesVisitadas($id_paciente);
-            
-            // Calcular porcentajes
-            $total = $estadisticas['total_citas'];
-            if ($total > 0) {
-                $estadisticas['porcentaje_completadas'] = round(($estadisticas['citas_completadas'] / $total) * 100, 1);
-                $estadisticas['porcentaje_pendientes'] = round(($estadisticas['citas_pendientes'] / $total) * 100, 1);
-                $estadisticas['porcentaje_canceladas'] = round(($estadisticas['citas_canceladas'] / $total) * 100, 1);
-                $estadisticas['porcentaje_virtuales'] = round(($estadisticas['citas_virtuales'] / $total) * 100, 1);
-            } else {
-                $estadisticas['porcentaje_completadas'] = 0;
-                $estadisticas['porcentaje_pendientes'] = 0;
-                $estadisticas['porcentaje_canceladas'] = 0;
-                $estadisticas['porcentaje_virtuales'] = 0;
-            }
-            
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => true,
-                'data' => [
-                    'estadisticas' => $estadisticas,
-                    'especialidades_visitadas' => $especialidades
-                ]
-            ]);
-            
-        } catch (Exception $e) {
-            throw new Exception('Error al obtener estadísticas: ' . $e->getMessage());
+ * Obtener estadísticas del paciente - CORREGIDO
+ */
+private function obtenerEstadisticas() {
+    try {
+        $id_paciente = $this->obtenerIdPaciente();
+        
+        error_log("Obteniendo estadísticas para paciente ID: " . $id_paciente); // Debug
+        
+        $estadisticas = $this->pacienteCitas->obtenerEstadisticasPaciente($id_paciente);
+        $especialidades = $this->pacienteCitas->obtenerEspecialidadesVisitadas($id_paciente);
+        
+        error_log("Estadísticas obtenidas: " . print_r($estadisticas, true)); // Debug
+        
+        // Calcular porcentajes
+        $total = $estadisticas['total_citas'];
+        if ($total > 0) {
+            $estadisticas['porcentaje_completadas'] = round(($estadisticas['citas_completadas'] / $total) * 100, 1);
+            $estadisticas['porcentaje_pendientes'] = round(($estadisticas['citas_pendientes'] / $total) * 100, 1);
+            $estadisticas['porcentaje_canceladas'] = round(($estadisticas['citas_canceladas'] / $total) * 100, 1);
+            $estadisticas['porcentaje_virtuales'] = round(($estadisticas['citas_virtuales'] / $total) * 100, 1);
+        } else {
+            $estadisticas['porcentaje_completadas'] = 0;
+            $estadisticas['porcentaje_pendientes'] = 0;
+            $estadisticas['porcentaje_canceladas'] = 0;
+            $estadisticas['porcentaje_virtuales'] = 0;
         }
+        
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'estadisticas' => $estadisticas,
+                'especialidades_visitadas' => $especialidades
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        error_log("Error en obtenerEstadisticas: " . $e->getMessage());
+        throw new Exception('Error al obtener estadísticas: ' . $e->getMessage());
     }
+}
     
     /**
      * Obtener especialidades visitadas por el paciente

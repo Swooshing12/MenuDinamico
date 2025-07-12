@@ -472,62 +472,156 @@ setupEventListeners() {
     }
     
     /**
-     * Buscar por rango de fechas
-     */
-    async buscarPorFechas() {
-        const fechaDesde = $('#fechaDesde').val();
-        const fechaHasta = $('#fechaHasta').val();
-        
-        if (!fechaDesde || !fechaHasta) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Fechas requeridas',
-                text: 'Por favor selecciona ambas fechas para la búsqueda',
-                confirmButtonColor: '#0077b6'
-            });
-            return;
-        }
-        
-        this.mostrarLoading();
-        
-        try {
-            const response = await $.ajax({
-                url: '../../controladores/PacientesControlador/PacientesController.php',
-                method: 'POST',
-                data: {
-                    accion: 'buscar_por_fechas',
-                    fecha_inicio: fechaDesde,
-                    fecha_fin: fechaHasta
-                },
-                dataType: 'json'
-            });
-            
-            if (response.success) {
-                this.renderizarCitas(response.data.citas);
-                $('#paginacionContainer').html(''); // Limpiar paginación
-                
-                // Mostrar resumen de búsqueda
-                this.mostrarResumenBusqueda(response.data.rango);
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Búsqueda completada',
-                    text: `Se encontraron ${response.data.rango.total_encontradas} citas en el rango seleccionado`,
-                    timer: 3000,
-                    showConfirmButton: false
-                });
-                
-            } else {
-                throw new Error(response.error);
-            }
-            
-        } catch (error) {
-            console.error('Error en búsqueda por fechas:', error);
-            this.mostrarError('Error al buscar por fechas');
-        } finally {
-            this.ocultarLoading();
-        }
+ * Buscar por rango de fechas - CORREGIDO
+ */
+async buscarPorFechas() {
+    const fechaDesde = $('#fechaDesde').val();
+    const fechaHasta = $('#fechaHasta').val();
+    
+    if (!fechaDesde || !fechaHasta) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Fechas requeridas',
+            text: 'Por favor selecciona ambas fechas para la búsqueda',
+            confirmButtonColor: '#0077b6'
+        });
+        return;
     }
+    
+    this.mostrarLoading();
+    
+    try {
+        const response = await $.ajax({
+            url: '../../controladores/PacientesControlador/PacientesController.php',
+            method: 'POST',
+            data: {
+                accion: 'buscar_por_fechas',
+                fecha_inicio: fechaDesde,
+                fecha_fin: fechaHasta
+            },
+            dataType: 'json'
+        });
+        
+        console.log('Respuesta de búsqueda por fechas:', response); // Debug
+        
+        if (response.success) {
+            this.renderizarCitas(response.data.citas);
+            $('#paginacionContainer').html(''); // Limpiar paginación
+            
+            // Mostrar resumen de búsqueda - CORREGIDO
+            this.mostrarResumenBusquedaFechas(response.data.rango);
+            
+            // Actualizar indicadores de filtros
+            this.actualizarIndicadoresFiltros();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Búsqueda completada',
+                text: `Se encontraron ${response.data.rango.total_encontradas} citas en el rango seleccionado`,
+                timer: 3000,
+                showConfirmButton: false
+            });
+            
+        } else {
+            throw new Error(response.error || 'Error desconocido en la búsqueda');
+        }
+        
+    } catch (error) {
+        console.error('Error en búsqueda por fechas:', error);
+        
+        // Mostrar error más específico
+        let mensajeError = 'Error al buscar por fechas';
+        if (error.responseJSON && error.responseJSON.error) {
+            mensajeError = error.responseJSON.error;
+        } else if (error.message) {
+            mensajeError = error.message;
+        }
+        
+        this.mostrarError(mensajeError);
+    } finally {
+        this.ocultarLoading();
+    }
+}
+
+/**
+ * Mostrar resumen de búsqueda por fechas - MÉTODO NUEVO
+ */
+mostrarResumenBusquedaFechas(rango) {
+    const resumenContainer = $('#resumenFiltros');
+    const resumenTotal = $('#resumenTotal');
+    
+    // Actualizar el contenido del resumen
+    resumenTotal.text(rango.total_encontradas);
+    
+    // Mostrar información adicional sobre el rango
+    const fechaInicioFormat = this.formatearFechaSimple(rango.fecha_inicio);
+    const fechaFinFormat = this.formatearFechaSimple(rango.fecha_fin);
+    
+    // Crear contenido del resumen
+    const contenidoResumen = `
+        <div class="d-flex align-items-center">
+            <i class="bi bi-calendar-range text-info me-2"></i>
+            <div>
+                <strong>Búsqueda por fechas:</strong> ${fechaInicioFormat} - ${fechaFinFormat}
+                <br>
+                <small>Se encontraron <strong>${rango.total_encontradas}</strong> citas en este período</small>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="window.consultaCitasApp.limpiarBusquedaFechas()">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `;
+    
+    // Actualizar el contenido y mostrar
+    resumenContainer.html(contenidoResumen).show();
+    
+    // Agregar clase especial para búsqueda por fechas
+    resumenContainer.addClass('busqueda-fechas-activa');
+}
+
+/**
+ * Limpiar búsqueda por fechas - MÉTODO NUEVO
+ */
+limpiarBusquedaFechas() {
+    // Limpiar los campos de fecha
+    $('#fechaDesde').val('');
+    $('#fechaHasta').val('');
+    
+    // Limpiar el resumen
+    $('#resumenFiltros').removeClass('busqueda-fechas-activa').hide();
+    
+    // Recargar todas las citas
+    this.currentPage = 1;
+    this.filtros = {}; // Limpiar todos los filtros
+    this.cargarHistorial();
+    
+    // Mostrar mensaje de confirmación
+    Swal.fire({
+        icon: 'info',
+        title: 'Filtros limpiados',
+        text: 'Se ha restaurado la vista completa de citas',
+        timer: 2000,
+        showConfirmButton: false
+    });
+}
+
+/**
+ * Formatear fecha simple - MÉTODO AUXILIAR NUEVO
+ */
+formatearFechaSimple(fecha) {
+    if (!fecha) return 'Fecha no válida';
+    
+    try {
+        const fechaObj = new Date(fecha + 'T00:00:00'); // Evitar problemas de zona horaria
+        return fechaObj.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    } catch (error) {
+        return fecha; // Si no se puede formatear, devolver tal como está
+    }
+}
     
     /**
      * Aplicar filtros
@@ -584,42 +678,45 @@ setupEventListeners() {
     }
     
     /**
-     * Mostrar detalle de cita en modal
-     */
-    async mostrarDetalleCita(idCita) {
-        const modal = $('#modalDetalleCita');
-        const content = $('#detalleContent');
+ * Mostrar detalle de cita en modal - MÉTODO COMPLETO CORREGIDO
+ */
+async mostrarDetalleCita(idCita) {
+    const modal = $('#modalDetalleCita');
+    const content = $('#detalleContent');
+    
+    // Guardar ID de cita en el modal para PDF
+    modal.data('current-cita-id', idCita);
+    
+    // Mostrar modal con loading
+    content.html(this.getTemplateLoading());
+    modal.modal('show');
+    
+    try {
+        const response = await $.ajax({
+            url: '../../controladores/PacientesControlador/PacientesController.php',
+            method: 'POST',
+            data: {
+                accion: 'obtener_detalle_cita',
+                id_cita: idCita
+            },
+            dataType: 'json'
+        });
         
-        // Mostrar modal con loading
-        content.html(this.getTemplateLoading());
-        modal.modal('show');
-        
-        try {
-            const response = await $.ajax({
-                url: '../../controladores/PacientesControlador/PacientesController.php',
-                method: 'POST',
-                data: {
-                    accion: 'obtener_detalle_cita',
-                    id_cita: idCita
-                },
-                dataType: 'json'
-            });
+        if (response.success) {
+            content.html(this.getTemplateDetalleCita(response.data));
             
-            if (response.success) {
-                content.html(this.getTemplateDetalleCita(response.data));
-                
-                // Inicializar componentes del modal
-                this.setupModalComponents();
-                
-            } else {
-                throw new Error(response.error);
-            }
+            // Inicializar componentes del modal
+            this.setupModalComponents();
             
-        } catch (error) {
-            console.error('Error cargando detalle:', error);
-            content.html(this.getTemplateError('No se pudo cargar el detalle de la cita'));
+        } else {
+            throw new Error(response.error);
         }
+        
+    } catch (error) {
+        console.error('Error cargando detalle:', error);
+        content.html(this.getTemplateError('No se pudo cargar el detalle de la cita'));
     }
+}
     
     /**
      * Cargar próximas citas (widget)
@@ -653,11 +750,97 @@ renderizarEspecialidadesWidget(especialidades) {
     // Por ahora solo lo agregamos para evitar el error
     console.log('Especialidades visitadas:', especialidades);
 }
-    /**
- * Cargar estadísticas del paciente - CORREGIDO
+
+/**
+ * Exportar datos - MÉTODO COMPLETO
+ */
+exportarDatos(formato) {
+    if (formato === 'pdf') {
+        // Obtener ID de la cita actual del modal
+        const modal = $('#modalDetalleCita');
+        if (modal.hasClass('show')) {
+            const idCita = modal.data('current-cita-id');
+            if (idCita) {
+                this.generarPDFCita(idCita);
+            } else {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Cita no seleccionada',
+                    text: 'Por favor seleccione una cita para generar el PDF',
+                    confirmButtonColor: '#0077b6'
+                });
+            }
+        } else {
+            Swal.fire({
+                icon: 'info',
+                title: 'Abrir detalle de cita',
+                text: 'Por favor abra el detalle de una cita para generar el PDF',
+                confirmButtonColor: '#0077b6'
+            });
+        }
+    } else {
+        Swal.fire({
+            icon: 'info',
+            title: 'Función en desarrollo',
+            text: `La exportación a ${formato.toUpperCase()} estará disponible próximamente`,
+            confirmButtonColor: '#0077b6'
+        });
+    }
+}
+/**
+ * Generar PDF de la cita - MÉTODO NUEVO
+ */
+generarPDFCita(idCita) {
+    if (!idCita) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'ID de cita no válido',
+            confirmButtonColor: '#ef476f'
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: 'Generando PDF...',
+        text: 'Por favor espere mientras se genera el documento',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Crear enlace de descarga
+    const url = `../../controladores/PacientesControlador/GenerarPDFCita.php?accion=generar_pdf&id_cita=${idCita}`;
+    
+    // Crear iframe para descarga (mejor método)
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    
+    // Limpiar iframe después de un tiempo
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+        
+        Swal.fire({
+            icon: 'success',
+            title: 'PDF Generado',
+            text: 'El documento se ha descargado correctamente',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    }, 3000);
+}
+   /**
+ * Cargar estadísticas del paciente - CON DEBUG
  */
 async cargarEstadisticas() {
     try {
+        console.log('Iniciando carga de estadísticas...'); // Debug
+        
         const response = await $.ajax({
             url: '../../controladores/PacientesControlador/PacientesController.php',
             method: 'POST',
@@ -667,10 +850,14 @@ async cargarEstadisticas() {
             dataType: 'json'
         });
         
+        console.log('Respuesta completa de estadísticas:', response); // Debug
+        
         if (response.success) {
             this.renderizarEstadisticas(response.data.estadisticas);
             // Comentado temporalmente hasta implementar el widget
             // this.renderizarEspecialidadesWidget(response.data.especialidades_visitadas);
+        } else {
+            console.error('Error en respuesta de estadísticas:', response.error);
         }
         
     } catch (error) {
@@ -767,11 +954,13 @@ async cargarEstadisticas() {
         container.html(html);
     }
     
-    /**
- * Renderizar estadísticas - CORREGIDO
+/**
+ * Renderizar estadísticas - CORREGIDO CON DEBUG
  */
 renderizarEstadisticas(stats) {
-    // Actualizar contadores
+    console.log('Estadísticas recibidas:', stats); // Debug
+    
+    // Actualizar contadores con validación
     $('#totalCitas').text(stats.total_citas || 0);
     $('#citasCompletadas').text(stats.citas_completadas || 0);
     $('#citasPendientes').text(stats.citas_pendientes || 0);
@@ -786,7 +975,10 @@ renderizarEstadisticas(stats) {
     this.actualizarBarraProgreso('#progressCompletadas', stats.porcentaje_completadas || 0);
     this.actualizarBarraProgreso('#progressPendientes', stats.porcentaje_pendientes || 0);
     this.actualizarBarraProgreso('#progressVirtuales', stats.porcentaje_virtuales || 0);
+    
+    console.log('Estadísticas renderizadas correctamente');
 }
+
 
     
     // ===== MÉTODOS AUXILIARES =====
@@ -1551,6 +1743,9 @@ getTemplateEstadoEspecifico(cita) {
 /**
  * Template detalle completo de cita - ADAPTADO SEGÚN ESTADO
  */
+/**
+ * Template detalle completo de cita - MÉTODO COMPLETO CON PDF
+ */
 getTemplateDetalleCita(cita) {
     return `
         <div class="detalle-cita-container">
@@ -1568,10 +1763,14 @@ getTemplateDetalleCita(cita) {
                         </p>
                     </div>
                     <div class="col-md-4 text-end">
-                        <div class="status-badges">
+                        <div class="status-badges mb-2">
                             ${this.getEstadoBadge(cita.estado)}
                             ${this.getTipoBadge(cita.tipo_cita)}
                         </div>
+                        <button class="btn btn-danger btn-sm" onclick="window.consultaCitasApp.generarPDFCita(${cita.id_cita})">
+                            <i class="bi bi-file-earmark-pdf me-1"></i>
+                            PDF
+                        </button>
                         <div class="mt-2">
                             ${this.getEstadoDescripcion(cita.estado)}
                         </div>
@@ -1718,12 +1917,11 @@ getTemplateDetalleCita(cita) {
                 </div>
             </div>
 
-            <!-- Información del Triaje (disponible para cualquier estado si existe) -->
+            <!-- Información del Triaje -->
             ${cita.id_triage ? this.getTemplateTriaje(cita) : this.getTemplateNoTriaje(cita.estado)}
 
-            <!-- Consultas Médicas (solo si existen) -->
+            <!-- Consultas Médicas -->
             ${cita.consultas && cita.consultas.length > 0 ? this.getTemplateConsultas(cita.consultas) : this.getTemplateNoConsultas(cita.estado)}
-
 
             <!-- Estado específico de la cita -->
             ${this.getTemplateEstadoEspecifico(cita)}
@@ -1732,9 +1930,13 @@ getTemplateDetalleCita(cita) {
             <div class="acciones-detalle mt-4 pt-3 border-top">
                 <div class="row">
                     <div class="col-md-6">
+                        <button class="btn btn-danger me-2" onclick="window.consultaCitasApp.generarPDFCita(${cita.id_cita})">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>
+                            Descargar PDF Completo
+                        </button>
                         <button class="btn btn-outline-primary" onclick="window.print()">
                             <i class="bi bi-printer me-2"></i>
-                            Imprimir Detalle
+                            Imprimir
                         </button>
                     </div>
                     <div class="col-md-6 text-end">
@@ -1872,18 +2074,7 @@ getTemplateDetalleCita(cita) {
        });
    }
    
-   /**
-    * Exportar datos (placeholder)
-    */
-   exportarDatos(formato) {
-       // Esta funcionalidad se puede implementar en el backend
-       Swal.fire({
-           icon: 'info',
-           title: 'Función en desarrollo',
-           text: `La exportación a ${formato.toUpperCase()} estará disponible próximamente`,
-           confirmButtonColor: '#0077b6'
-       });
-   }
+   
 }
 
 // ===== CSS ADICIONAL PARA ANIMACIONES =====
