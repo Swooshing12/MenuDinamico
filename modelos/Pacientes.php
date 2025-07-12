@@ -498,6 +498,8 @@ class Pacientes {
             throw new Exception("Error al verificar eliminación");
         }
     }
+
+
     /**
  * Obtener paciente por ID de usuario (método alias para consistencia)
  * Este método es usado para determinar el tipo de dashboard
