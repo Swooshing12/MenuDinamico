@@ -545,34 +545,33 @@ function abrirModalConsulta(idCita) {
     modalConsulta.show();
 }
 
-// ===== GUARDAR CONSULTA =====
 function guardarConsulta() {
-    console.log('💾 Iniciando guardado de consulta...');
-    
-    const form = $('#formConsulta')[0];
-    const formData = new FormData(form);
-    formData.append('action', 'crearConsulta');
-    
-    // Validar campos requeridos
-    const motivo = formData.get('motivo_consulta');
-    const diagnostico = formData.get('diagnostico');
-    
-    if (!motivo || !motivo.trim()) {
-        mostrarError('El motivo de consulta es requerido');
-        $('textarea[name="motivo_consulta"]').focus();
+    const form = document.getElementById('formConsulta');
+    if (!form) {
+        console.error('❌ Formulario no encontrado');
         return;
     }
     
-    if (!diagnostico || !diagnostico.trim()) {
-        mostrarError('El diagnóstico es requerido');
-        $('textarea[name="diagnostico"]').focus();
+    const formData = new FormData(form);
+    formData.append('action', 'crearConsulta');
+    formData.append('submenu_id', config.submenuId);
+    
+    // 🔥 IMPORTANTE: Capturar el ID de la cita antes del envío
+    const id_cita = formData.get('id_cita');
+    
+    if (!id_cita) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo identificar la cita. Por favor, intente nuevamente.'
+        });
         return;
     }
     
     // Mostrar loading
     Swal.fire({
         title: 'Guardando consulta...',
-        text: 'Por favor espere...',
+        text: 'Por favor espere',
         allowOutsideClick: false,
         allowEscapeKey: false,
         showConfirmButton: false,
@@ -583,49 +582,329 @@ function guardarConsulta() {
     
     $.ajax({
         url: config.baseUrl,
-        method: 'POST',
+        type: 'POST',
         data: formData,
         processData: false,
         contentType: false,
         dataType: 'json',
         success: function(response) {
-            console.log('💾 Respuesta guardar consulta:', response);
-            
-            Swal.close();
+            console.log('✅ Respuesta guardar consulta:', response);
             
             if (response.success) {
+                Swal.close();
+                
+                // 🔥 MOSTRAR MENSAJE DE ÉXITO CON BOTÓN CORREGIDO
+                const mensajePDF = response.pdf_enviado ? 
+                    '<span class="text-success">✅ PDF enviado automáticamente al correo del paciente.</span>' :
+                    '<span class="text-warning">⚠️ Error al enviar PDF automáticamente.</span>';
+                
                 Swal.fire({
                     icon: 'success',
-                    title: '¡Consulta registrada!',
-                    text: response.message,
-                    timer: 2000,
-                    showConfirmButton: false
+                    title: '¡Consulta Guardada Exitosamente!',
+                    html: `
+                        <div class="text-center">
+                            <p class="mb-3"><strong>${response.message}</strong></p>
+                            <div class="alert alert-info mb-3">
+                                ${mensajePDF}
+                            </div>
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button class="btn btn-danger btn-sm" onclick="generarPDFConsulta(${id_cita})" type="button">
+                                    <i class="bi bi-file-pdf me-1"></i>Descargar PDF
+                                </button>
+                                <button class="btn btn-primary btn-sm" onclick="imprimirConsulta(${id_cita})" type="button">
+                                    <i class="bi bi-printer me-1"></i>Imprimir
+                                </button>
+                            </div>
+                        </div>
+                    `,
+                    confirmButtonText: 'Continuar',
+                    confirmButtonColor: '#198754',
+                    width: '500px'
                 }).then(() => {
-                    modalConsulta.hide();
-                    cargarCitasConTriaje();
-                    cargarEstadisticas();
-                    citaSeleccionada = null;
-                    $('#infoPaciente').html(crearMensajeVacio('info', 'Selecciona un paciente para ver su información'));
-                    $('#historialPaciente').html(crearMensajeVacio('info', 'Selecciona un paciente para ver su historial'));
+                    // Cerrar modal y recargar datos
+                    if (modalConsulta) {
+                        modalConsulta.hide();
+                    }
+                    cargarCitasDelDia();
                 });
+                
             } else {
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: response.message
+                    text: response.message || 'Error al guardar la consulta'
                 });
             }
         },
         error: function(xhr, status, error) {
-            console.error('❌ Error guardando consulta:', error);
-            Swal.close();
+            console.error('❌ Error AJAX guardar consulta:', error);
+            console.error('❌ Respuesta del servidor:', xhr.responseText);
+            
             Swal.fire({
                 icon: 'error',
                 title: 'Error de conexión',
-                text: 'No se pudo guardar la consulta. Por favor, intente nuevamente.'
+                text: 'Error al comunicarse con el servidor: ' + error
             });
         }
     });
+}
+
+// 🔥 NUEVA FUNCIÓN: Generar PDF desde consultas médicas
+function generarPDFConsulta(id_cita) {
+    if (!id_cita) {
+        console.error('❌ ID de cita no válido');
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'ID de cita no válido'
+        });
+        return;
+    }
+    
+    console.log('📄 Generando PDF para cita:', id_cita);
+    
+    // Mostrar loading
+    Swal.fire({
+        title: 'Generando PDF...',
+        text: 'Por favor espere mientras se genera el documento',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // 🔥 USAR LA RUTA CORRECTA PARA CONSULTAS MÉDICAS
+    const url = `${config.baseUrl}?action=generarPDFConsulta&id_cita=${id_cita}`;
+    
+    // Crear iframe oculto para la descarga
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    
+    // Simular tiempo de generación y cerrar loading
+    setTimeout(() => {
+        Swal.close();
+        // Limpiar iframe después de un tiempo
+        setTimeout(() => {
+            if (iframe.parentNode) {
+                iframe.parentNode.removeChild(iframe);
+            }
+        }, 2000);
+    }, 1500);
+}
+
+// 🔥 NUEVA FUNCIÓN: Imprimir consulta
+function imprimirConsulta(id_cita) {
+    if (!id_cita) {
+        console.error('❌ ID de cita no válido');
+        return;
+    }
+    
+    console.log('🖨️ Imprimiendo consulta:', id_cita);
+    
+    // Por ahora, redirigir al PDF para imprimir
+    const url = `${config.baseUrl}?action=generarPDFConsulta&id_cita=${id_cita}`;
+    window.open(url, '_blank');
+}
+// 🔥 NUEVA FUNCIÓN: Mostrar modal de resumen
+function mostrarModalResumen(id_cita) {
+    // Obtener datos completos de la consulta
+    $.ajax({
+        url: config.baseUrl,
+        type: 'GET',
+        data: {
+            action: 'obtenerDatosConsultaCompleta',
+            id_cita: id_cita
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                const datos = response.data;
+                
+                // Crear el modal dinámicamente
+                const modalHTML = crearModalResumen(datos);
+                
+                // Agregar al DOM
+                $('body').append(modalHTML);
+                
+                // Mostrar modal
+                const modal = new bootstrap.Modal(document.getElementById('modalResumenConsulta'));
+                modal.show();
+                
+                // Limpiar modal al cerrar
+                $('#modalResumenConsulta').on('hidden.bs.modal', function() {
+                    $(this).remove();
+                });
+                
+            } else {
+                console.error('❌ Error obteniendo datos:', response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error AJAX obtener datos:', error);
+        }
+    });
+}
+
+// 🔥 NUEVA FUNCIÓN: Crear HTML del modal de resumen
+function crearModalResumen(datos) {
+    const fechaCita = new Date(datos.fecha_hora).toLocaleString('es-ES');
+    const fechaConsulta = datos.fecha_consulta ? new Date(datos.fecha_consulta).toLocaleString('es-ES') : 'No registrada';
+    
+    return `
+    <div class="modal fade" id="modalResumenConsulta" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-check-circle me-2"></i>
+                        Consulta Completada - Cita #${datos.id_cita}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Información del Paciente -->
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0"><i class="bi bi-person me-2"></i>Información del Paciente</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Nombre:</strong> ${datos.nombres_paciente} ${datos.apellidos_paciente}</p>
+                                    <p><strong>Cédula:</strong> ${datos.cedula_paciente}</p>
+                                    <p><strong>Correo:</strong> ${datos.correo_paciente || 'No disponible'}</p>
+                                    <p><strong>Tipo de Sangre:</strong> ${datos.tipo_sangre || 'No especificado'}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Información de la Cita -->
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="bi bi-calendar me-2"></i>Información de la Cita</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Fecha/Hora:</strong> ${fechaCita}</p>
+                                    <p><strong>Especialidad:</strong> ${datos.nombre_especialidad}</p>
+                                    <p><strong>Sucursal:</strong> ${datos.nombre_sucursal}</p>
+                                    <p><strong>Estado:</strong> <span class="badge bg-success">${datos.estado}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Triaje -->
+                        ${datos.nivel_urgencia ? `
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="bi bi-clipboard-pulse me-2"></i>Triaje</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Temperatura:</strong> ${datos.temperatura || '-'}°C</p>
+                                    <p><strong>Presión:</strong> ${datos.presion_arterial || '-'}</p>
+                                    <p><strong>Peso:</strong> ${datos.peso || '-'} kg</p>
+                                    <p><strong>Urgencia:</strong> ${datos.nivel_urgencia}/5</p>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Consulta Médica -->
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Consulta Médica</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Fecha Consulta:</strong> ${fechaConsulta}</p>
+                                    <p><strong>Motivo:</strong> ${datos.motivo_consulta || '-'}</p>
+                                    <p><strong>Diagnóstico:</strong> ${datos.diagnostico || '-'}</p>
+                                    <p><strong>Tratamiento:</strong> ${datos.tratamiento || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Observaciones -->
+                    ${datos.consulta_observaciones ? `
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-chat-text me-2"></i>Observaciones</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>${datos.consulta_observaciones}</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="modal-footer">
+                    <div class="alert alert-success flex-grow-1 mb-0 me-3">
+                        <i class="bi bi-envelope-check me-2"></i>
+                        <strong>PDF enviado automáticamente</strong> al correo del paciente.
+                    </div>
+                    
+                    <button type="button" class="btn btn-danger" onclick="generarPDFModal(${datos.id_cita})">
+                        <i class="bi bi-file-pdf me-1"></i>Descargar PDF
+                    </button>
+                    
+                    <button type="button" class="btn btn-primary" onclick="imprimirResumen()">
+                        <i class="bi bi-printer me-1"></i>Imprimir
+                    </button>
+                    
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// 🔥 NUEVA FUNCIÓN: Generar PDF desde modal
+function generarPDFModal(id_cita) {
+    window.open(`../../controladores/PacientesControlador/GenerarPDFCita.php?accion=generar_pdf&id_cita=${id_cita}`, '_blank');
+}
+
+// 🔥 NUEVA FUNCIÓN: Imprimir resumen
+function imprimirResumen() {
+    const contenido = document.getElementById('modalResumenConsulta').querySelector('.modal-body').innerHTML;
+    
+    const ventanaImpresion = window.open('', '_blank');
+    ventanaImpresion.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Resumen de Consulta</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { padding: 20px; }
+                @media print {
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <h2 class="text-center mb-4">🏥 MediSys - Resumen de Consulta</h2>
+            ${contenido}
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                        window.close();
+                    }, 500);
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
 }
 
 // ===== FUNCIONES AUXILIARES =====

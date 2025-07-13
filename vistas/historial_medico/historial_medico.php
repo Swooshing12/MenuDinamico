@@ -98,10 +98,7 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
                                     <i class="bi bi-person-badge me-2"></i>
                                     Información del Paciente
                                 </h5>
-                                <button class="btn btn-sm btn-outline-light" id="btnEditarPaciente">
-                                    <i class="bi bi-pencil me-1"></i>
-                                    Editar
-                                </button>
+                 
                             </div>
                         </div>
                         <div class="card-body">
@@ -327,14 +324,6 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x-lg me-1"></i>
                     Cerrar
-                </button>
-                <button type="button" class="btn btn-primary" id="btnImprimirDetalle">
-                    <i class="bi bi-printer me-1"></i>
-                    Imprimir
-                </button>
-                <button type="button" class="btn btn-info" id="btnCompartirDetalle">
-                    <i class="bi bi-share me-1"></i>
-                    Compartir
                 </button>
             </div>
         </div>

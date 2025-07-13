@@ -31,530 +31,585 @@ require_once "../helpers/permisos.php"; // Protección de sesión
     <?php include "../navbars/sidebar.php"; ?>
 
     <!-- Contenido principal -->
-    <main class="dashboard-container">
-        <div class="container-fluid p-4">
-            <!-- Header Hero Section -->
-            <div class="hero-header" data-aos="fade-down">
-                <div class="hero-content">
-                    <div class="hero-text">
-                        <h1 class="hero-title">
-                            <i class="bi bi-heart-pulse me-3"></i>
-                            Centro de Salud Digital
+<main class="dashboard-container">
+    <div class="container-fluid p-4">
+        <!-- Header Hero Section Rediseñado -->
+        <div class="hero-header-clinic" data-aos="fade-down">
+            <div class="hero-overlay"></div>
+            <div class="hero-content-clinic">
+                <div class="welcome-section">
+                    <div class="welcome-icon">
+                        <i class="bi bi-hospital-fill"></i>
+                    </div>
+                    <div class="welcome-text">
+                        <h1 class="clinic-title">
+                            <span class="clinic-name">MediSys</span>
+                            <span class="clinic-subtitle">Centro Médico de Excelencia</span>
                         </h1>
-                        <p class="hero-subtitle">
+                        <p class="welcome-message">
                             Bienvenido/a, <span class="user-name"><?php echo $_SESSION["username"]; ?></span>
                         </p>
-                        <p class="hero-description">
-                            Transformando la atención médica con tecnología de vanguardia
+                        <p class="clinic-tagline">
+                            "Cuidando tu salud con tecnología de vanguardia y el mejor equipo médico"
                         </p>
                     </div>
-                    <div class="hero-stats">
-                        <div class="stat-item">
-                            <div class="stat-number" id="pacientesTotal">1,247</div>
-                            <div class="stat-label">Pacientes Atendidos</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number" id="satisfaccion">98%</div>
-                            <div class="stat-label">Satisfacción</div>
-                        </div>
-                    </div>
                 </div>
-                <div class="hero-visual">
-                    <div class="medical-icon-grid">
-                        <div class="floating-icon" style="--delay: 0s;">
-                            <i class="bi bi-heart-pulse"></i>
-                        </div>
-                        <div class="floating-icon" style="--delay: 1s;">
-                            <i class="bi bi-activity"></i>
-                        </div>
-                        <div class="floating-icon" style="--delay: 2s;">
-                            <i class="bi bi-shield-check"></i>
-                        </div>
-                        <div class="floating-icon" style="--delay: 3s;">
-                            <i class="bi bi-hospital"></i>
-                        </div>
+                
+                <div class="clinic-stats-hero">
+                    <div class="stat-hero-item">
+                        <div class="stat-hero-number">15+</div>
+                        <div class="stat-hero-label">Años de Experiencia</div>
+                    </div>
+                    <div class="stat-hero-item">
+                        <div class="stat-hero-number">25K+</div>
+                        <div class="stat-hero-label">Pacientes Satisfechos</div>
+                    </div>
+                    <div class="stat-hero-item">
+                        <div class="stat-hero-number">98%</div>
+                        <div class="stat-hero-label">Índice de Satisfacción</div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Tarjetas de estadísticas métricas -->
-            <div class="metrics-section" data-aos="fade-up" data-aos-delay="200">
-                <div class="row g-4">
-                    <div class="col-md-6 col-xl-3">
-                        <div class="metric-card" data-metric="patients">
-                            <div class="metric-icon">
-                                <i class="bi bi-people-fill"></i>
-                            </div>
-                            <div class="metric-content">
-                                <div class="metric-header">
-                                    <h3 class="metric-number" id="pacientesHoy">127</h3>
-                                    <div class="metric-trend positive">
-                                        <i class="bi bi-arrow-up"></i>
-                                        <span>+12%</span>
-                                    </div>
-                                </div>
-                                <p class="metric-label">Pacientes Hoy</p>
-                                <div class="metric-progress">
-                                    <div class="progress-bar" style="width: 78%;"></div>
-                                </div>
-                            </div>
+        <!-- Sección Sobre Nosotros -->
+        <div class="about-clinic-section" data-aos="fade-up" data-aos-delay="200">
+            <div class="row g-5 align-items-center">
+                <div class="col-lg-6">
+                    <div class="about-content">
+                        <div class="section-badge">
+                            <i class="bi bi-award me-2"></i>
+                            Certificados y Acreditados
                         </div>
-                    </div>
-
-                    <div class="col-md-6 col-xl-3">
-                        <div class="metric-card" data-metric="appointments">
-                            <div class="metric-icon">
-                                <i class="bi bi-calendar-event"></i>
-                            </div>
-                            <div class="metric-content">
-                                <div class="metric-header">
-                                    <h3 class="metric-number" id="citasPendientes">43</h3>
-                                    <div class="metric-trend neutral">
-                                        <i class="bi bi-dash"></i>
-                                        <span>0%</span>
-                                    </div>
+                        <h2 class="section-title">
+                            Líder en Atención Médica
+                            <span class="title-highlight">Integral</span>
+                        </h2>
+                        <p class="section-description">
+                            En MediSys, nos dedicamos a proporcionar atención médica de la más alta calidad, 
+                            combinando experiencia médica excepcional con tecnología de vanguardia para 
+                            garantizar el mejor cuidado para nuestros pacientes.
+                        </p>
+                        
+                        <div class="features-list">
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="bi bi-shield-check"></i>
                                 </div>
-                                <p class="metric-label">Citas Pendientes</p>
-                                <div class="metric-progress">
-                                    <div class="progress-bar" style="width: 65%;"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 col-xl-3">
-                        <div class="metric-card" data-metric="doctors">
-                            <div class="metric-icon">
-                                <i class="bi bi-person-hearts"></i>
-                            </div>
-                            <div class="metric-content">
-                                <div class="metric-header">
-                                    <h3 class="metric-number" id="medicosActivos">18</h3>
-                                    <div class="metric-trend positive">
-                                        <i class="bi bi-arrow-up"></i>
-                                        <span>+2</span>
-                                    </div>
-                                </div>
-                                <p class="metric-label">Médicos Activos</p>
-                                <div class="metric-progress">
-                                    <div class="progress-bar" style="width: 90%;"></div>
+                                <div class="feature-text">
+                                    <h6>Atención 24/7</h6>
+                                    <p>Servicios de emergencia disponibles las 24 horas del día</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 col-xl-3">
-                        <div class="metric-card" data-metric="revenue">
-                            <div class="metric-icon">
-                                <i class="bi bi-graph-up-arrow"></i>
-                            </div>
-                            <div class="metric-content">
-                                <div class="metric-header">
-                                    <h3 class="metric-number" id="ingresosHoy">$5,280</h3>
-                                    <div class="metric-trend positive">
-                                        <i class="bi bi-arrow-up"></i>
-                                        <span>+8%</span>
-                                    </div>
+                            
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="bi bi-people-fill"></i>
                                 </div>
-                                <p class="metric-label">Ingresos Hoy</p>
-                                <div class="metric-progress">
-                                    <div class="progress-bar" style="width: 85%;"></div>
+                                <div class="feature-text">
+                                    <h6>Equipo Especializado</h6>
+                                    <p>Médicos certificados en más de 15 especialidades</p>
+                                </div>
+                            </div>
+                            
+                            <div class="feature-item">
+                                <div class="feature-icon">
+                                    <i class="bi bi-cpu"></i>
+                                </div>
+                                <div class="feature-text">
+                                    <h6>Tecnología Avanzada</h6>
+                                    <p>Equipos médicos de última generación para diagnósticos precisos</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Sección de contenido principal -->
-            <div class="main-content-section" data-aos="fade-up" data-aos-delay="400">
-                <div class="row g-4">
-                    <!-- Panel de actividad reciente -->
-                    <div class="col-lg-8">
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h5 class="card-title">
-                                    <i class="bi bi-activity me-2"></i>
-                                    Actividad en Tiempo Real
-                                </h5>
-                                <div class="card-actions">
-                                    <button class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-arrow-clockwise"></i>
-                                    </button>
-                                </div>
+                
+                <div class="col-lg-6">
+                    <div class="about-visual">
+                        <div class="medical-grid">
+                            <div class="medical-card card-1" data-aos="zoom-in" data-aos-delay="300">
+                                <i class="bi bi-heart-pulse-fill"></i>
+                                <span>Cardiología</span>
                             </div>
-                            <div class="card-body">
-                                <div class="activity-chart-container">
-                                    <canvas id="activityChart"></canvas>
-                                </div>
+                            <div class="medical-card card-2" data-aos="zoom-in" data-aos-delay="400">
+                                <i class="bi bi-brain"></i>
+                                <span>Neurología</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Panel de citas próximas -->
-                    <div class="col-lg-4">
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h5 class="card-title">
-                                    <i class="bi bi-calendar-check me-2"></i>
-                                    Próximas Citas
-                                </h5>
+                            <div class="medical-card card-3" data-aos="zoom-in" data-aos-delay="500">
+                                <i class="bi bi-eye-fill"></i>
+                                <span>Oftalmología</span>
                             </div>
-                            <div class="card-body p-0">
-                                <div class="appointments-list">
-                                    <div class="appointment-item">
-                                        <div class="appointment-time">09:30</div>
-                                        <div class="appointment-details">
-                                            <h6 class="patient-name">María González</h6>
-                                            <p class="doctor-name">Dr. Carlos Mendez</p>
-                                            <span class="specialty-tag">Cardiología</span>
-                                        </div>
-                                        <div class="appointment-status urgent">
-                                            <i class="bi bi-exclamation-circle"></i>
-                                        </div>
-                                    </div>
-
-                                    <div class="appointment-item">
-                                        <div class="appointment-time">10:00</div>
-                                        <div class="appointment-details">
-                                            <h6 class="patient-name">José Rodríguez</h6>
-                                            <p class="doctor-name">Dra. Ana Torres</p>
-                                            <span class="specialty-tag">Neurología</span>
-                                        </div>
-                                        <div class="appointment-status confirmed">
-                                            <i class="bi bi-check-circle"></i>
-                                        </div>
-                                    </div>
-
-                                    <div class="appointment-item">
-                                        <div class="appointment-time">10:30</div>
-                                        <div class="appointment-details">
-                                            <h6 class="patient-name">Laura Pérez</h6>
-                                            <p class="doctor-name">Dr. Miguel Ruiz</p>
-                                            <span class="specialty-tag">Pediatría</span>
-                                        </div>
-                                        <div class="appointment-status pending">
-                                            <i class="bi bi-clock"></i>
-                                        </div>
-                                    </div>
-
-                                    <div class="appointment-item">
-                                        <div class="appointment-time">11:00</div>
-                                        <div class="appointment-details">
-                                            <h6 class="patient-name">Carmen Silva</h6>
-                                            <p class="doctor-name">Dra. Patricia Vega</p>
-                                            <span class="specialty-tag">Ginecología</span>
-                                        </div>
-                                        <div class="appointment-status confirmed">
-                                            <i class="bi bi-check-circle"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="medical-card card-4" data-aos="zoom-in" data-aos-delay="600">
+                                <i class="bi bi-clipboard2-pulse"></i>
+                                <span>Medicina General</span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sección de especialidades y servicios -->
-            <div class="services-section" data-aos="fade-up" data-aos-delay="600">
-                <div class="row g-4">
-                    <div class="col-lg-6">
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h5 class="card-title">
-                                    <i class="bi bi-hospital me-2"></i>
-                                    Especialidades Médicas
-                                </h5>
+                            <div class="medical-card card-5" data-aos="zoom-in" data-aos-delay="700">
+                                <i class="bi bi-emoji-smile"></i>
+                                <span>Pediatría</span>
                             </div>
-                            <div class="card-body">
-                                <div class="specialties-grid">
-                                    <div class="specialty-item">
-                                        <div class="specialty-icon cardiology">
-                                            <i class="bi bi-heart-pulse"></i>
-                                        </div>
-                                        <div class="specialty-info">
-                                            <h6>Cardiología</h6>
-                                            <p>3 doctores • 24 pacientes hoy</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="specialty-item">
-                                        <div class="specialty-icon neurology">
-                                            <i class="bi bi-brain"></i>
-                                        </div>
-                                        <div class="specialty-info">
-                                            <h6>Neurología</h6>
-                                            <p>2 doctores • 18 pacientes hoy</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="specialty-item">
-                                        <div class="specialty-icon pediatrics">
-                                            <i class="bi bi-emoji-smile"></i>
-                                        </div>
-                                        <div class="specialty-info">
-                                            <h6>Pediatría</h6>
-                                            <p>4 doctores • 32 pacientes hoy</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="specialty-item">
-                                        <div class="specialty-icon general">
-                                            <i class="bi bi-clipboard2-pulse"></i>
-                                        </div>
-                                        <div class="specialty-info">
-                                            <h6>Medicina General</h6>
-                                            <p>6 doctores • 45 pacientes hoy</p>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="medical-card card-6" data-aos="zoom-in" data-aos-delay="800">
+                                <i class="bi bi-gender-female"></i>
+                                <span>Ginecología</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-lg-6">
-                        <div class="content-card">
-                            <div class="card-header">
-                                <h5 class="card-title">
-                                    <i class="bi bi-shield-plus me-2"></i>
-                                    Estado del Sistema
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="system-status">
-                                    <div class="status-item">
-                                        <div class="status-indicator online"></div>
-                                        <span>Sistema Principal</span>
-                                        <div class="status-value">Operativo</div>
-                                    </div>
-                                    
-                                    <div class="status-item">
-                                        <div class="status-indicator online"></div>
-                                        <span>Base de Datos</span>
-                                        <div class="status-value">Estable</div>
-                                    </div>
-                                    
-                                    <div class="status-item">
-                                        <div class="status-indicator warning"></div>
-                                        <span>Respaldos</span>
-                                        <div class="status-value">En Proceso</div>
-                                    </div>
-                                    
-                                    <div class="status-item">
-                                        <div class="status-indicator online"></div>
-                                        <span>Red</span>
-                                        <div class="status-value">Excelente</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Accesos rápidos -->
-            <div class="quick-actions-section" data-aos="fade-up" data-aos-delay="800">
-                <div class="content-card">
-                    <div class="card-header">
-                        <h5 class="card-title">
-                            <i class="bi bi-lightning me-2"></i>
-                            Accesos Rápidos
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="quick-actions-grid">
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-person-plus"></i>
-                                </div>
-                                <span>Nuevo Paciente</span>
-                            </a>
-
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-calendar-plus"></i>
-                                </div>
-                                <span>Agendar Cita</span>
-                            </a>
-
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-file-medical"></i>
-                                </div>
-                                <span>Historial Médico</span>
-                            </a>
-
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-prescription2"></i>
-                                </div>
-                                <span>Recetas</span>
-                            </a>
-
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-graph-up"></i>
-                                </div>
-                                <span>Reportes</span>
-                            </a>
-
-                            <a href="#" class="quick-action-item">
-                                <div class="action-icon">
-                                    <i class="bi bi-gear"></i>
-                                </div>
-                                <span>Configuración</span>
-                            </a>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </main>
 
+        <!-- Sección de Servicios -->
+        <div class="services-showcase" data-aos="fade-up" data-aos-delay="400">
+            <div class="text-center mb-5">
+                <div class="section-badge mx-auto">
+                    <i class="bi bi-hospital me-2"></i>
+                    Nuestros Servicios
+                </div>
+                <h2 class="section-title">
+                    Atención Médica <span class="title-highlight">Completa</span>
+                </h2>
+                <p class="section-subtitle">
+                    Ofrecemos una amplia gama de servicios médicos para cuidar tu salud y la de tu familia
+                </p>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="500">
+                        <div class="service-icon emergency">
+                            <i class="bi bi-truck"></i>
+                        </div>
+                        <h5 class="service-title">Urgencias</h5>
+                        <p class="service-description">
+                            Atención médica inmediata las 24 horas del día con personal 
+                            especializado en emergencias médicas.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">24/7</span>
+                            <span class="feature-tag">Ambulancia</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="600">
+                        <div class="service-icon consultation">
+                            <i class="bi bi-camera-video"></i>
+                        </div>
+                        <h5 class="service-title">Telemedicina</h5>
+                        <p class="service-description">
+                            Consultas médicas virtuales desde la comodidad de tu hogar 
+                            con nuestros especialistas certificados.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">Virtual</span>
+                            <span class="feature-tag">Seguro</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="700">
+                        <div class="service-icon laboratory">
+                            <i class="bi bi-clipboard2-data"></i>
+                        </div>
+                        <h5 class="service-title">Laboratorio</h5>
+                        <p class="service-description">
+                            Análisis clínicos completos con tecnología de última generación 
+                            y resultados en tiempo record.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">Rápido</span>
+                            <span class="feature-tag">Preciso</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="800">
+                        <div class="service-icon surgery">
+                            <i class="bi bi-scissors"></i>
+                        </div>
+                        <h5 class="service-title">Cirugía</h5>
+                        <p class="service-description">
+                            Procedimientos quirúrgicos con tecnología mínimamente invasiva 
+                            y los más altos estándares de seguridad.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">Seguro</span>
+                            <span class="feature-tag">Moderno</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="900">
+                        <div class="service-icon imaging">
+                            <i class="bi bi-x-diamond"></i>
+                        </div>
+                        <h5 class="service-title">Imagenología</h5>
+                        <p class="service-description">
+                            Rayos X, tomografías, resonancias magnéticas y ecografías 
+                            con equipos de última generación.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">HD</span>
+                            <span class="feature-tag">3D</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="service-card" data-aos="flip-left" data-aos-delay="1000">
+                        <div class="service-icon pharmacy">
+                            <i class="bi bi-capsule"></i>
+                        </div>
+                        <h5 class="service-title">Farmacia</h5>
+                        <p class="service-description">
+                            Medicamentos originales y genéricos con asesoría farmacéutica 
+                            profesional y entregas a domicilio.
+                        </p>
+                        <div class="service-features">
+                            <span class="feature-tag">Delivery</span>
+                            <span class="feature-tag">Asesoría</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Instalaciones -->
+        <div class="facilities-section" data-aos="fade-up" data-aos-delay="600">
+            <div class="row g-0">
+                <div class="col-lg-6">
+                    <div class="facilities-content">
+                        <div class="section-badge">
+                            <i class="bi bi-building me-2"></i>
+                            Nuestras Instalaciones
+                        </div>
+                        <h2 class="section-title">
+                            Espacios Diseñados para
+                            <span class="title-highlight">tu Bienestar</span>
+                        </h2>
+                        <p class="section-description">
+                            Contamos con instalaciones modernas y cómodas, diseñadas pensando 
+                            en la experiencia del paciente y equipadas con la tecnología médica más avanzada.
+                        </p>
+                        
+                        <div class="facilities-list">
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>50 Consultorios especializados</span>
+                            </div>
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>8 Quirófanos de última generación</span>
+                            </div>
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Unidad de Cuidados Intensivos</span>
+                            </div>
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Laboratorio certificado ISO</span>
+                            </div>
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Cafetería y áreas de descanso</span>
+                            </div>
+                            <div class="facility-item">
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>Estacionamiento gratuito</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="facilities-visual">
+                        <div class="facility-highlight">
+                            <div class="facility-image">
+                                <div class="image-placeholder">
+                                    <i class="bi bi-hospital"></i>
+                                    <span>Instalaciones Modernas</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Contacto y Ubicación -->
+        <div class="contact-section" data-aos="fade-up" data-aos-delay="800">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="contact-card">
+                        <div class="contact-header">
+                            <h3 class="contact-title">
+                                <i class="bi bi-geo-alt-fill me-2"></i>
+                                Visítanos
+                            </h3>
+                            <p class="contact-subtitle">Estamos ubicados en el corazón de la ciudad</p>
+                        </div>
+                        
+                        <div class="map-container">
+                            <div class="map-placeholder">
+                                <i class="bi bi-map"></i>
+                                <h5>Nuestra Ubicación</h5>
+                                <p>Av. Principal 123, Centro Médico<br>Quito, Ecuador</p>
+                                <button class="btn btn-primary">
+                                    <i class="bi bi-navigation me-2"></i>
+                                    Cómo llegar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="contact-info-card">
+                        <h4 class="contact-info-title">
+                            <i class="bi bi-telephone-fill me-2"></i>
+                            Contáctanos
+                        </h4>
+                        
+                        <div class="contact-methods">
+                            <div class="contact-method">
+                                <div class="method-icon emergency-contact">
+                                    <i class="bi bi-phone-vibrate"></i>
+                                </div>
+                                <div class="method-info">
+                                    <h6>Emergencias</h6>
+                                    <p>911 / (02) 2-911-911</p>
+                                    <span class="availability">24 horas</span>
+                                </div>
+                            </div>
+                            
+                            <div class="contact-method">
+                                <div class="method-icon general-contact">
+                                    <i class="bi bi-telephone"></i>
+                                </div>
+                                <div class="method-info">
+                                    <h6>Citas y Consultas</h6>
+                                    <p>(02) 2-456-789</p>
+                                    <span class="availability">Lun - Dom: 6:00 - 22:00</span>
+                                </div>
+                            </div>
+                            
+                            <div class="contact-method">
+                                <div class="method-icon email-contact">
+                                    <i class="bi bi-envelope"></i>
+                                </div>
+                                <div class="method-info">
+                                    <h6>Correo Electrónico</h6>
+                                    <p>info@medisys.com</p>
+                                    <span class="availability">Respuesta en 2 horas</span>
+                                </div>
+                            </div>
+                            
+                            <div class="contact-method">
+                                <div class="method-icon whatsapp-contact">
+                                    <i class="bi bi-whatsapp"></i>
+                                </div>
+                                <div class="method-info">
+                                    <h6>WhatsApp</h6>
+                                    <p>+593 99 123 4567</p>
+                                    <span class="availability">Chat directo</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
     <!-- Scripts -->
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    
-    <!-- Script personalizado -->
     <script>
-    $(document).ready(function() {
-        // Inicializar AOS (animaciones)
-        AOS.init({
-            duration: 800,
-            easing: 'ease-out',
-            once: true
-        });
-
-        // Inicializar dashboard
-        initializeDashboard();
-        
-        // Animaciones de contadores
-        animateCounters();
-        
-        // Gráfico de actividad
-        initializeActivityChart();
-        
-        // Actualizar cada 30 segundos
-        setInterval(updateRealTimeData, 30000);
+$(document).ready(function() {
+    // Inicializar AOS (animaciones)
+    AOS.init({
+        duration: 800,
+        easing: 'ease-out',
+        once: true,
+        offset: 100
     });
+
+    // Inicializar efectos del dashboard
+    initializeClinicDashboard();
     
-    function initializeDashboard() {
-        console.log('🏥 Dashboard médico inicializado');
+    // Animaciones de entrada
+    setTimeout(() => {
+        $('.content-loading').addClass('content-loaded');
+    }, 300);
+    
+    // Efectos de parallax suave
+    initializeParallaxEffects();
+    
+    // Efectos hover mejorados
+    initializeHoverEffects();
+});
+
+function initializeClinicDashboard() {
+    console.log('🏥 Dashboard Clínica MediSys inicializado');
+    
+    // Animación de contador en stats hero
+    animateHeroCounters();
+    
+    // Efectos de typing en el tagline
+    initializeTypingEffect();
+}
+
+function animateHeroCounters() {
+    $('.stat-hero-number').each(function() {
+        const $this = $(this);
+        const finalText = $this.text();
+        const isPercentage = finalText.includes('%');
+        const isPlus = finalText.includes('+');
+        const numericValue = parseInt(finalText.replace(/[^0-9]/g, ''));
         
-        // Simular datos en tiempo real
-        updateMetrics();
-    }
+        $this.text('0');
+        
+        $({ countNum: 0 }).animate({
+            countNum: numericValue
+        }, {
+            duration: 2500,
+            easing: 'swing',
+            step: function() {
+                const current = Math.floor(this.countNum);
+                let displayText = current.toLocaleString();
+                
+                if (isPercentage) displayText += '%';
+                if (isPlus && current > 0) displayText += '+';
+                
+                $this.text(displayText);
+            },
+            complete: function() {
+                $this.text(finalText);
+            }
+        });
+    });
+}
+
+function initializeTypingEffect() {
+    const tagline = $('.clinic-tagline');
+    const text = tagline.text();
+    tagline.text('');
     
-    function animateCounters() {
-        $('.metric-number').each(function() {
-            const $this = $(this);
-            const countTo = parseInt($this.text().replace(/[^0-9]/g, ''));
-            
-            $({ countNum: 0 }).animate({
-                countNum: countTo
-            }, {
-                duration: 2000,
-                easing: 'swing',
-                step: function() {
-                    const num = Math.floor(this.countNum);
-                    if ($this.text().includes('$')) {
-                        $this.text('$' + num.toLocaleString());
-                    } else {
-                        $this.text(num.toLocaleString());
-                    }
-                },
-                complete: function() {
-                    if ($this.text().includes('$')) {
-                        $this.text('$' + countTo.toLocaleString());
-                    } else {
-                        $this.text(countTo.toLocaleString());
-                    }
+    setTimeout(() => {
+        let i = 0;
+        const typeInterval = setInterval(() => {
+            tagline.text(text.slice(0, i));
+            i++;
+            if (i > text.length) {
+                clearInterval(typeInterval);
+            }
+        }, 50);
+    }, 1000);
+}
+
+function initializeParallaxEffects() {
+    $(window).scroll(function() {
+        const scrollTop = $(this).scrollTop();
+        const windowHeight = $(this).height();
+        
+        // Parallax suave en el hero
+        $('.hero-overlay').css({
+            'transform': `translateY(${scrollTop * 0.3}px)`
+        });
+        
+        // Fade out del hero
+        const heroOpacity = Math.max(0, 1 - scrollTop / windowHeight);
+        $('.hero-header-clinic').css('opacity', heroOpacity);
+    });
+}
+
+function initializeHoverEffects() {
+    // Efecto hover en service cards
+    $('.service-card').hover(
+        function() {
+            $(this).find('.service-icon').addClass('animate__animated animate__pulse');
+        },
+        function() {
+            $(this).find('.service-icon').removeClass('animate__animated animate__pulse');
+        }
+    );
+    
+    // Efecto hover en medical cards
+    $('.medical-card').hover(
+        function() {
+            $(this).siblings().css('opacity', '0.7');
+        },
+        function() {
+            $(this).siblings().css('opacity', '1');
+        }
+    );
+    
+    // Efecto click en contact methods
+    $('.contact-method').click(function() {
+        const method = $(this);
+        method.addClass('animate__animated animate__heartBeat');
+        
+        setTimeout(() => {
+            method.removeClass('animate__animated animate__heartBeat');
+        }, 1000);
+    });
+}
+
+// Funciones adicionales para interactividad
+function showNotification(message, type = 'info') {
+    const notification = $(`
+        <div class="notification notification-${type}">
+            <i class="bi bi-info-circle me-2"></i>
+            ${message}
+        </div>
+    `);
+    
+    $('body').append(notification);
+    
+    setTimeout(() => {
+        notification.addClass('show');
+    }, 100);
+    
+    setTimeout(() => {
+        notification.removeClass('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Smooth scroll para navegación interna
+$('a[href^="#"]').click(function(e) {
+    e.preventDefault();
+    const target = $($(this).attr('href'));
+    if (target.length) {
+        $('html, body').animate({
+            scrollTop: target.offset().top - 80
+        }, 800);
+    }
+});
+
+// Lazy loading para imágenes (si las agregas después)
+function initializeLazyLoading() {
+    if ('IntersectionObserver' in window) {
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    img.src = img.dataset.src;
+                    img.classList.remove('lazy');
+                    imageObserver.unobserve(img);
                 }
             });
         });
-    }
-    
-    function initializeActivityChart() {
-        const ctx = document.getElementById('activityChart').getContext('2d');
         
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['6:00', '8:00', '10:00', '12:00', '14:00', '16:00', '18:00'],
-                datasets: [{
-                    label: 'Pacientes por Hora',
-                    data: [5, 12, 28, 35, 42, 38, 25],
-                    borderColor: '#2e7d32',
-                    backgroundColor: 'rgba(46, 125, 50, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: '#2e7d32',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0,0,0,0.05)'
-                        }
-                    }
-                },
-                elements: {
-                    point: {
-                        hoverRadius: 8
-                    }
-                }
-            }
+        document.querySelectorAll('img[data-src]').forEach(img => {
+            imageObserver.observe(img);
         });
     }
-    
-    function updateMetrics() {
-        // Simular actualización de métricas
-        const metrics = {
-            patients: Math.floor(Math.random() * 50) + 100,
-            appointments: Math.floor(Math.random() * 20) + 30,
-            doctors: 18,
-            revenue: Math.floor(Math.random() * 2000) + 4000
-        };
-        
-        // Actualizar valores (opcional)
-        // $('#pacientesHoy').text(metrics.patients);
-        // $('#citasPendientes').text(metrics.appointments);
-        // $('#ingresosHoy').text('$' + metrics.revenue.toLocaleString());
-    }
-    
-    function updateRealTimeData() {
-        // Actualizar datos en tiempo real
-        console.log('📊 Actualizando datos en tiempo real...');
-        updateMetrics();
-    }
-    
-    // Efectos hover para las tarjetas métricas
-    $('.metric-card').hover(
-        function() {
-            $(this).addClass('hovered');
-        },
-        function() {
-            $(this).removeClass('hovered');
-        }
-    );
-    </script>
+}
+</script>
 </body>
 </html>

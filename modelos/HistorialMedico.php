@@ -9,40 +9,70 @@ class HistorialMedico {
     }
     
     /**
-     * 🔍 Buscar paciente por cédula y obtener información básica
-     */
-    public function buscarPacientePorCedula($cedula) {
-        try {
-            $query = "SELECT 
-                        p.id_paciente,
-                        u.nombres,
-                        u.apellidos,
-                        u.cedula,
-                        u.correo,
-                        u.sexo,
-                        u.nacionalidad,
-                        p.fecha_nacimiento,
-                        p.tipo_sangre,
-                        p.alergias,
-                        p.antecedentes_medicos,
-                        p.contacto_emergencia,
-                        p.telefono_emergencia,
-                        p.telefono,
-                        TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) as edad
-                     FROM pacientes p
-                     INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
-                     WHERE u.cedula = :cedula";
+ * 🔍 Buscar paciente por cédula y obtener información básica
+ */
+public function buscarPacientePorCedula($cedula) {
+    try {
+        $query = "SELECT 
+                    p.id_paciente,
+                    u.nombres,
+                    u.apellidos,
+                    u.cedula,
+                    u.correo,
+                    u.sexo,
+                    u.nacionalidad,
+                    u.fecha_creacion as fecha_registro,
+                    p.fecha_nacimiento,
+                    p.tipo_sangre,
+                    p.alergias,
+                    p.antecedentes_medicos,
+                    p.contacto_emergencia,
+                    p.telefono_emergencia,
+                    p.telefono,
+                    p.numero_seguro,
+                    TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) as edad,
+                    CASE 
+                        WHEN u.sexo = 'M' THEN 'Masculino'
+                        WHEN u.sexo = 'F' THEN 'Femenino'
+                        ELSE 'No especificado'
+                    END as genero_texto
+                 FROM pacientes p
+                 INNER JOIN usuarios u ON p.id_usuario = u.id_usuario
+                 WHERE u.cedula = :cedula AND u.id_estado = 1";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':cedula' => $cedula]);
+        
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Agregar información adicional calculada
+        if ($resultado) {
+            // Formatear fechas
+            if ($resultado['fecha_nacimiento']) {
+                $resultado['fecha_nacimiento_formateada'] = date('d/m/Y', strtotime($resultado['fecha_nacimiento']));
+            }
             
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute([':cedula' => $cedula]);
+            if ($resultado['fecha_registro']) {
+                $resultado['fecha_registro_formateada'] = date('d/m/Y', strtotime($resultado['fecha_registro']));
+            }
             
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-            
-        } catch (PDOException $e) {
-            error_log("Error buscando paciente por cédula: " . $e->getMessage());
-            throw new Exception("Error al buscar el paciente");
+            // Limpiar datos nulos
+            $resultado['telefono'] = $resultado['telefono'] ?: 'No especificado';
+            $resultado['tipo_sangre'] = $resultado['tipo_sangre'] ?: 'No especificado';
+            $resultado['alergias'] = $resultado['alergias'] ?: 'Ninguna registrada';
+            $resultado['contacto_emergencia'] = $resultado['contacto_emergencia'] ?: 'No registrado';
+            $resultado['telefono_emergencia'] = $resultado['telefono_emergencia'] ?: 'No registrado';
+            $resultado['antecedentes_medicos'] = $resultado['antecedentes_medicos'] ?: 'Ninguno registrado';
+            $resultado['numero_seguro'] = $resultado['numero_seguro'] ?: 'No registrado';
         }
+        
+        return $resultado;
+        
+    } catch (PDOException $e) {
+        error_log("Error buscando paciente por cédula: " . $e->getMessage());
+        throw new Exception("Error al buscar el paciente");
     }
+}
     
     /**
      * 📋 Obtener historial médico completo del paciente con filtros
