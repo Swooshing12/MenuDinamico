@@ -1031,3 +1031,631 @@ body.sidebar-collapsed .main-content {
         min-height: 30px;
     }
 }
+
+.status-indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.calendario-container {
+    min-height: 600px;
+    position: relative;
+}
+
+.agenda-doctor {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.btn-group .btn.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: white;
+}
+
+/* Mejoras responsive */
+@media (max-width: 768px) {
+    .calendario-container {
+        min-height: 400px;
+    }
+    
+    .btn-group .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .d-flex.flex-wrap > * {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Animaciones suaves */
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.btn {
+    transition: all 0.2s ease;
+}
+
+/* ===== MEJORAS ESPECÍFICAS PARA EVENTOS DEL CALENDARIO ===== */
+
+/* Contenedor del día en el calendario */
+.fc-daygrid-day-frame {
+  position: relative;
+  min-height: 120px !important;
+}
+
+.fc-daygrid-day-events {
+  margin: 2px !important;
+  min-height: 100px !important;
+}
+
+/* Mejoras para múltiples eventos en un día */
+.fc-daygrid-day-event {
+  margin: 1px 2px !important;
+  border-radius: 4px !important;
+}
+
+/* Diseño mejorado para eventos individuales */
+.fc-event {
+  border: none !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  padding: 2px 6px !important;
+  margin: 1px 0 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+  overflow: hidden !important;
+  position: relative !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Efectos hover para eventos */
+.fc-event:hover {
+  transform: scale(1.02) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+  z-index: 10 !important;
+}
+
+/* Estados específicos con mejor visibilidad */
+.fc-event.estado-pendiente {
+  background: linear-gradient(135deg, #fff3cd, #ffc107) !important;
+  color: #856404 !important;
+  border-left: 3px solid #ff8f00 !important;
+}
+
+.fc-event.estado-confirmada {
+  background: linear-gradient(135deg, #d1edcc, #28a745) !important;
+  color: #155724 !important;
+  border-left: 3px solid #2e7d32 !important;
+}
+
+.fc-event.estado-completada {
+  background: linear-gradient(135deg, #cce7f0, #17a2b8) !important;
+  color: #0c5460 !important;
+  border-left: 3px solid #0097a7 !important;
+}
+
+.fc-event.estado-cancelada {
+  background: linear-gradient(135deg, #f8d7da, #dc3545) !important;
+  color: #721c24 !important;
+  border-left: 3px solid #c62828 !important;
+  opacity: 0.85 !important;
+  text-decoration: line-through !important;
+}
+
+/* Indicador de tipo de cita */
+.fc-event.tipo-virtual::after {
+  content: '💻';
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+}
+
+.fc-event.tipo-presencial::after {
+  content: '🏢';
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+}
+
+/* Manejo de múltiples citas en un día */
+.fc-daygrid-day-events {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Contador de citas adicionales */
+.fc-daygrid-more-link {
+  background: rgba(25, 118, 210, 0.1) !important;
+  color: #1976d2 !important;
+  border: 1px solid rgba(25, 118, 210, 0.3) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  margin: 1px 2px !important;
+  text-align: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.fc-daygrid-more-link:hover {
+  background: rgba(25, 118, 210, 0.2) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Mejoras para la vista semanal y diaria */
+.fc-timegrid-event {
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+  border-left: 4px solid !important;
+  font-size: 12px !important;
+}
+
+/* Tooltip personalizado para eventos */
+.fc-event[title] {
+  position: relative;
+}
+
+/* Responsive para eventos en móviles */
+@media (max-width: 768px) {
+  .fc-event {
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+  }
+  
+  .fc-daygrid-day-frame {
+    min-height: 80px !important;
+  }
+  
+  .fc-daygrid-day-events {
+    min-height: 60px !important;
+  }
+}
+
+/* ===== POPOVER MEJORADO PARA MÚLTIPLES CITAS ===== */
+.fc-popover {
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+  background: white !important;
+  max-width: 300px !important;
+}
+
+.fc-popover-header {
+  background: linear-gradient(135deg, #1976d2, #1565c0) !important;
+  color: white !important;
+  border-radius: 12px 12px 0 0 !important;
+  padding: 12px 16px !important;
+  font-weight: 600 !important;
+}
+
+.fc-popover-body {
+  padding: 8px !important;
+  max-height: 250px !important;
+  overflow-y: auto !important;
+}
+
+.fc-popover .fc-event {
+  margin: 4px 0 !important;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+}
+
+/* ===== ESTILOS PARA INDICADORES DE PRIORIDAD ===== */
+.fc-event.prioridad-alta::before {
+  content: '🚨';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+}
+
+.fc-event.prioridad-media::before {
+  content: '⚠️';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+}
+
+/* Animación sutil para eventos nuevos */
+@keyframes newEventPulse {
+  0% { 
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(25, 118, 210, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 118, 210, 0);
+  }
+}
+
+.fc-event.evento-nuevo {
+  animation: newEventPulse 2s infinite;
+}
+/* ===== ESTILOS PARA MODAL DETALLE DE CITA ===== */
+#modalDetalleCita .modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+#headerDetalleCita {
+  background: linear-gradient(135deg, #1976d2, #1565c0);
+  position: relative;
+}
+
+#headerDetalleCita::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23pattern)"/></svg>');
+  opacity: 0.3;
+}
+
+/* Estados específicos del header */
+#headerDetalleCita.estado-pendiente {
+  background: linear-gradient(135deg, #ffa726, #ff8f00);
+}
+
+#headerDetalleCita.estado-confirmada {
+  background: linear-gradient(135deg, #66bb6a, #4caf50);
+}
+
+#headerDetalleCita.estado-completada {
+  background: linear-gradient(135deg, #26c6da, #00bcd4);
+}
+
+#headerDetalleCita.estado-cancelada {
+  background: linear-gradient(135deg, #ef5350, #f44336);
+}
+
+/* Cards internos del modal */
+#modalDetalleCita .card {
+  transition: transform 0.2s ease;
+}
+
+#modalDetalleCita .card:hover {
+  transform: translateY(-2px);
+}
+
+/* Badges dinámicos */
+#badgeEstadoCita.estado-pendiente {
+  background: rgba(255, 193, 7, 0.9) !important;
+  color: #212529 !important;
+}
+
+#badgeEstadoCita.estado-confirmada {
+  background: rgba(40, 167, 69, 0.9) !important;
+  color: white !important;
+}
+
+#badgeEstadoCita.estado-completada {
+  background: rgba(23, 162, 184, 0.9) !important;
+  color: white !important;
+}
+
+#badgeEstadoCita.estado-cancelada {
+  background: rgba(220, 53, 69, 0.9) !important;
+  color: white !important;
+}
+
+/* Animación de entrada */
+#modalDetalleCita.show .modal-content {
+  animation: modalSlideIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+/* ===== ESTILOS PARA MODAL VER CITA - ESTRUCTURA FIJA ===== */
+
+/* Contenedor principal */
+#modalVerCita .modal-content {
+  border-radius: 16px !important;
+  overflow: hidden;
+}
+
+/* Header del paciente */
+.patient-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-left: 4px solid #007bff;
+}
+
+.patient-avatar {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.patient-info-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+/* Cards de detalle */
+.detail-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.detail-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.detail-card-header {
+  background: linear-gradient(135deg, #f8f9fa, #ffffff);
+  padding: 12px 16px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+}
+
+.detail-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  color: white;
+  font-size: 14px;
+}
+
+.detail-title {
+  margin: 0;
+  font-weight: 600;
+  color: #495057;
+  font-size: 14px;
+}
+
+.detail-card-body {
+  padding: 16px;
+}
+
+.detail-row {
+  margin-bottom: 12px;
+}
+
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dotted #dee2e6;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  color: #6c757d;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: #212529;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: right;
+  margin-left: 8px;
+}
+
+/* Contenido especial */
+.motivo-content, .observaciones-content {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #ffc107;
+  display: flex;
+  align-items: flex-start;
+}
+
+.observaciones-content {
+  border-left-color: #6c757d;
+}
+
+/* Estados del header */
+#headerVerCita.estado-pendiente {
+  background: linear-gradient(135deg, #ffc107, #ffb300);
+}
+
+#headerVerCita.estado-confirmada {
+  background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+#headerVerCita.estado-completada {
+  background: linear-gradient(135deg, #17a2b8, #20c997);
+}
+
+#headerVerCita.estado-cancelada {
+  background: linear-gradient(135deg, #dc3545, #fd7e14);
+}
+
+/* Badge de estado */
+#badgeEstadoVerCita {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-size: 11px !important;
+}
+
+/* Botones mejorados */
+#modalVerCita .btn {
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border-width: 2px;
+}
+
+#modalVerCita .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .detail-value {
+    text-align: left;
+    margin-left: 0;
+  }
+  
+  .patient-info-item {
+    justify-content: flex-start;
+  }
+  
+  #modalVerCita .modal-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  #modalVerCita .modal-footer .d-flex:last-child {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+/* Loading mejorado */
+#loadingVerCita {
+  background: rgba(248, 249, 250, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+/* Animación de entrada */
+#modalVerCita.show .modal-content {
+  animation: modalBounceIn 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+@keyframes modalBounceIn {
+  0% {
+    transform: scale3d(0.8, 0.8, 0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale3d(1.05, 1.05, 1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale3d(1, 1, 1);
+    opacity: 1;
+  }
+}
+
+/* ===== OPTIMIZAR ESPACIADO EN INFORMACIÓN DEL PACIENTE ===== */
+
+/* Reducir espaciado general del header del paciente */
+.patient-header {
+    padding: 20px 24px !important; /* Reducir padding */
+}
+
+/* Optimizar el grid de información del paciente */
+.patient-header .row.g-3 {
+    --bs-gutter-x: 0.5rem; /* Reducir espaciado entre columnas */
+    --bs-gutter-y: 0.25rem;
+}
+
+.patient-header .col-md-4 {
+    padding: 0 0.25rem; /* Reducir padding interno */
+    flex: 0 1 auto; /* Permitir que se ajusten al contenido */
+}
+
+/* Hacer más compactos los items de información */
+.patient-info-item {
+    display: flex;
+    align-items: center;
+    padding: 2px 0; /* Reducir padding vertical */
+    font-size: 12px; /* Reducir tamaño de fuente */
+    line-height: 1.2;
+}
+
+.patient-info-item i {
+    font-size: 14px; /* Iconos más pequeños */
+    margin-right: 6px; /* Menos margen */
+    width: 16px; /* Ancho fijo para alineación */
+    text-align: center;
+}
+
+.patient-info-item .text-muted {
+    font-size: 11px; /* Labels más pequeños */
+    margin-right: 4px;
+    font-weight: 500;
+}
+
+.patient-info-item .fw-semibold {
+    font-size: 12px; /* Valores más pequeños */
+    font-weight: 600;
+}
+
+
+
+/* Responsive: en móviles, stack verticalmente */
+@media (max-width: 768px) {
+    .patient-header .col-md-4 {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+    
+    .patient-info-compact {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}
+

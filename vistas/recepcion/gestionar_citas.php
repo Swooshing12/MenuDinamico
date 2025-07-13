@@ -136,63 +136,96 @@ if (!isset($sucursales)) {
 
     <div class="row">
         <!-- Filtros Lateral -->
-        <div class="col-md-3">
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Filtros</h6>
+<div class="col-md-3">
+    <!-- Panel de Filtros -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-primary text-white">
+            <h6 class="mb-0">
+                <i class="bi bi-funnel-fill me-2"></i>Filtros de Búsqueda
+            </h6>
+        </div>
+        <div class="card-body">
+            <form id="formFiltros">
+                <!-- Filtro por Sucursal -->
+                <div class="mb-3">
+                    <label for="filtroSucursal" class="form-label fw-semibold">
+                        <i class="bi bi-building me-1 text-primary"></i>Sucursal
+                    </label>
+                    <select class="form-select" id="filtroSucursal" name="sucursal">
+                        <option value="">📍 Todas las sucursales</option>
+                        <?php foreach($sucursales as $sucursal): ?>
+                        <option value="<?= $sucursal['id_sucursal'] ?>">
+                            <?= htmlspecialchars($sucursal['nombre_sucursal']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">Sucursal</label>
-                        <select class="form-select" id="filtroSucursal">
-                            <option value="">Todas</option>
-                            <?php foreach($sucursales as $sucursal): ?>
-                            <option value="<?= $sucursal['id_sucursal'] ?>">
-                                <?= htmlspecialchars($sucursal['nombre_sucursal']) ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tipo de Cita</label>
-                        <select class="form-select" id="filtroTipoCita">
-                            <option value="">Todos</option>
-                            <option value="1">Presencial</option>
-                            <option value="2">Virtual</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Especialidad</label>
-                        <select class="form-select" id="filtroEspecialidad">
-                            <option value="">Todas</option>
-                            <?php foreach($especialidades as $especialidad): ?>
-                            <option value="<?= $especialidad['id_especialidad'] ?>">
-                                <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Estado</label>
-                        <select class="form-select" id="filtroEstado">
-                            <option value="">Todos</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Confirmada">Confirmada</option>
-                            <option value="Completada">Completada</option>
-                            <option value="Cancelada">Cancelada</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Doctor</label>
-                        <select class="form-select" id="filtroDoctor">
-                            <option value="">Todos</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary w-100" id="btnAplicarFiltros">
+
+                <!-- Filtro por Tipo de Cita -->
+                <div class="mb-3">
+                    <label for="filtroTipoCita" class="form-label fw-semibold">
+                        <i class="bi bi-type me-1 text-success"></i>Tipo de Cita
+                    </label>
+                    <select class="form-select" id="filtroTipoCita" name="tipo_cita">
+                        <option value="">💊 Todos los tipos</option>
+                        <option value="presencial">🏢 Presencial</option>
+                        <option value="virtual">💻 Virtual</option>
+                    </select>
+                </div>
+
+                <!-- Filtro por Especialidad -->
+                <div class="mb-3">
+                    <label for="filtroEspecialidad" class="form-label fw-semibold">
+                        <i class="bi bi-heart-pulse me-1 text-info"></i>Especialidad
+                    </label>
+                    <select class="form-select" id="filtroEspecialidad" name="especialidad">
+                        <option value="">🏥 Todas las especialidades</option>
+                        <?php foreach($especialidades as $especialidad): ?>
+                        <option value="<?= $especialidad['id_especialidad'] ?>">
+                            <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Filtro por Estado -->
+                <div class="mb-3">
+                    <label for="filtroEstado" class="form-label fw-semibold">
+                        <i class="bi bi-check-circle me-1 text-warning"></i>Estado
+                    </label>
+                    <select class="form-select" id="filtroEstado" name="estado">
+                        <option value="">📋 Todos los estados</option>
+                        <option value="Pendiente">⏳ Pendiente</option>
+                        <option value="Confirmada">✅ Confirmada</option>
+                        <option value="Completada">🎯 Completada</option>
+                        <option value="Cancelada">❌ Cancelada</option>
+                    </select>
+                </div>
+
+                <!-- Filtro por Doctor -->
+                <div class="mb-3">
+                    <label for="filtroDoctor" class="form-label fw-semibold">
+                        <i class="bi bi-person-badge me-1 text-secondary"></i>Doctor
+                    </label>
+                    <select class="form-select" id="filtroDoctor" name="doctor">
+                        <option value="">👨‍⚕️ Todos los doctores</option>
+                        <!-- Se carga dinámicamente -->
+                    </select>
+                </div>
+
+                <!-- Botones de Control -->
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" id="btnAplicarFiltros">
                         <i class="bi bi-search me-1"></i>Aplicar Filtros
                     </button>
+                    <button type="button" class="btn btn-outline-secondary" id="btnLimpiarFiltros">
+                        <i class="bi bi-eraser me-1"></i>Limpiar Filtros
+                    </button>
                 </div>
-            </div>
+            </form>
+        </div>
+    </div>
+
 
             <!-- Leyenda de Estados -->
             <div class="card">
@@ -732,35 +765,317 @@ if (!isset($sucursales)) {
    </div>
 </div>
 
-<!-- Modal Ver/Editar Cita -->
+<!-- Modal Ver/Editar Cita - Versión Corregida y Estructurada -->
 <div class="modal fade" id="modalVerCita" tabindex="-1" aria-hidden="true">
-   <div class="modal-dialog modal-lg">
-       <div class="modal-content">
-           <div class="modal-header">
-               <h5 class="modal-title"><i class="bi bi-eye me-1"></i>Detalles de la Cita</h5>
-               <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-           </div>
-           <div class="modal-body" id="detallesCita">
-               <!-- Los detalles de la cita se cargarán aquí -->
-           </div>
-           <div class="modal-footer">
-               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-               <?php if($permisos['puede_editar']): ?>
-               <button type="button" class="btn btn-warning" id="btnEditarCita">
-                   <i class="bi bi-pencil me-1"></i>Editar
-               </button>
-               <button type="button" class="btn btn-success" id="btnConfirmarCita">
-                   <i class="bi bi-check-circle me-1"></i>Confirmar
-               </button>
-               <?php endif; ?>
-               <?php if($permisos['puede_eliminar']): ?>
-               <button type="button" class="btn btn-danger" id="btnCancelarCita">
-                   <i class="bi bi-x-circle me-1"></i>Cancelar
-               </button>
-               <?php endif; ?>
-           </div>
-       </div>
-   </div>
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <!-- Header dinámico con gradiente según estado -->
+            <div class="modal-header border-0 text-white position-relative overflow-hidden rounded-top-4" id="headerVerCita">
+                <div class="position-relative z-3 d-flex align-items-center w-100">
+                    <div class="flex-grow-1">
+                        <h5 class="modal-title fw-bold mb-1 d-flex align-items-center">
+                            <i class="bi bi-calendar-event me-2 fs-4"></i>
+                            Detalles de la Cita
+                        </h5>
+                        <small class="opacity-75 d-flex align-items-center">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Información completa de la cita médica
+                        </small>
+                    </div>
+                    
+                    <!-- Badge de estado flotante -->
+                    <div class="ms-3">
+                        <span class="badge fs-6 px-3 py-2 rounded-pill border border-white border-opacity-25" 
+                              id="badgeEstadoVerCita">
+                            <i class="bi bi-clock me-1"></i>
+                            <span id="textoEstadoCita">Estado</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <button type="button" class="btn-close btn-close-white position-relative z-3 ms-3" 
+                        data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                
+                <!-- Patrón de fondo médico -->
+                <div class="position-absolute top-0 start-0 w-100 h-100 opacity-10">
+                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <pattern id="medical-pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+                                <circle cx="20" cy="20" r="1" fill="white" opacity="0.3"/>
+                                <path d="M18 20h4M20 18v4" stroke="white" stroke-width="0.5" opacity="0.2"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#medical-pattern)"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Body estructurado -->
+            <div class="modal-body p-0">
+                <!-- Loading State -->
+                <div id="loadingVerCita" class="text-center py-5" style="display: none;">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Cargando detalles...</span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center text-muted">
+                        <i class="bi bi-hourglass-split me-2"></i>
+                        Cargando información de la cita...
+                    </div>
+                </div>
+                
+                <!-- Información del Paciente - Header -->
+                <div class="patient-header bg-gradient p-4 border-bottom">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div class="patient-avatar">
+                                <i class="bi bi-person-fill fs-2 text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-person-badge text-primary me-2 fs-5"></i>
+                                <h6 class="mb-0 fw-bold text-dark">Información del Paciente</h6>
+                            </div>
+                            <h4 class="mb-2 text-dark fw-bold" id="nombreCompletoPaciente">
+                                <i class="bi bi-person-heart me-2 text-success"></i>
+                                <span id="nombrePacienteDetalle">Cargando...</span>
+                            </h4>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="patient-info-item">
+                                        <i class="bi bi-credit-card-2-front text-info me-2"></i>
+                                        <span class="text-muted small">Cédula:</span>
+                                        <span class="fw-semibold ms-1" id="cedulaPacienteDetalle">---</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="patient-info-item">
+                                        <i class="bi bi-telephone text-success me-2"></i>
+                                        <span class="text-muted small">Teléfono:</span>
+                                        <span class="fw-semibold ms-1" id="telefonoPacienteDetalle">---</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="patient-info-item">
+                                        <i class="bi bi-envelope text-warning me-2"></i>
+                                        <span class="text-muted small">Email:</span>
+                                        <span class="fw-semibold ms-1" id="emailPacienteDetalle">---</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contenido Principal en Grid -->
+                <div class="modal-body-content p-4">
+                    <div class="row g-4">
+                        <!-- COLUMNA IZQUIERDA -->
+                        <div class="col-md-6">
+                            <!-- Fecha y Hora -->
+                            <div class="detail-card mb-4">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-calendar-check detail-icon bg-info"></i>
+                                    <h6 class="detail-title">Fecha y Horario</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-calendar3 text-primary me-2"></i>
+                                            <span class="detail-label">Fecha:</span>
+                                            <span class="detail-value" id="fechaCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-clock text-success me-2"></i>
+                                            <span class="detail-label">Hora:</span>
+                                            <span class="detail-value" id="horaCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-hourglass-split text-warning me-2"></i>
+                                            <span class="detail-label">Duración:</span>
+                                            <span class="detail-value" id="duracionCitaDetalle">30 minutos</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Ubicación -->
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-geo-alt-fill detail-icon bg-primary"></i>
+                                    <h6 class="detail-title">Ubicación</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-building text-primary me-2"></i>
+                                            <span class="detail-label">Sucursal:</span>
+                                            <span class="detail-value" id="sucursalCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-door-open text-info me-2"></i>
+                                            <span class="detail-label">Consultorio:</span>
+                                            <span class="detail-value" id="consultorioCitaDetalle">Por asignar</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-pin-map text-danger me-2"></i>
+                                            <span class="detail-label">Dirección:</span>
+                                            <span class="detail-value" id="direccionSucursalDetalle">---</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- COLUMNA DERECHA -->
+                        <div class="col-md-6">
+                            <!-- Información Médica -->
+                            <div class="detail-card mb-4">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-heart-pulse-fill detail-icon bg-success"></i>
+                                    <h6 class="detail-title">Información Médica</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-person-badge text-success me-2"></i>
+                                            <span class="detail-label">Doctor:</span>
+                                            <span class="detail-value" id="doctorCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-hospital text-info me-2"></i>
+                                            <span class="detail-label">Especialidad:</span>
+                                            <span class="detail-value" id="especialidadCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-laptop text-primary me-2" id="iconTipoCita"></i>
+                                            <span class="detail-label">Tipo:</span>
+                                            <span class="detail-value" id="tipoCitaDetalle">---</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Estado y Control -->
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-activity detail-icon bg-warning"></i>
+                                    <h6 class="detail-title">Estado y Control</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <span class="detail-label">Estado:</span>
+                                            <span class="detail-value" id="estadoActualCita">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-calendar-plus text-info me-2"></i>
+                                            <span class="detail-label">Registrada:</span>
+                                            <span class="detail-value" id="fechaRegistroCita">---</span>
+                                        </div>
+                                    </div>
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <i class="bi bi-person-check text-primary me-2"></i>
+                                            <span class="detail-label">Registrada por:</span>
+                                            <span class="detail-value" id="usuarioRegistroCita">Sistema</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Motivo - Ancho completo -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-chat-text-fill detail-icon bg-warning"></i>
+                                    <h6 class="detail-title">Motivo de la Consulta</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="motivo-content">
+                                        <i class="bi bi-quote text-muted me-2"></i>
+                                        <span id="motivoCitaDetalle" class="text-muted fst-italic">---</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Observaciones (condicional) -->
+                    <div class="row mt-3" id="contenedorObservacionesCita" style="display: none;">
+                        <div class="col-12">
+                            <div class="detail-card">
+                                <div class="detail-card-header">
+                                    <i class="bi bi-journal-text detail-icon bg-secondary"></i>
+                                    <h6 class="detail-title">Observaciones Adicionales</h6>
+                                </div>
+                                <div class="detail-card-body">
+                                    <div class="observaciones-content">
+                                        <i class="bi bi-pencil-square text-muted me-2"></i>
+                                        <span id="observacionesCitaDetalle" class="text-muted">---</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- El div original se mantiene oculto para compatibilidad -->
+                <div id="detallesCita" style="display: none;">
+                    <!-- Aquí se cargará el contenido dinámico como antes -->
+                </div>
+            </div>
+            
+            <!-- Footer con botones originales mejorados -->
+            <div class="modal-footer border-0 bg-light rounded-bottom-4 d-flex justify-content-between align-items-center p-4">
+                <!-- Información de registro -->
+                <div class="d-flex align-items-center text-muted small">
+                    <i class="bi bi-shield-check me-2 text-success"></i>
+                    <span>ID Cita: <span id="idCitaDetalle" class="fw-bold text-primary">#---</span></span>
+                </div>
+                
+                <!-- Botones de acción (originales mantenidos) -->
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cerrar
+                    </button>
+                    
+                    <?php if($permisos['puede_editar']): ?>
+                    <button type="button" class="btn btn-warning rounded-pill px-3" id="btnEditarCita">
+                        <i class="bi bi-pencil me-1"></i>Editar
+                    </button>
+                    <button type="button" class="btn btn-success rounded-pill px-3" id="btnConfirmarCita">
+                        <i class="bi bi-check-circle me-1"></i>Confirmar
+                    </button>
+                    <?php endif; ?>
+                    
+                    <?php if($permisos['puede_eliminar']): ?>
+                    <button type="button" class="btn btn-danger rounded-pill px-3" id="btnCancelarCita">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Registrar Paciente -->

@@ -150,87 +150,125 @@ public function actualizarEstado($id_cita, $nuevo_estado) {
     
     // ===== MÉTODOS DE CONSULTA ESPECÍFICOS =====
     
-    /**
-     * Obtener todas las citas con filtros opcionales
-     */
-    public function obtenerTodas($filtros = []) {
-        try {
-            $where_conditions = [];
-            $params = [];
-            
-            // Construir condiciones WHERE según filtros
-            if (!empty($filtros['estado'])) {
-                $where_conditions[] = "c.estado = :estado";
-                $params[':estado'] = $filtros['estado'];
-            }
-            
-            if (!empty($filtros['fecha_desde'])) {
-                $where_conditions[] = "DATE(c.fecha_hora) >= :fecha_desde";
-                $params[':fecha_desde'] = $filtros['fecha_desde'];
-            }
-            
-            if (!empty($filtros['fecha_hasta'])) {
-                $where_conditions[] = "DATE(c.fecha_hora) <= :fecha_hasta";
-                $params[':fecha_hasta'] = $filtros['fecha_hasta'];
-            }
-            
-            if (!empty($filtros['id_sucursal'])) {
-                $where_conditions[] = "c.id_sucursal = :id_sucursal";
-                $params[':id_sucursal'] = $filtros['id_sucursal'];
-            }
-            
-            if (!empty($filtros['id_doctor'])) {
-                $where_conditions[] = "c.id_doctor = :id_doctor";
-                $params[':id_doctor'] = $filtros['id_doctor'];
-            }
-            
-            if (!empty($filtros['id_tipo_cita'])) {
-                $where_conditions[] = "c.id_tipo_cita = :id_tipo_cita";
-                $params[':id_tipo_cita'] = $filtros['id_tipo_cita'];
-            }
-            
-            if (!empty($filtros['cedula_paciente'])) {
-                $where_conditions[] = "u_paciente.cedula LIKE :cedula";
-                $params[':cedula'] = '%' . $filtros['cedula_paciente'] . '%';
-            }
-            
-            $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-            
-            $query = "SELECT c.*, 
-                             p.nombres as paciente_nombres, p.apellidos as paciente_apellidos,
-                             u_paciente.cedula as paciente_cedula, u_paciente.correo as paciente_correo,
-                             d.nombres as doctor_nombres, d.apellidos as doctor_apellidos,
-                             e.nombre_especialidad,
-                             s.nombre_sucursal, s.direccion as sucursal_direccion,
-                             tc.nombre_tipo as tipo_cita_nombre, tc.descripcion as tipo_cita_descripcion,
-                             CASE 
-                                WHEN c.estado = 'Pendiente' THEN 'warning'
-                                WHEN c.estado = 'Confirmada' THEN 'success'
-                                WHEN c.estado = 'Completada' THEN 'info'
-                                WHEN c.estado = 'Cancelada' THEN 'danger'
-                                ELSE 'secondary'
-                             END as estado_badge
-                      FROM citas c
-                      INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
-                      INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
-                      INNER JOIN usuarios u_paciente ON pac.id_usuario = u_paciente.id_usuario
-                      INNER JOIN doctores doc ON c.id_doctor = doc.id_doctor
-                      INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
-                      INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
-                      INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
-                      INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
-                      $where_clause
-                      ORDER BY c.fecha_hora DESC";
-            
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($params);
-            
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error obteniendo citas: " . $e->getMessage());
-            throw new Exception("Error al obtener las citas");
+ /**
+ * Obtener todas las citas con filtros opcionales - VERSIÓN CORREGIDA
+ */
+public function obtenerTodas($filtros = []) {
+    try {
+        // DEBUG
+        error_log("=== DEBUG MODELO CITAS ===");
+        error_log("Filtros recibidos en modelo: " . json_encode($filtros));
+        
+        $where_conditions = [];
+        $params = [];
+        
+        // Construir condiciones WHERE según filtros
+        if (!empty($filtros['estado'])) {
+            $where_conditions[] = "c.estado = :estado";
+            $params[':estado'] = $filtros['estado'];
+            error_log("Agregando filtro estado: " . $filtros['estado']);
         }
+        
+        if (!empty($filtros['fecha_desde'])) {
+            $where_conditions[] = "DATE(c.fecha_hora) >= :fecha_desde";
+            $params[':fecha_desde'] = $filtros['fecha_desde'];
+            error_log("Agregando filtro fecha_desde: " . $filtros['fecha_desde']);
+        }
+        
+        if (!empty($filtros['fecha_hasta'])) {
+            $where_conditions[] = "DATE(c.fecha_hora) <= :fecha_hasta";
+            $params[':fecha_hasta'] = $filtros['fecha_hasta'];
+            error_log("Agregando filtro fecha_hasta: " . $filtros['fecha_hasta']);
+        }
+        
+        if (!empty($filtros['id_sucursal'])) {
+            $where_conditions[] = "c.id_sucursal = :id_sucursal";
+            $params[':id_sucursal'] = $filtros['id_sucursal'];
+            error_log("Agregando filtro id_sucursal: " . $filtros['id_sucursal']);
+        }
+        
+        if (!empty($filtros['id_doctor'])) {
+            $where_conditions[] = "c.id_doctor = :id_doctor";
+            $params[':id_doctor'] = $filtros['id_doctor'];
+            error_log("Agregando filtro id_doctor: " . $filtros['id_doctor']);
+        }
+        
+        if (!empty($filtros['id_especialidad'])) {
+            $where_conditions[] = "e.id_especialidad = :id_especialidad";
+            $params[':id_especialidad'] = $filtros['id_especialidad'];
+            error_log("Agregando filtro id_especialidad: " . $filtros['id_especialidad']);
+        }
+        
+        if (!empty($filtros['tipo_cita'])) {
+            if ($filtros['tipo_cita'] === 'presencial') {
+                $where_conditions[] = "c.tipo_cita = 'presencial'";
+                error_log("Agregando filtro tipo_cita: presencial");
+            } elseif ($filtros['tipo_cita'] === 'virtual') {
+                $where_conditions[] = "c.tipo_cita = 'virtual'";
+                error_log("Agregando filtro tipo_cita: virtual");
+            }
+        }
+        
+        if (!empty($filtros['cedula_paciente'])) {
+            $where_conditions[] = "u_paciente.cedula LIKE :cedula";
+            $params[':cedula'] = '%' . $filtros['cedula_paciente'] . '%';
+            error_log("Agregando filtro cedula_paciente: " . $filtros['cedula_paciente']);
+        }
+        
+        $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+        
+        error_log("WHERE clause: " . $where_clause);
+        error_log("Parámetros: " . json_encode($params));
+        
+        // Tu consulta existente...
+        $query = "SELECT c.*, 
+                         p.nombres as paciente_nombres, 
+                         p.apellidos as paciente_apellidos,
+                         u_paciente.cedula as paciente_cedula, 
+                         u_paciente.correo as paciente_correo,
+                         pac.telefono as paciente_telefono,
+                         d.nombres as doctor_nombres, 
+                         d.apellidos as doctor_apellidos,
+                         e.nombre_especialidad,
+                         s.nombre_sucursal, 
+                         s.direccion as sucursal_direccion,
+                         s.telefono as sucursal_telefono,
+                         s.email as sucursal_email,
+                         tc.nombre_tipo as tipo_cita_nombre, 
+                         tc.descripcion as tipo_cita_descripcion,
+                         CASE 
+                            WHEN c.estado = 'Pendiente' THEN 'warning'
+                            WHEN c.estado = 'Confirmada' THEN 'success'
+                            WHEN c.estado = 'Completada' THEN 'info'
+                            WHEN c.estado = 'Cancelada' THEN 'danger'
+                            ELSE 'secondary'
+                         END as estado_badge
+                  FROM citas c
+                  INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
+                  INNER JOIN usuarios p ON pac.id_usuario = p.id_usuario
+                  INNER JOIN usuarios u_paciente ON pac.id_usuario = u_paciente.id_usuario
+                  INNER JOIN doctores doc ON c.id_doctor = doc.id_doctor
+                  INNER JOIN usuarios d ON doc.id_usuario = d.id_usuario
+                  INNER JOIN especialidades e ON doc.id_especialidad = e.id_especialidad
+                  INNER JOIN sucursales s ON c.id_sucursal = s.id_sucursal
+                  INNER JOIN tipos_cita tc ON c.id_tipo_cita = tc.id_tipo_cita
+                  $where_clause
+                  ORDER BY c.fecha_hora DESC";
+        
+        error_log("Query final: " . $query);
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        
+        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Resultados obtenidos: " . count($resultados));
+        
+        return $resultados;
+    } catch (PDOException $e) {
+        error_log("Error SQL en obtenerTodas: " . $e->getMessage());
+        throw new Exception("Error al obtener las citas");
     }
+}
     
     /**
      * Obtener citas paginadas

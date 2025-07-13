@@ -43,6 +43,11 @@ let sucursalSeleccionada = window.sucursalSeleccionada;
 // ===== INICIALIZACIÓN =====
 $(document).ready(function() {
     console.log('🚀 Iniciando Sistema de Gestión de Citas con Wizard');
+
+    // Cargar doctores al inicializar
+    setTimeout(() => {
+        cargarTodosLosDoctores();
+    }, 1000);
     
     try {
         inicializarCalendario();
@@ -703,6 +708,7 @@ function mostrarTooltipCita(info) {
 }
 
 // ===== INICIALIZACIÓN DE EVENTOS =====
+// ===== INICIALIZACIÓN DE EVENTOS =====
 function inicializarEventos() {
     // Botones de vista del calendario
     $('#btnVistaDia').click(() => calendario.changeView('timeGridDay'));
@@ -717,9 +723,37 @@ function inicializarEventos() {
         $('#modalNuevaCita').modal('show');
     });
     
-    // Filtros
-    $('#btnAplicarFiltros').click(aplicarFiltros);
-    $('#filtroSucursal, #filtroTipoCita, #filtroEspecialidad, #filtroEstado, #filtroDoctor').change(aplicarFiltros);
+    // ===== FILTROS CORREGIDOS =====
+    // Botón aplicar filtros
+    $('#btnAplicarFiltros').click(function(e) {
+        e.preventDefault();
+        aplicarFiltros();
+    });
+    
+    // Botón limpiar filtros
+    $('#btnLimpiarFiltros').click(function(e) {
+        e.preventDefault();
+        limpiarFiltros();
+    });
+    
+    // Filtros que no dependen de otros
+    $('#filtroSucursal, #filtroTipoCita, #filtroEstado').change(function() {
+        console.log(`🔄 Cambió ${this.id}:`, $(this).val());
+        aplicarFiltros();
+    });
+    
+    // Especialidad: cuando cambia, actualiza doctores Y aplica filtros
+    $('#filtroEspecialidad').change(function() {
+        console.log('🏥 Especialidad seleccionada:', $(this).val());
+        cargarDoctoresPorEspecialidad();
+        // Los filtros se aplicarán automáticamente después de cargar los doctores
+    });
+    
+    // Doctor: cuando cambia, aplica filtros
+    $('#filtroDoctor').change(function() {
+        console.log('👨‍⚕️ Doctor seleccionado:', $(this).val());
+        aplicarFiltros();
+    });
     
     // Formulario búsqueda paciente
     $('#btnBuscarPaciente').click(buscarPaciente);
@@ -728,10 +762,24 @@ function inicializarEventos() {
     // Formulario registrar paciente
     $('#formRegistrarPaciente').submit(manejarSubmitRegistrarPaciente);
     
-    // Cascadas de selects
-    $('#sucursalCita').change(cargarEspecialidadesPorSucursal);
-    $('#especialidadCita').change(cargarDoctoresPorEspecialidad);
-    $('#doctorCita, #fechaCita').change(cargarHorariosDisponibles);
+    // ===== CASCADAS DE SELECTS EN MODAL NUEVA CITA =====
+    $('#sucursalCita').change(function() {
+        cargarEspecialidadesPorSucursal();
+        // Limpiar calendario cuando cambie sucursal
+        mostrarCalendarioVacio('Seleccione un doctor para ver los horarios disponibles');
+        slotSeleccionado = null;
+        $('#fechaCita, #horaCita, #fechaHoraCompleta').val('');
+    });
+    
+    $('#especialidadCita').change(function() {
+        cargarDoctoresPorEspecialidad(); // Esta es diferente a la de filtros
+    });
+    
+    $('#doctorCita').change(function() {
+        cargarCalendarioHorarios(); // En lugar de cargarHorariosDisponibles
+    });
+    
+    $('#fechaCita').change(cargarHorariosDisponibles);
     
     // Acciones de citas
     $('#btnEditarCita').click(editarCita);
@@ -742,28 +790,17 @@ function inicializarEventos() {
     $('#modalNuevaCita').on('hidden.bs.modal', limpiarWizard);
     $('#modalRegistrarPaciente').on('hidden.bs.modal', limpiarFormularioRegistrarPaciente);
     
-    // Navegación del calendario de horarios
-$('#btnSemanaAnterior').click(() => cambiarSemana(-1));
-$('#btnSemanaSiguiente').click(() => cambiarSemana(1));
-$('#btnSemanaActual').click(() => {
-    semanaActual = new Date();
-    if (doctorSeleccionado) {
-        cargarCalendarioHorarios();
-    }
-});
-
-// Actualizar cascadas para incluir calendario
-$('#doctorCita').change(function() {
-    cargarCalendarioHorarios(); // En lugar de cargarHorariosDisponibles
-});
-
-$('#sucursalCita').change(function() {
-    // Limpiar calendario cuando cambie sucursal
-    mostrarCalendarioVacio('Seleccione un doctor para ver los horarios disponibles');
-    slotSeleccionado = null;
-    $('#fechaCita, #horaCita, #fechaHoraCompleta').val('');
-});
-    console.log('🎯 Eventos inicializados');
+    // ===== NAVEGACIÓN DEL CALENDARIO DE HORARIOS =====
+    $('#btnSemanaAnterior').click(() => cambiarSemana(-1));
+    $('#btnSemanaSiguiente').click(() => cambiarSemana(1));
+    $('#btnSemanaActual').click(() => {
+        semanaActual = new Date();
+        if (doctorSeleccionado) {
+            cargarCalendarioHorarios();
+        }
+    });
+    
+    console.log('🎯 Eventos inicializados correctamente');
 }
 
 // ===== INICIALIZACIÓN DE SELECT2 =====
@@ -1013,59 +1050,91 @@ function cargarEspecialidadesPorSucursal() {
    });
 }
 
+// Función para cargar doctores dinámicamente cuando se selecciona una especialidad
 function cargarDoctoresPorEspecialidad() {
-   const idEspecialidad = $('#especialidadCita').val();
-   const idSucursal = $('#sucursalCita').val();
-   const $doctor = $('#doctorCita');
-   
-   if (!idEspecialidad || !idSucursal) {
-       $doctor.html('<option value="">Seleccione especialidad y sucursal</option>').prop('disabled', true);
-       return;
-   }
-   
-   $doctor.html('<option value="">Cargando doctores...</option>').prop('disabled', true);
-   
-   $.ajax({
-       url: config.baseUrl,
-       type: 'GET',
-       data: {
-           action: 'obtenerDoctoresPorEspecialidad',
-           id_especialidad: idEspecialidad,
-           id_sucursal: idSucursal,
-           submenu_id: config.submenuId
-       },
-       dataType: 'json',
-       success: function(response) {
-           if (response.success) {
-               let options = '<option value="">Seleccione doctor</option>';
-               response.data.forEach(doctor => {
-                   options += `<option value="${doctor.id_doctor}">
-                       Dr. ${doctor.nombres} ${doctor.apellidos}
-                   </option>`;
-               });
-               $doctor.html(options).prop('disabled', false);
-               
-               // Mostrar información de la especialidad
-               const especialidad = config.especialidades.find(e => e.id_especialidad == idEspecialidad);
-               if (especialidad) {
-                   $('#detallesEspecialidad').html(`
-                       <strong>${especialidad.nombre_especialidad}</strong><br>
-                       <small>${especialidad.descripcion || 'Especialidad médica'}</small>
-                   `);
-                   $('#infoEspecialidad').removeClass('d-none');
-               }
-               
-               console.log(`✅ Cargados ${response.data.length} doctores`);
-           } else {
-               $doctor.html('<option value="">No hay doctores disponibles</option>');
-               mostrarAdvertencia('No hay doctores disponibles para esta especialidad');
-           }
-       },
-       error: function(xhr, status, error) {
-           console.error('❌ Error cargando doctores:', error);
-           $doctor.html('<option value="">Error cargando doctores</option>');
-       }
-   });
+    const especialidadId = $('#filtroEspecialidad').val();
+    const doctorSelect = $('#filtroDoctor');
+    
+    console.log('🏥 Cargando doctores para especialidad:', especialidadId);
+    
+    // Limpiar opciones de doctores
+    doctorSelect.html('<option value="">👨‍⚕️ Todos los doctores</option>');
+    
+    if (!especialidadId) {
+        // Si no hay especialidad seleccionada, cargar todos los doctores
+        cargarTodosLosDoctores();
+        return;
+    }
+    
+    // Cargar doctores de la especialidad seleccionada
+    $.ajax({
+        url: config.baseUrl,
+        type: 'GET',
+        data: {
+            action: 'obtenerDoctoresPorEspecialidad',
+            id_especialidad: especialidadId,
+            submenu_id: config.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('Respuesta doctores por especialidad:', response);
+            
+            if (response.success && response.data && response.data.length > 0) {
+                response.data.forEach(doctor => {
+                    doctorSelect.append(`
+                        <option value="${doctor.id_doctor}">
+                            Dr. ${doctor.nombres} ${doctor.apellidos}
+                        </option>
+                    `);
+                });
+                console.log(`✅ Cargados ${response.data.length} doctores para especialidad ${especialidadId}`);
+            } else {
+                doctorSelect.append('<option value="" disabled>No hay doctores para esta especialidad</option>');
+                console.log('⚠️ No se encontraron doctores para la especialidad seleccionada');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error cargando doctores por especialidad:', error);
+            console.error('Respuesta del servidor:', xhr.responseText);
+        }
+    });
+}
+
+function cargarTodosLosDoctores() {
+    console.log('👨‍⚕️ Cargando todos los doctores...');
+    
+    $.ajax({
+        url: config.baseUrl,
+        type: 'GET',
+        data: {
+            action: 'obtenerDoctores',
+            submenu_id: config.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('Respuesta todos los doctores:', response);
+            
+            if (response.success && response.data) {
+                const doctorSelect = $('#filtroDoctor');
+                doctorSelect.html('<option value="">👨‍⚕️ Todos los doctores</option>');
+                
+                response.data.forEach(doctor => {
+                    doctorSelect.append(`
+                        <option value="${doctor.id_doctor}">
+                            Dr. ${doctor.nombres} ${doctor.apellidos} - ${doctor.especialidad || doctor.nombre_especialidad || ''}
+                        </option>
+                    `);
+                });
+                console.log(`✅ Cargados ${response.data.length} doctores`);
+            } else {
+                console.log('⚠️ No se encontraron doctores o respuesta inválida');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error cargando todos los doctores:', error);
+            console.error('Respuesta del servidor:', xhr.responseText);
+        }
+    });
 }
 
 // ===== GENERAR CALENDARIO SEMANAL =====
@@ -1468,86 +1537,212 @@ function cargarCalendarioHorarios() {
     });
 }
 
-// ===== MOSTRAR DETALLES DE CITA =====
+// ===== MOSTRAR DETALLES DE CITA - VERSIÓN CORREGIDA =====
 function mostrarDetallesCita(cita) {
-   const fecha = new Date(cita.fecha_hora);
-   const fechaFormateada = fecha.toLocaleDateString('es-ES', {
-       weekday: 'long',
-       year: 'numeric',
-       month: 'long',
-       day: 'numeric'
-   });
-   const horaFormateada = fecha.toLocaleTimeString('es-ES', {
-       hour: '2-digit',
-       minute: '2-digit'
-   });
-   
-   const estadoBadge = `<span class="badge bg-${obtenerColorBootstrap(cita.estado)}">${cita.estado}</span>`;
-   const tipoBadge = `<span class="badge bg-${cita.id_tipo_cita == 2 ? 'info' : 'primary'}">
-       <i class="bi ${cita.id_tipo_cita == 2 ? 'bi-camera-video' : 'bi-building'} me-1"></i>
-       ${cita.tipo_cita_nombre || (cita.id_tipo_cita == 2 ? 'Virtual' : 'Presencial')}
-   </span>`;
-   
-   let detallesHTML = `
-       <div class="row g-3">
-           <div class="col-md-6">
-               <h6><i class="bi bi-person me-2"></i>Información del Paciente</h6>
-               <p><strong>Nombre:</strong> ${cita.paciente_nombres} ${cita.paciente_apellidos}</p>
-               <p><strong>Cédula:</strong> ${cita.paciente_cedula}</p>
-               <p><strong>Correo:</strong> ${cita.paciente_correo || 'No registrado'}</p>
-           </div>
-           <div class="col-md-6">
-               <h6><i class="bi bi-person-badge me-2"></i>Información del Doctor</h6>
-               <p><strong>Doctor:</strong> ${cita.doctor_nombres} ${cita.doctor_apellidos}</p>
-               <p><strong>Especialidad:</strong> ${cita.nombre_especialidad}</p>
-               <p><strong>Sucursal:</strong> ${cita.nombre_sucursal}</p>
-           </div>
-           <div class="col-12">
-               <h6><i class="bi bi-calendar-event me-2"></i>Información de la Cita</h6>
-               <div class="row">
-                   <div class="col-md-3">
-                       <p><strong>Fecha:</strong> ${fechaFormateada}</p>
-                   </div>
-                   <div class="col-md-3">
-                       <p><strong>Hora:</strong> ${horaFormateada}</p>
-                   </div>
-                   <div class="col-md-3">
-                       <p><strong>Tipo:</strong> ${tipoBadge}</p>
-                   </div>
-                   <div class="col-md-3">
-                       <p><strong>Estado:</strong> ${estadoBadge}</p>
-                   </div>
-               </div>
-               <p><strong>Motivo:</strong> ${cita.motivo}</p>
-               ${cita.notas ? `<p><strong>Notas:</strong> ${cita.notas}</p>` : ''}
-           </div>
-   `;
-   
-   // Información adicional para citas virtuales
-   if (cita.id_tipo_cita == 2) {
-       detallesHTML += `
-           <div class="col-12">
-               <h6><i class="bi bi-camera-video me-2"></i>Información Virtual</h6>
-       `;
-       
-       if (cita.enlace_virtual) {
-           detallesHTML += `<p><strong>Enlace:</strong> <a href="${cita.enlace_virtual}" target="_blank">${cita.enlace_virtual}</a></p>`;
-       }
-       
-       if (cita.sala_virtual) {
-           detallesHTML += `<p><strong>ID de Sala:</strong> ${cita.sala_virtual}</p>`;
-       }
-       
-       detallesHTML += `</div>`;
-   }
-   
-   detallesHTML += `</div>`;
-   
-   $('#detallesCita').html(detallesHTML);
-   $('#modalVerCita').modal('show');
-   
-   // Configurar botones según estado
-   configurarBotonesCita(cita);
+    console.log('🔍 Mostrando detalles de cita:', cita); // Debug
+    
+    // Formatear fecha y hora
+    const fecha = new Date(cita.fecha_hora);
+    const fechaFormateada = fecha.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const horaFormateada = fecha.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // Mostrar loading primero
+    $('#loadingVerCita').show();
+    $('.modal-body-content').hide();
+    $('#detallesCita').hide();
+    
+    // Abrir el modal
+    $('#modalVerCita').modal('show');
+    
+    // Simular carga y luego mostrar datos
+    setTimeout(() => {
+        // Ocultar loading y mostrar contenido
+        $('#loadingVerCita').hide();
+        $('.modal-body-content').show();
+        
+        // ===== POBLAR DATOS DEL PACIENTE =====
+        $('#nombrePacienteDetalle').text(`${cita.paciente_nombres} ${cita.paciente_apellidos}`);
+        $('#cedulaPacienteDetalle').text(cita.paciente_cedula || '---');
+        
+        // CORREGIR: El teléfono del paciente está en la tabla pacientes como 'telefono'
+        // Necesitamos obtenerlo del JOIN con la consulta
+        $('#telefonoPacienteDetalle').text(cita.telefono || cita.paciente_telefono || '---');
+        $('#emailPacienteDetalle').text(cita.paciente_correo || '---');
+        
+        // ===== FECHA Y HORA =====
+        $('#fechaCitaDetalle').text(fechaFormateada);
+        $('#horaCitaDetalle').text(horaFormateada);
+        $('#duracionCitaDetalle').text('30 minutos');
+        
+        // ===== INFORMACIÓN MÉDICA =====
+        $('#doctorCitaDetalle').text(`Dr. ${cita.doctor_nombres} ${cita.doctor_apellidos}`);
+        $('#especialidadCitaDetalle').text(cita.nombre_especialidad || '---');
+        
+        // Tipo de cita con icono dinámico
+        const tipoTexto = cita.tipo_cita_nombre || (cita.id_tipo_cita == 2 ? 'Virtual' : 'Presencial');
+        $('#tipoCitaDetalle').text(tipoTexto);
+        
+        const iconTipo = $('#iconTipoCita');
+        if (cita.id_tipo_cita == 2) {
+            iconTipo.removeClass('bi-building bi-laptop').addClass('bi-camera-video text-success');
+        } else {
+            iconTipo.removeClass('bi-camera-video bi-laptop').addClass('bi-building text-primary');
+        }
+        
+        // ===== UBICACIÓN =====
+        $('#sucursalCitaDetalle').text(cita.nombre_sucursal || '---');
+        $('#consultorioCitaDetalle').text(cita.consultorio || 'Por asignar');
+        
+        // CORREGIR: La dirección está en la tabla sucursales como 'direccion'
+        $('#direccionSucursalDetalle').text(cita.direccion || cita.sucursal_direccion || '---');
+        
+        // ===== ESTADO Y CONTROL =====
+        $('#estadoActualCita').text(cita.estado);
+        $('#fechaRegistroCita').text(cita.fecha_creacion ? 
+            new Date(cita.fecha_creacion).toLocaleDateString('es-ES') : '---');
+        
+        // CORREGIR: Para mostrar quién registró la cita, necesitamos el nombre del usuario
+        // que aparece en los datos de la cita
+        let usuarioRegistro = 'Sistema';
+        if (cita.usuario_registro) {
+            usuarioRegistro = cita.usuario_registro;
+        } else if (cita.registrado_por) {
+            usuarioRegistro = cita.registrado_por;
+        } else if (cita.usuario_nombres && cita.usuario_apellidos) {
+            usuarioRegistro = `${cita.usuario_nombres} ${cita.usuario_apellidos}`;
+        }
+        $('#usuarioRegistroCita').text(usuarioRegistro);
+        
+        $('#idCitaDetalle').text(`#${cita.id_cita}`);
+        
+        // ===== MOTIVO =====
+        $('#motivoCitaDetalle').text(cita.motivo || 'No especificado');
+        
+        // ===== OBSERVACIONES (condicional) =====
+        if (cita.notas && cita.notas.trim()) {
+            $('#observacionesCitaDetalle').text(cita.notas);
+            $('#contenedorObservacionesCita').show();
+        } else {
+            $('#contenedorObservacionesCita').hide();
+        }
+        
+        // ===== INFORMACIÓN VIRTUAL (si aplica) =====
+        manejarInformacionVirtual(cita);
+        
+        // ===== ACTUALIZAR HEADER SEGÚN ESTADO =====
+        actualizarHeaderEstado(cita.estado);
+        
+        console.log('✅ Detalles cargados correctamente en nueva estructura');
+        
+    }, 500); // Delay para mostrar el loading
+    
+    // ===== CONFIGURAR BOTONES SEGÚN ESTADO =====
+    configurarBotonesCita(cita);
+}
+
+// ===== FUNCIÓN AUXILIAR PARA INFORMACIÓN VIRTUAL =====
+function manejarInformacionVirtual(cita) {
+    if (cita.id_tipo_cita == 2) {
+        // Crear sección adicional para info virtual si no existe
+        let seccionVirtual = $('#seccionInfoVirtual');
+        if (seccionVirtual.length === 0) {
+            const htmlVirtual = `
+                <div class="row mt-3" id="seccionInfoVirtual">
+                    <div class="col-12">
+                        <div class="detail-card">
+                            <div class="detail-card-header">
+                                <i class="bi bi-camera-video-fill detail-icon bg-info"></i>
+                                <h6 class="detail-title">Información Virtual</h6>
+                            </div>
+                            <div class="detail-card-body">
+                                <div class="detail-row" id="rowEnlaceVirtual" style="display: none;">
+                                    <div class="detail-item">
+                                        <i class="bi bi-link-45deg text-info me-2"></i>
+                                        <span class="detail-label">Enlace:</span>
+                                        <a href="#" id="enlaceVirtual" class="detail-value text-info" target="_blank">Ver enlace</a>
+                                    </div>
+                                </div>
+                                <div class="detail-row" id="rowSalaVirtual" style="display: none;">
+                                    <div class="detail-item">
+                                        <i class="bi bi-door-open text-success me-2"></i>
+                                        <span class="detail-label">ID de Sala:</span>
+                                        <span class="detail-value" id="salaVirtual">---</span>
+                                    </div>
+                                </div>
+                                <div class="detail-row" id="rowPlataformaVirtual">
+                                    <div class="detail-item">
+                                        <i class="bi bi-laptop text-primary me-2"></i>
+                                        <span class="detail-label">Plataforma:</span>
+                                        <span class="detail-value" id="plataformaVirtual">Jitsi Meet</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $('.modal-body-content').append(htmlVirtual);
+        }
+        
+        // Mostrar información virtual
+        if (cita.enlace_virtual) {
+            $('#enlaceVirtual').attr('href', cita.enlace_virtual).text('Acceder a videollamada');
+            $('#rowEnlaceVirtual').show();
+        } else {
+            $('#rowEnlaceVirtual').hide();
+        }
+        
+        if (cita.sala_virtual) {
+            $('#salaVirtual').text(cita.sala_virtual);
+            $('#rowSalaVirtual').show();
+        } else {
+            $('#rowSalaVirtual').hide();
+        }
+        
+        $('#plataformaVirtual').text(cita.plataforma_virtual || 'Jitsi Meet');
+        $('#seccionInfoVirtual').show();
+    } else {
+        // Ocultar sección virtual para citas presenciales
+        $('#seccionInfoVirtual').hide();
+    }
+}
+
+// ===== FUNCIÓN AUXILIAR PARA ACTUALIZAR HEADER =====
+function actualizarHeaderEstado(estado) {
+    const header = $('#headerVerCita');
+    const badge = $('#badgeEstadoVerCita');
+    
+    // Limpiar clases previas
+    header.removeClass('estado-pendiente estado-confirmada estado-completada estado-cancelada');
+    badge.removeClass('estado-pendiente estado-confirmada estado-completada estado-cancelada');
+    
+    // Agregar clase según estado
+    const estadoLower = estado.toLowerCase();
+    const estadoClass = `estado-${estadoLower}`;
+    header.addClass(estadoClass);
+    badge.addClass(estadoClass);
+    
+    // Actualizar texto del badge
+    $('#textoEstadoCita').text(estado);
+    
+    // Actualizar icono del badge
+    const iconos = {
+        'pendiente': 'bi-clock',
+        'confirmada': 'bi-check-circle',
+        'completada': 'bi-check-all',
+        'cancelada': 'bi-x-circle'
+    };
+    
+    const iconoClase = iconos[estadoLower] || 'bi-clock';
+    badge.find('i').removeClass().addClass(`bi ${iconoClase} me-1`);
 }
 
 function obtenerColorBootstrap(estado) {
@@ -1722,20 +1917,63 @@ function cargarDatosParaEdicion(cita) {
 }
 
 // ===== FILTROS =====
+// ===== FILTROS CORREGIDOS PARA COINCIDIR CON EL HTML =====
 function obtenerFiltrosActivos() {
-   return {
-       estado: $('#filtroEstado').val(),
-       id_sucursal: $('#filtroSucursal').val(),
-       id_tipo_cita: $('#filtroTipoCita').val(),
-       id_especialidad: $('#filtroEspecialidad').val(),
-       id_doctor: $('#filtroDoctor').val()
-   };
+    const filtros = {
+        estado: $('#filtroEstado').val(),
+        id_sucursal: $('#filtroSucursal').val(),
+        tipo_cita: $('#filtroTipoCita').val(), // ⚠️ CAMBIO: era id_tipo_cita
+        id_especialidad: $('#filtroEspecialidad').val(),
+        id_doctor: $('#filtroDoctor').val()
+    };
+    
+    // Debug para ver qué filtros se están enviando
+    console.log('🔍 Filtros del formulario:', {
+        sucursal: $('#filtroSucursal').val(),
+        tipo_cita: $('#filtroTipoCita').val(),
+        especialidad: $('#filtroEspecialidad').val(),
+        estado: $('#filtroEstado').val(),
+        doctor: $('#filtroDoctor').val()
+    });
+    
+    // Remover filtros vacíos
+    Object.keys(filtros).forEach(key => {
+        if (!filtros[key] || filtros[key] === '') {
+            delete filtros[key];
+        }
+    });
+    
+    console.log('🔍 Filtros enviados al servidor:', filtros);
+    return filtros;
 }
 
 function aplicarFiltros() {
-   console.log('🔍 Aplicando filtros...');
-   calendario.refetchEvents();
-   cargarEstadisticas();
+    console.log('🔍 Aplicando filtros...');
+    const filtrosActivos = obtenerFiltrosActivos();
+    console.log('📊 Filtros que se aplicarán:', filtrosActivos);
+    
+    calendario.refetchEvents();
+    cargarEstadisticas();
+}
+
+// Función para limpiar filtros
+function limpiarFiltros() {
+    console.log('🧹 Limpiando filtros...');
+    
+    // Resetear todos los selects
+    $('#filtroSucursal').val('');
+    $('#filtroTipoCita').val('');
+    $('#filtroEspecialidad').val('');
+    $('#filtroEstado').val('');
+    $('#filtroDoctor').val('');
+    
+    // Recargar todos los doctores (sin filtro de especialidad)
+    cargarTodosLosDoctores();
+    
+    // Aplicar los filtros (ahora vacíos)
+    aplicarFiltros();
+    
+    console.log('✅ Filtros limpiados');
 }
 
 function cargarDoctoresParaFiltro() {
@@ -2407,6 +2645,43 @@ $(document).ready(function() {
        configurarNotificacionesEnTiempoReal();
    }
    
+   // Cuando se abre el modal
+    $('#modalVerCita').on('show.bs.modal', function() {
+        console.log('🔄 Abriendo modal de detalles...');
+        
+        // Mostrar loading inicial
+        $('#loadingVerCita').show();
+        $('.modal-body-content').hide();
+        $('#detallesCita').hide();
+        $('#seccionInfoVirtual').hide();
+        
+        // Reset del header
+        $('#headerVerCita').removeClass('estado-pendiente estado-confirmada estado-completada estado-cancelada');
+        $('#badgeEstadoVerCita').removeClass('estado-pendiente estado-confirmada estado-completada estado-cancelada');
+        $('#textoEstadoCita').text('Cargando...');
+    });
+    
+    // Cuando se cierra el modal
+    $('#modalVerCita').on('hidden.bs.modal', function() {
+        console.log('❌ Cerrando modal de detalles...');
+        
+        // Limpiar contenido
+        $('#detallesCita').empty().hide();
+        $('.modal-body-content').hide();
+        $('#loadingVerCita').hide();
+        $('#seccionInfoVirtual').hide();
+        
+        // Reset valores por defecto
+        $('.detail-value').text('---');
+        $('#nombrePacienteDetalle').text('Cargando...');
+        $('#duracionCitaDetalle').text('30 minutos');
+        $('#usuarioRegistroCita').text('Sistema');
+        $('#consultorioCitaDetalle').text('Por asignar');
+        
+        // Reset icono tipo
+        $('#iconTipoCita').removeClass('bi-camera-video bi-building').addClass('bi-laptop');
+    });
+    
    // Verificar si hay borrador guardado
    setTimeout(() => {
        cargarBorrador();

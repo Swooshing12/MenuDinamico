@@ -325,48 +325,75 @@ class RecepcionistaController {
 }
     
     private function obtenerCitas() {
-        try {
-            $filtros = [];
-            
-            // Aplicar filtros si vienen en la petición
-            if (!empty($_GET['estado'])) {
-                $filtros['estado'] = $_GET['estado'];
-            }
-            
-            if (!empty($_GET['fecha_desde'])) {
-                $filtros['fecha_desde'] = $_GET['fecha_desde'];
-            }
-            
-            if (!empty($_GET['fecha_hasta'])) {
-                $filtros['fecha_hasta'] = $_GET['fecha_hasta'];
-            }
-            
-            if (!empty($_GET['id_sucursal'])) {
-                $filtros['id_sucursal'] = $_GET['id_sucursal'];
-            }
-            
-            if (!empty($_GET['id_tipo_cita'])) { // NUEVO: Filtro por tipo de cita
-                $filtros['id_tipo_cita'] = $_GET['id_tipo_cita'];
-            }
-            
-            if (!empty($_GET['cedula_paciente'])) {
-                $filtros['cedula_paciente'] = $_GET['cedula_paciente'];
-            }
-            
-            $citas = $this->citasModel->obtenerTodas($filtros);
-            
-            $this->responderJSON([
-                'success' => true,
-                'data' => $citas,
-                'count' => count($citas)
-            ]);
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
+    try {
+        $filtros = [];
+        
+        // DEBUG: Ver qué llega al backend
+        error_log("=== DEBUG FILTROS ===");
+        error_log("GET data: " . json_encode($_GET));
+        error_log("POST data: " . json_encode($_POST));
+        
+        // Aplicar filtros si vienen en la petición
+        if (!empty($_GET['estado'])) {
+            $filtros['estado'] = $_GET['estado'];
+            error_log("Filtro estado: " . $_GET['estado']);
         }
+        
+        if (!empty($_GET['fecha_desde'])) {
+            $filtros['fecha_desde'] = $_GET['fecha_desde'];
+            error_log("Filtro fecha_desde: " . $_GET['fecha_desde']);
+        }
+        
+        if (!empty($_GET['fecha_hasta'])) {
+            $filtros['fecha_hasta'] = $_GET['fecha_hasta'];
+            error_log("Filtro fecha_hasta: " . $_GET['fecha_hasta']);
+        }
+        
+        if (!empty($_GET['id_sucursal'])) {
+            $filtros['id_sucursal'] = $_GET['id_sucursal'];
+            error_log("Filtro id_sucursal: " . $_GET['id_sucursal']);
+        }
+        
+        if (!empty($_GET['tipo_cita'])) {
+            $filtros['tipo_cita'] = $_GET['tipo_cita'];
+            error_log("Filtro tipo_cita: " . $_GET['tipo_cita']);
+        }
+        
+        if (!empty($_GET['id_especialidad'])) {
+            $filtros['id_especialidad'] = $_GET['id_especialidad'];
+            error_log("Filtro id_especialidad: " . $_GET['id_especialidad']);
+        }
+        
+        if (!empty($_GET['id_doctor'])) {
+            $filtros['id_doctor'] = $_GET['id_doctor'];
+            error_log("Filtro id_doctor: " . $_GET['id_doctor']);
+        }
+        
+        if (!empty($_GET['cedula_paciente'])) {
+            $filtros['cedula_paciente'] = $_GET['cedula_paciente'];
+            error_log("Filtro cedula_paciente: " . $_GET['cedula_paciente']);
+        }
+        
+        error_log("Filtros finales: " . json_encode($filtros));
+        
+        $citas = $this->citasModel->obtenerTodas($filtros);
+        
+        error_log("Citas obtenidas: " . count($citas));
+        
+        $this->responderJSON([
+            'success' => true,
+            'data' => $citas,
+            'count' => count($citas),
+            'filtros_aplicados' => $filtros // DEBUG: enviar filtros de vuelta
+        ]);
+    } catch (Exception $e) {
+        error_log("Error en obtenerCitas: " . $e->getMessage());
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error: ' . $e->getMessage()
+        ]);
     }
+}
     
     private function editarCita() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1272,6 +1299,9 @@ class RecepcionistaController {
            ]);
        }
    }
+
+
+
    
    // ===== MÉTODOS AUXILIARES =====
    private function verificarPermisos($accion) {
