@@ -199,16 +199,24 @@ public function obtenerTodas($filtros = []) {
             error_log("Agregando filtro id_especialidad: " . $filtros['id_especialidad']);
         }
         
-        if (!empty($filtros['tipo_cita'])) {
-            if ($filtros['tipo_cita'] === 'presencial') {
-                $where_conditions[] = "c.tipo_cita = 'presencial'";
-                error_log("Agregando filtro tipo_cita: presencial");
-            } elseif ($filtros['tipo_cita'] === 'virtual') {
-                $where_conditions[] = "c.tipo_cita = 'virtual'";
-                error_log("Agregando filtro tipo_cita: virtual");
+                // Usa esto:
+            // En el método obtenerTodas() del modelo Citas.php
+if (!empty($filtros['tipo_cita'])) {
+    if ($filtros['tipo_cita'] === 'presencial') {
+        $where_conditions[] = "c.tipo_cita = 'presencial'";
+        error_log("Filtro aplicado: tipo_cita = presencial");
+    } elseif ($filtros['tipo_cita'] === 'virtual') {
+        $where_conditions[] = "c.tipo_cita = 'virtual'";
+        error_log("Filtro aplicado: tipo_cita = virtual");
+    }
+}
+
+            // Y mantén también el filtro por ID si viene
+            if (!empty($filtros['id_tipo_cita'])) {
+                $where_conditions[] = "c.id_tipo_cita = :id_tipo_cita";
+                $params[':id_tipo_cita'] = $filtros['id_tipo_cita'];
             }
-        }
-        
+                                
         if (!empty($filtros['cedula_paciente'])) {
             $where_conditions[] = "u_paciente.cedula LIKE :cedula";
             $params[':cedula'] = '%' . $filtros['cedula_paciente'] . '%';

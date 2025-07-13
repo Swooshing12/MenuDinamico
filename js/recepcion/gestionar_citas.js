@@ -518,6 +518,7 @@ function confirmarRegistroCita() {
 }
 
 // ===== INICIALIZACIÓN DEL CALENDARIO =====
+// ===== INICIALIZACIÓN DEL CALENDARIO =====
 function inicializarCalendario() {
     const calendarEl = document.getElementById('calendario');
     
@@ -527,6 +528,10 @@ function inicializarCalendario() {
         locale: 'es',
         firstDay: 1, // Lunes como primer día
         height: 'auto',
+        
+        // 🔧 QUITAR las restricciones globales para permitir ver todo
+        // validRange: NO usar esto
+        // selectConstraint: NO usar esto
         
         // Configuración de header
         headerToolbar: {
@@ -571,6 +576,32 @@ function inicializarCalendario() {
         
         // Eventos del calendario
         dateClick: function(info) {
+            // 🔧 VALIDACIÓN MEJORADA: Solo validar cuando se quiere crear nueva cita
+            const fechaSeleccionada = new Date(info.dateStr + 'T00:00:00');
+            const ahora = new Date();
+            
+            // Comparar solo fechas (sin hora) - permitir HOY
+            const fechaHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+            const fechaElegida = new Date(fechaSeleccionada.getFullYear(), fechaSeleccionada.getMonth(), fechaSeleccionada.getDate());
+            
+            console.log('📅 Click en fecha:');
+            console.log('  - Fecha elegida:', fechaElegida.toDateString());
+            console.log('  - Fecha hoy:', fechaHoy.toDateString());
+            console.log('  - Es pasada?', fechaElegida < fechaHoy);
+            
+            // 🔧 SOLO bloquear fechas ANTERIORES a hoy (permitir hoy)
+            if (fechaElegida < fechaHoy) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Fecha no válida',
+                    text: 'No se pueden agendar citas en fechas pasadas. Puede agendar desde hoy en adelante.',
+                    confirmButtonColor: '#0d6efd'
+                });
+                return;
+            }
+            
+            // Si es fecha válida (hoy o futura), continuar con el flujo normal
+            console.log('✅ Fecha válida para nueva cita');
             manejarClickFecha(info);
         },
         
@@ -594,7 +625,7 @@ function inicializarCalendario() {
     
     calendario.render();
     
-    console.log('📅 Calendario inicializado');
+    console.log('📅 Calendario inicializado con validación inteligente de fechas');
 }
 
 // ===== CARGA DE CITAS PARA EL CALENDARIO =====
@@ -1916,22 +1947,60 @@ function cargarDatosParaEdicion(cita) {
 }
 
 // ===== FILTROS =====
+// 🔧 CORREGIR: Función para obtener filtros activos
 function obtenerFiltrosActivos() {
-   return {
-       estado: $('#filtroEstado').val(),
-       id_sucursal: $('#filtroSucursal').val(),
-       id_tipo_cita: $('#filtroTipoCita').val(),
-       id_especialidad: $('#filtroEspecialidad').val(),
-       id_doctor: $('#filtroDoctor').val()
-   };
+    return {
+        estado: $('#filtroEstado').val() || '',
+        id_sucursal: $('#filtroSucursal').val() || '',
+        tipo_cita: $('#filtroTipoCita').val() || '', // 🔧 IMPORTANTE
+        id_especialidad: $('#filtroEspecialidad').val() || '',
+        id_doctor: $('#filtroDoctor').val() || ''
+    };
+}
+
+// 🔧 NUEVA FUNCIÓN: Validar fechas y horas pasadas
+// 🔧 FUNCIÓN MEJORADA: Validar fechas y horas pasadas
+function validarFechaHoraPasada(fecha, hora) {
+    const ahora = new Date();
+    const fechaSeleccionada = new Date(`${fecha}T${hora}`);
+    
+    console.log('🕐 Validando fecha/hora:');
+    console.log('  - Ahora:', ahora.toLocaleString());
+    console.log('  - Seleccionada:', fechaSeleccionada.toLocaleString());
+    
+    // 🔧 MEJORAR: Dar margen de 5 minutos para evitar problemas de sincronización
+    const margenMinutos = 5 * 60 * 1000; // 5 minutos en milisegundos
+    const tiempoLimite = new Date(ahora.getTime() + margenMinutos);
+    
+    if (fechaSeleccionada <= tiempoLimite) {
+        console.log('❌ Fecha/hora muy próxima o en el pasado');
+        return false;
+    }
+    
+    console.log('✅ Fecha/hora válida');
+    return true;
 }
 
 
 
+// 🔧 CORREGIR: Función para aplicar filtros
 function aplicarFiltros() {
-   console.log('🔍 Aplicando filtros...');
-   calendario.refetchEvents();
-   cargarEstadisticas();
+    console.log('🔍 Aplicando filtros...');
+    
+    // Obtener valores de filtros
+    const filtros = {
+        estado: $('#filtroEstado').val(),
+        id_sucursal: $('#filtroSucursal').val(),
+        tipo_cita: $('#filtroTipoCita').val(), // 🔧 ASEGURAR que se envía
+        id_especialidad: $('#filtroEspecialidad').val(),
+        id_doctor: $('#filtroDoctor').val()
+    };
+    
+    console.log('Filtros a aplicar:', filtros);
+    
+    // Recargar calendario con filtros
+    calendario.refetchEvents();
+    cargarEstadisticas();
 }
 
 // Función para limpiar filtros
