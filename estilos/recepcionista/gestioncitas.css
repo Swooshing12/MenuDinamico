@@ -1670,6 +1670,7 @@ body.sidebar-collapsed .main-content {
 .fc-day.fecha-pasada:hover {
     background-color: #f8f9fa !important;
     transform: none !important;
+}
 
 /* Estilo para inputs de fecha inválidos */
 .form-control.is-invalid {
