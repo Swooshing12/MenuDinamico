@@ -43,11 +43,6 @@ let sucursalSeleccionada = window.sucursalSeleccionada;
 // ===== INICIALIZACIÓN =====
 $(document).ready(function() {
     console.log('🚀 Iniciando Sistema de Gestión de Citas con Wizard');
-
-    // Cargar doctores al inicializar
-    setTimeout(() => {
-        cargarTodosLosDoctores();
-    }, 1000);
     
     try {
         inicializarCalendario();
@@ -707,6 +702,43 @@ function mostrarTooltipCita(info) {
     info.el.title = tooltip.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '');
 }
 
+function cargarTodosLosDoctores() {
+    console.log('👨‍⚕️ Cargando todos los doctores...');
+    
+    $.ajax({
+        url: config.baseUrl,
+        type: 'GET',
+        data: {
+            action: 'obtenerDoctores',
+            submenu_id: config.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('Respuesta todos los doctores:', response);
+            
+            if (response.success && response.data) {
+                const doctorSelect = $('#filtroDoctor');
+                doctorSelect.html('<option value="">👨‍⚕️ Todos los doctores</option>');
+                
+                response.data.forEach(doctor => {
+                    doctorSelect.append(`
+                        <option value="${doctor.id_doctor}">
+                            Dr. ${doctor.nombres} ${doctor.apellidos} - ${doctor.especialidad || doctor.nombre_especialidad || ''}
+                        </option>
+                    `);
+                });
+                console.log(`✅ Cargados ${response.data.length} doctores`);
+            } else {
+                console.log('⚠️ No se encontraron doctores o respuesta inválida');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error cargando todos los doctores:', error);
+            console.error('Respuesta del servidor:', xhr.responseText);
+        }
+    });
+}
+
 // ===== INICIALIZACIÓN DE EVENTOS =====
 // ===== INICIALIZACIÓN DE EVENTOS =====
 function inicializarEventos() {
@@ -802,7 +834,6 @@ function inicializarEventos() {
     
     console.log('🎯 Eventos inicializados correctamente');
 }
-
 // ===== INICIALIZACIÓN DE SELECT2 =====
 function inicializarSelect2() {
     $('.select2').select2({
@@ -1050,91 +1081,59 @@ function cargarEspecialidadesPorSucursal() {
    });
 }
 
-// Función para cargar doctores dinámicamente cuando se selecciona una especialidad
 function cargarDoctoresPorEspecialidad() {
-    const especialidadId = $('#filtroEspecialidad').val();
-    const doctorSelect = $('#filtroDoctor');
-    
-    console.log('🏥 Cargando doctores para especialidad:', especialidadId);
-    
-    // Limpiar opciones de doctores
-    doctorSelect.html('<option value="">👨‍⚕️ Todos los doctores</option>');
-    
-    if (!especialidadId) {
-        // Si no hay especialidad seleccionada, cargar todos los doctores
-        cargarTodosLosDoctores();
-        return;
-    }
-    
-    // Cargar doctores de la especialidad seleccionada
-    $.ajax({
-        url: config.baseUrl,
-        type: 'GET',
-        data: {
-            action: 'obtenerDoctoresPorEspecialidad',
-            id_especialidad: especialidadId,
-            submenu_id: config.submenuId
-        },
-        dataType: 'json',
-        success: function(response) {
-            console.log('Respuesta doctores por especialidad:', response);
-            
-            if (response.success && response.data && response.data.length > 0) {
-                response.data.forEach(doctor => {
-                    doctorSelect.append(`
-                        <option value="${doctor.id_doctor}">
-                            Dr. ${doctor.nombres} ${doctor.apellidos}
-                        </option>
-                    `);
-                });
-                console.log(`✅ Cargados ${response.data.length} doctores para especialidad ${especialidadId}`);
-            } else {
-                doctorSelect.append('<option value="" disabled>No hay doctores para esta especialidad</option>');
-                console.log('⚠️ No se encontraron doctores para la especialidad seleccionada');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('❌ Error cargando doctores por especialidad:', error);
-            console.error('Respuesta del servidor:', xhr.responseText);
-        }
-    });
-}
-
-function cargarTodosLosDoctores() {
-    console.log('👨‍⚕️ Cargando todos los doctores...');
-    
-    $.ajax({
-        url: config.baseUrl,
-        type: 'GET',
-        data: {
-            action: 'obtenerDoctores',
-            submenu_id: config.submenuId
-        },
-        dataType: 'json',
-        success: function(response) {
-            console.log('Respuesta todos los doctores:', response);
-            
-            if (response.success && response.data) {
-                const doctorSelect = $('#filtroDoctor');
-                doctorSelect.html('<option value="">👨‍⚕️ Todos los doctores</option>');
-                
-                response.data.forEach(doctor => {
-                    doctorSelect.append(`
-                        <option value="${doctor.id_doctor}">
-                            Dr. ${doctor.nombres} ${doctor.apellidos} - ${doctor.especialidad || doctor.nombre_especialidad || ''}
-                        </option>
-                    `);
-                });
-                console.log(`✅ Cargados ${response.data.length} doctores`);
-            } else {
-                console.log('⚠️ No se encontraron doctores o respuesta inválida');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('❌ Error cargando todos los doctores:', error);
-            console.error('Respuesta del servidor:', xhr.responseText);
-        }
-    });
+   const idEspecialidad = $('#especialidadCita').val();
+   const idSucursal = $('#sucursalCita').val();
+   const $doctor = $('#doctorCita');
+   
+   if (!idEspecialidad || !idSucursal) {
+       $doctor.html('<option value="">Seleccione especialidad y sucursal</option>').prop('disabled', true);
+       return;
+   }
+   
+   $doctor.html('<option value="">Cargando doctores...</option>').prop('disabled', true);
+   
+   $.ajax({
+       url: config.baseUrl,
+       type: 'GET',
+       data: {
+           action: 'obtenerDoctoresPorEspecialidad',
+           id_especialidad: idEspecialidad,
+           id_sucursal: idSucursal,
+           submenu_id: config.submenuId
+       },
+       dataType: 'json',
+       success: function(response) {
+           if (response.success) {
+               let options = '<option value="">Seleccione doctor</option>';
+               response.data.forEach(doctor => {
+                   options += `<option value="${doctor.id_doctor}">
+                       Dr. ${doctor.nombres} ${doctor.apellidos}
+                   </option>`;
+               });
+               $doctor.html(options).prop('disabled', false);
+               
+               // Mostrar información de la especialidad
+               const especialidad = config.especialidades.find(e => e.id_especialidad == idEspecialidad);
+               if (especialidad) {
+                   $('#detallesEspecialidad').html(`
+                       <strong>${especialidad.nombre_especialidad}</strong><br>
+                       <small>${especialidad.descripcion || 'Especialidad médica'}</small>
+                   `);
+                   $('#infoEspecialidad').removeClass('d-none');
+               }
+               
+               console.log(`✅ Cargados ${response.data.length} doctores`);
+           } else {
+               $doctor.html('<option value="">No hay doctores disponibles</option>');
+               mostrarAdvertencia('No hay doctores disponibles para esta especialidad');
+           }
+       },
+       error: function(xhr, status, error) {
+           console.error('❌ Error cargando doctores:', error);
+           $doctor.html('<option value="">Error cargando doctores</option>');
+       }
+   });
 }
 
 // ===== GENERAR CALENDARIO SEMANAL =====
@@ -1917,43 +1916,22 @@ function cargarDatosParaEdicion(cita) {
 }
 
 // ===== FILTROS =====
-// ===== FILTROS CORREGIDOS PARA COINCIDIR CON EL HTML =====
 function obtenerFiltrosActivos() {
-    const filtros = {
-        estado: $('#filtroEstado').val(),
-        id_sucursal: $('#filtroSucursal').val(),
-        tipo_cita: $('#filtroTipoCita').val(), // ⚠️ CAMBIO: era id_tipo_cita
-        id_especialidad: $('#filtroEspecialidad').val(),
-        id_doctor: $('#filtroDoctor').val()
-    };
-    
-    // Debug para ver qué filtros se están enviando
-    console.log('🔍 Filtros del formulario:', {
-        sucursal: $('#filtroSucursal').val(),
-        tipo_cita: $('#filtroTipoCita').val(),
-        especialidad: $('#filtroEspecialidad').val(),
-        estado: $('#filtroEstado').val(),
-        doctor: $('#filtroDoctor').val()
-    });
-    
-    // Remover filtros vacíos
-    Object.keys(filtros).forEach(key => {
-        if (!filtros[key] || filtros[key] === '') {
-            delete filtros[key];
-        }
-    });
-    
-    console.log('🔍 Filtros enviados al servidor:', filtros);
-    return filtros;
+   return {
+       estado: $('#filtroEstado').val(),
+       id_sucursal: $('#filtroSucursal').val(),
+       id_tipo_cita: $('#filtroTipoCita').val(),
+       id_especialidad: $('#filtroEspecialidad').val(),
+       id_doctor: $('#filtroDoctor').val()
+   };
 }
 
+
+
 function aplicarFiltros() {
-    console.log('🔍 Aplicando filtros...');
-    const filtrosActivos = obtenerFiltrosActivos();
-    console.log('📊 Filtros que se aplicarán:', filtrosActivos);
-    
-    calendario.refetchEvents();
-    cargarEstadisticas();
+   console.log('🔍 Aplicando filtros...');
+   calendario.refetchEvents();
+   cargarEstadisticas();
 }
 
 // Función para limpiar filtros
@@ -1975,7 +1953,6 @@ function limpiarFiltros() {
     
     console.log('✅ Filtros limpiados');
 }
-
 function cargarDoctoresParaFiltro() {
    $.ajax({
        url: config.baseUrl,
