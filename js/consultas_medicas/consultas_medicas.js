@@ -113,6 +113,77 @@ function cargarDatosIniciales() {
     cargarCitasConTriaje();
 }
 
+// ===== FUNCIONES ADICIONALES PARA EL MODAL MEJORADO =====
+
+// Mostrar hora de inicio cuando se abre el modal
+$('#modalConsulta').on('show.bs.modal', function() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    $('#horaInicio').text(timeString);
+    
+    // Animar las secciones
+    setTimeout(() => {
+        $('.consulta-section').addClass('animate-in');
+    }, 100);
+});
+
+// Función para poblar el modal con datos de la cita
+function poblarModalConsulta(datoCita) {
+    // Información del paciente
+    $('#nombrePacienteModal').text(datoCita.nombre_completo);
+    $('#cedulaPacienteModal').text(datoCita.cedula);
+    $('#edadPacienteModal').text(datoCita.edad + ' años');
+    $('#tipoSangreModal').text(datoCita.tipo_sangre || 'No especificado');
+    $('#alergiasModal').text(datoCita.alergias || 'Ninguna conocida');
+    
+    // Signos vitales
+    $('#pesoTriaje').text(datoCita.peso || '--');
+    $('#tallaTriaje').text(datoCita.talla || '--');
+    $('#presionTriaje').text(datoCita.presion_arterial || '--');
+    $('#frecuenciaTriaje').text(datoCita.frecuencia_cardiaca || '--');
+    $('#temperaturaTriaje').text(datoCita.temperatura || '--');
+    $('#saturacionTriaje').text(datoCita.saturacion_oxigeno || '--');
+    
+    // Prioridad
+    const prioridadColor = getPrioridadColor(datoCita.prioridad);
+    $('#prioridadTriaje')
+        .removeClass('bg-secondary bg-success bg-warning bg-danger')
+        .addClass(`bg-${prioridadColor}`)
+        .text(datoCita.prioridad);
+    
+    // Observaciones del triaje
+    if (datoCita.observaciones && datoCita.observaciones.trim() !== '') {
+        $('#sintomasTriaje').text(datoCita.observaciones);
+        $('#observacionesTriajeContainer').show();
+    } else {
+        $('#observacionesTriajeContainer').hide();
+    }
+}
+
+// Validación en tiempo real
+$('.form-control-enhanced').on('input', function() {
+    const $this = $(this);
+    const isRequired = $this.prop('required');
+    const value = $this.val().trim();
+    
+    if (isRequired) {
+        if (value === '') {
+            $this.removeClass('is-valid').addClass('is-invalid');
+        } else {
+            $this.removeClass('is-invalid').addClass('is-valid');
+        }
+    }
+});
+
+// Efecto de escritura en textareas
+$('textarea.form-control-enhanced').on('focus', function() {
+    $(this).parent().addClass('focused');
+}).on('blur', function() {
+    $(this).parent().removeClass('focused');
+});
 // ===== CARGAR ESTADÍSTICAS =====
 function cargarEstadisticas() {
     console.log('📊 Cargando estadísticas del médico...');
@@ -196,13 +267,20 @@ function cargarCitasConTriaje() {
 }
 
 // ===== MOSTRAR CITAS =====
+// ===== MOSTRAR CITAS - VERSIÓN ACTUALIZADA =====
 function mostrarCitas(citas) {
     const container = $('#listaPacientes');
     
     console.log('🎨 Mostrando citas:', citas.length);
     
     if (!citas || citas.length === 0) {
-        container.html(crearMensajeVacio('info', 'No hay pacientes con triaje completado para la fecha seleccionada'));
+        container.html(`
+            <div class="empty-state">
+                <i class="bi bi-people"></i>
+                <h6>No hay pacientes disponibles</h6>
+                <p>No hay pacientes con triaje completado para la fecha seleccionada</p>
+            </div>
+        `);
         return;
     }
     
@@ -217,88 +295,100 @@ function mostrarCitas(citas) {
         const edadPaciente = cita.edad_paciente || calcularEdad(cita.fecha_nacimiento);
         
         html += `
-            <div class="card card-paciente ${prioridadClass} ${yaConsultado ? 'consultado' : ''} mb-3" 
+            <div class="card card-paciente ${prioridadClass} ${yaConsultado ? 'consultado' : ''}" 
                  data-cita-id="${cita.id_cita}" 
                  onclick="${yaConsultado ? '' : 'seleccionarPaciente(' + cita.id_cita + ')'}">
                 <div class="card-body">
                     <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="mb-1">
-                                    <i class="bi bi-person-circle me-2"></i>
+                        <div class="col-lg-8">
+                            <!-- Header del paciente -->
+                            <div class="paciente-card-header">
+                                <h6>
+                                    <i class="bi bi-person-circle"></i>
                                     ${cita.nombres_paciente} ${cita.apellidos_paciente}
-                                    ${yaConsultado ? '<span class="badge bg-success ms-2">CONSULTADO</span>' : ''}
+                                    ${yaConsultado ? '<span class="badge bg-success ms-2"><i class="bi bi-check-circle me-1"></i>CONSULTADO</span>' : ''}
                                 </h6>
-                                <span class="badge bg-${prioridadColor}">${cita.prioridad}</span>
+                                <span class="badge bg-${prioridadColor} prioridad-badge">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>${cita.prioridad}
+                                </span>
                             </div>
                             
-                            <div class="row text-muted small mb-2">
-                                <div class="col-md-6">
-                                    <i class="bi bi-card-text me-1"></i>
-                                    CI: ${cita.cedula_paciente}
+                            <!-- Información básica -->
+                            <div class="paciente-info-grid">
+                                <div class="info-item">
+                                    <i class="bi bi-credit-card"></i>
+                                    <span>CI: ${cita.cedula_paciente}</span>
                                 </div>
-                                <div class="col-md-6">
-                                    <i class="bi bi-calendar3 me-1"></i>
-                                    ${edadPaciente} años
+                                <div class="info-item">
+                                    <i class="bi bi-calendar-heart"></i>
+                                    <span>${edadPaciente} años</span>
                                 </div>
-                                <div class="col-md-6">
-                                    <i class="bi bi-clock me-1"></i>
-                                    ${formatearHora(cita.fecha_hora)}
+                                <div class="info-item">
+                                    <i class="bi bi-clock"></i>
+                                    <span>${formatearHora(cita.fecha_hora)}</span>
                                 </div>
-                                <div class="col-md-6">
-                                    <i class="bi bi-droplet me-1"></i>
-                                    ${cita.tipo_sangre || 'No especificado'}
+                                <div class="info-item">
+                                    <i class="bi bi-droplet-fill"></i>
+                                    <span>${cita.tipo_sangre || 'No especificado'}</span>
                                 </div>
                             </div>
                             
-                            <p class="mb-1">
-                                <strong>Motivo:</strong> ${cita.motivo}
-                            </p>
+                            <!-- Motivo -->
+                            <div class="motivo-consulta">
+                                <strong><i class="bi bi-chat-text me-1"></i>Motivo:</strong>
+                                <span>${cita.motivo}</span>
+                            </div>
                             
-                            ${cita.alergias ? `
-                                <div class="alert alert-warning alert-sm mt-2 mb-0 py-1">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                            ${cita.alergias && cita.alergias !== 'NINGUNA' ? `
+                                <div class="alergias-warning">
+                                    <i class="bi bi-shield-exclamation"></i>
                                     <strong>Alergias:</strong> ${cita.alergias}
                                 </div>
                             ` : ''}
                         </div>
                         
-                        <div class="col-md-4 text-end">
-                            <!-- Signos Vitales Resumidos -->
-                            <div class="row text-center mb-3">
-                                <div class="col-6">
-                                    <small class="text-muted d-block">P.A.</small>
-                                    <strong class="small">${cita.presion_arterial || '--'}</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">Temp</small>
-                                    <strong class="small">${cita.temperatura || '--'}°C</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">F.C.</small>
-                                    <strong class="small">${cita.frecuencia_cardiaca || '--'} bpm</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">Sat O2</small>
-                                    <strong class="small">${cita.saturacion_oxigeno || '--'}%</strong>
+                        <div class="col-lg-4">
+                            <!-- Signos vitales compactos -->
+                            <div class="vitales-resumen">
+                                <h6 class="vitales-titulo">
+                                    <i class="bi bi-activity"></i>
+                                    Signos Vitales
+                                </h6>
+                                <div class="vitales-grid-compacto">
+                                    <div class="vital-compacto">
+                                        <span class="vital-label">P.A.</span>
+                                        <span class="vital-valor">${cita.presion_arterial || '--'}</span>
+                                    </div>
+                                    <div class="vital-compacto">
+                                        <span class="vital-label">Temp</span>
+                                        <span class="vital-valor">${cita.temperatura || '--'}°</span>
+                                    </div>
+                                    <div class="vital-compacto">
+                                        <span class="vital-label">F.C.</span>
+                                        <span class="vital-valor">${cita.frecuencia_cardiaca || '--'}</span>
+                                    </div>
+                                    <div class="vital-compacto">
+                                        <span class="vital-label">Sat O₂</span>
+                                        <span class="vital-valor">${cita.saturacion_oxigeno || '--'}%</span>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <!-- Botones de Acción -->
-                            <div class="d-grid gap-2">
+                            <!-- Botones de acción -->
+                            <div class="acciones-paciente">
                                 ${!yaConsultado ? `
-                                    <button class="btn btn-consultar btn-sm" onclick="event.stopPropagation(); abrirModalConsulta(${cita.id_cita})">
-                                        <i class="bi bi-heart-pulse me-1"></i>
+                                    <button class="btn btn-consultar" onclick="event.stopPropagation(); abrirModalConsulta(${cita.id_cita})">
+                                        <i class="bi bi-heart-pulse"></i>
                                         Realizar Consulta
                                     </button>
                                 ` : `
-                                    <button class="btn btn-outline-success btn-sm" disabled>
-                                        <i class="bi bi-check-circle me-1"></i>
+                                    <button class="btn btn-outline-success" disabled>
+                                        <i class="bi bi-check-circle"></i>
                                         Consulta Completada
                                     </button>
                                 `}
                                 <button class="btn btn-outline-info btn-sm" onclick="event.stopPropagation(); verHistorialCompleto(${cita.id_cita})">
-                                    <i class="bi bi-clipboard2-data me-1"></i>
+                                    <i class="bi bi-clipboard2-data"></i>
                                     Ver Historial
                                 </button>
                             </div>
@@ -335,7 +425,7 @@ function seleccionarPaciente(idCita) {
     $(`.card-paciente[data-cita-id="${idCita}"]`).addClass('border-primary');
 }
 
-// ===== MOSTRAR INFORMACIÓN DEL PACIENTE =====
+// ===== MOSTRAR INFORMACIÓN DEL PACIENTE - MEJORADO =====
 function mostrarInfoPaciente(cita) {
     console.log('ℹ️ Mostrando información del paciente');
     
@@ -343,88 +433,165 @@ function mostrarInfoPaciente(cita) {
     
     const html = `
         <div class="paciente-info">
-            <h6 class="mb-3">
-                <i class="bi bi-person-circle me-2"></i>
-                ${cita.nombres_paciente} ${cita.apellidos_paciente}
-            </h6>
+            <!-- Header del Paciente -->
+            <div class="paciente-header">
+                <div class="avatar-container">
+                    <i class="bi bi-person-circle"></i>
+                </div>
+                <div class="paciente-datos-header">
+                    <h6 class="paciente-nombre">
+                        ${cita.nombres_paciente} ${cita.apellidos_paciente}
+                    </h6>
+                    <span class="paciente-cedula">CI: ${cita.cedula_paciente}</span>
+                </div>
+            </div>
             
-            <div class="row mb-3">
-                <div class="col-6">
-                    <strong>Cédula:</strong><br>
-                    <span class="text-primary">${cita.cedula_paciente}</span>
+            <!-- Datos Básicos -->
+            <div class="datos-basicos">
+                <div class="dato-item">
+                    <div class="dato-icon">
+                        <i class="bi bi-calendar-heart"></i>
+                    </div>
+                    <div class="dato-content">
+                        <span class="dato-label">Edad</span>
+                        <span class="dato-valor">${edadPaciente} años</span>
+                    </div>
                 </div>
-                <div class="col-6">
-                    <strong>Edad:</strong><br>
-                    <span class="text-primary">${edadPaciente} años</span>
+                
+                <div class="dato-item">
+                    <div class="dato-icon tipo-sangre">
+                        <i class="bi bi-droplet-fill"></i>
+                    </div>
+                    <div class="dato-content">
+                        <span class="dato-label">Tipo de Sangre</span>
+                        <span class="dato-valor">${cita.tipo_sangre || 'No especificado'}</span>
+                    </div>
                 </div>
-                <div class="col-6">
-                    <strong>Tipo Sangre:</strong><br>
-                    <span class="text-primary">${cita.tipo_sangre || 'No especificado'}</span>
-                </div>
-                <div class="col-6">
-                    <strong>Prioridad:</strong><br>
-                    <span class="badge bg-${getPrioridadColor(cita.prioridad)}">${cita.prioridad}</span>
+                
+                <div class="dato-item">
+                    <div class="dato-icon prioridad">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    </div>
+                    <div class="dato-content">
+                        <span class="dato-label">Prioridad</span>
+                        <span class="badge bg-${getPrioridadColor(cita.prioridad)}">${cita.prioridad}</span>
+                    </div>
                 </div>
             </div>
             
             ${cita.alergias ? `
-                <div class="alert alert-warning py-2">
-                    <strong><i class="bi bi-exclamation-triangle me-1"></i>Alergias:</strong><br>
-                    ${cita.alergias}
+                <div class="alergias-alert">
+                    <div class="alert-icon">
+                        <i class="bi bi-shield-exclamation"></i>
+                    </div>
+                    <div class="alert-content">
+                        <strong>Alergias Conocidas</strong>
+                        <p>${cita.alergias}</p>
+                    </div>
                 </div>
             ` : ''}
             
-            <hr>
-            
-            <h6><i class="bi bi-activity me-2"></i>Signos Vitales (Triaje)</h6>
-            <div class="row text-center">
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.peso || '--'} kg</strong>
-                        <small class="d-block text-muted">Peso</small>
+            <!-- Signos Vitales -->
+            <div class="signos-vitales-section">
+                <h6 class="section-title">
+                    <i class="bi bi-activity"></i>
+                    Signos Vitales (Triaje)
+                </h6>
+                
+                <div class="vitales-grid">
+                    <div class="vital-card peso">
+                        <div class="vital-icon">
+                            <i class="bi bi-person-standing"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.peso || '--'}</span>
+                            <span class="vital-unidad">kg</span>
+                            <span class="vital-label">Peso</span>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.talla || '--'} cm</strong>
-                        <small class="d-block text-muted">Talla</small>
+                    
+                    <div class="vital-card talla">
+                        <div class="vital-icon">
+                            <i class="bi bi-rulers"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.talla || '--'}</span>
+                            <span class="vital-unidad">cm</span>
+                            <span class="vital-label">Talla</span>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.presion_arterial || '--'}</strong>
-                        <small class="d-block text-muted">P.A.</small>
+                    
+                    <div class="vital-card presion">
+                        <div class="vital-icon">
+                            <i class="bi bi-heart-pulse"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.presion_arterial || '--'}</span>
+                            <span class="vital-unidad">mmHg</span>
+                            <span class="vital-label">Presión Arterial</span>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.frecuencia_cardiaca || '--'} bpm</strong>
-                        <small class="d-block text-muted">F.C.</small>
+                    
+                    <div class="vital-card frecuencia">
+                        <div class="vital-icon">
+                            <i class="bi bi-heart"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.frecuencia_cardiaca || '--'}</span>
+                            <span class="vital-unidad">bpm</span>
+                            <span class="vital-label">Frecuencia Cardíaca</span>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.temperatura || '--'} °C</strong>
-                        <small class="d-block text-muted">Temp.</small>
+                    
+                    <div class="vital-card temperatura">
+                        <div class="vital-icon">
+                            <i class="bi bi-thermometer-half"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.temperatura || '--'}</span>
+                            <span class="vital-unidad">°C</span>
+                            <span class="vital-label">Temperatura</span>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 mb-2">
-                    <div class="signo-vital">
-                        <strong>${cita.saturacion_oxigeno || '--'} %</strong>
-                        <small class="d-block text-muted">Sat O2</small>
+                    
+                    <div class="vital-card saturacion">
+                        <div class="vital-icon">
+                            <i class="bi bi-lungs"></i>
+                        </div>
+                        <div class="vital-info">
+                            <span class="vital-valor">${cita.saturacion_oxigeno || '--'}</span>
+                            <span class="vital-unidad">%</span>
+                            <span class="vital-label">Saturación O₂</span>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="mt-3">
-                <strong>Nivel Urgencia:</strong> 
-                <span class="badge bg-${getPrioridadColor(cita.prioridad)}">${cita.prioridad} (${cita.nivel_urgencia}/4)</span>
+            <!-- Nivel de Urgencia -->
+            <div class="urgencia-section">
+                <div class="urgencia-card">
+                    <div class="urgencia-icon">
+                        <i class="bi bi-speedometer2"></i>
+                    </div>
+                    <div class="urgencia-content">
+                        <span class="urgencia-label">Nivel de Urgencia</span>
+                        <div class="urgencia-valor">
+                            <span class="badge bg-${getPrioridadColor(cita.prioridad)}">${cita.prioridad}</span>
+                            <span class="urgencia-numero">(${cita.nivel_urgencia}/4)</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             ${cita.observaciones ? `
-                <div class="mt-3">
-                    <strong>Observaciones:</strong><br>
-                    <span class="text-muted">${cita.observaciones}</span>
+                <div class="observaciones-section">
+                    <h6 class="section-title">
+                        <i class="bi bi-chat-square-text"></i>
+                        Observaciones del Triaje
+                    </h6>
+                    <div class="observaciones-content">
+                        <p>${cita.observaciones}</p>
+                    </div>
                 </div>
             ` : ''}
         </div>
@@ -432,7 +599,6 @@ function mostrarInfoPaciente(cita) {
     
     $('#infoPaciente').html(html);
 }
-
 // ===== CARGAR HISTORIAL DEL PACIENTE =====
 function cargarHistorialPaciente(cita) {
     console.log('📋 Cargando historial del paciente ID:', cita.id_paciente);
@@ -468,32 +634,94 @@ function cargarHistorialPaciente(cita) {
 
 // ===== RESTO DE FUNCIONES =====
 
+// ===== MOSTRAR HISTORIAL DEL PACIENTE - VERSIÓN ACTUALIZADA =====
 function mostrarHistorialPaciente(historial) {
     const container = $('#historialPaciente');
     
     if (!historial || historial.length === 0) {
-        container.html(crearMensajeVacio('info', 'Paciente nuevo: No hay consultas médicas anteriores registradas.'));
+        container.html(`
+            <div class="empty-state">
+                <i class="bi bi-file-medical"></i>
+                <h6>Historial Nuevo</h6>
+                <p>Este paciente no tiene consultas médicas anteriores registradas.</p>
+            </div>
+        `);
         return;
     }
     
     let html = '<div class="timeline">';
     
     historial.forEach((consulta, index) => {
+        // Determinar el color del marcador según la antigüedad
+        const diasPasados = Math.floor((new Date() - new Date(consulta.fecha_cita)) / (1000 * 60 * 60 * 24));
+        let markerClass = 'recent';
+        if (diasPasados > 90) markerClass = 'old';
+        else if (diasPasados > 30) markerClass = 'medium';
+        
         html += `
-            <div class="timeline-item">
-                <div class="timeline-marker"></div>
+            <div class="timeline-item" style="animation-delay: ${index * 0.1}s">
+                <div class="timeline-marker ${markerClass}"></div>
                 <div class="timeline-content">
-                    <h6 class="mb-2">
-                        <i class="bi bi-calendar3 me-1"></i>
-                        ${formatearFecha(consulta.fecha_cita)}
-                    </h6>
-                    <p class="mb-1">
-                        <strong>Dr. ${consulta.doctor_nombres} ${consulta.doctor_apellidos}</strong>
-                        <span class="badge bg-primary ms-2">${consulta.nombre_especialidad}</span>
-                    </p>
-                    <p class="mb-1"><strong>Diagnóstico:</strong> ${consulta.diagnostico}</p>
-                    ${consulta.tratamiento ? `<p class="mb-1"><strong>Tratamiento:</strong> ${consulta.tratamiento}</p>` : ''}
-                    ${consulta.observaciones ? `<p class="mb-0"><strong>Observaciones:</strong> ${consulta.observaciones}</p>` : ''}
+                    <!-- Header de la consulta -->
+                    <div class="consulta-header">
+                        <h6>
+                            <i class="bi bi-calendar-check"></i>
+                            ${formatearFecha(consulta.fecha_cita)}
+                        </h6>
+                        <span class="tiempo-transcurrido">${calcularTiempoTranscurrido(consulta.fecha_cita)}</span>
+                    </div>
+                    
+                    <!-- Información del médico -->
+                    <div class="medico-info">
+                        <div class="medico-avatar">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
+                        <div class="medico-datos">
+                            <strong>Dr. ${consulta.doctor_nombres} ${consulta.doctor_apellidos}</strong>
+                            <span class="badge bg-primary especialidad-badge">
+                                <i class="bi bi-hospital"></i>
+                                ${consulta.nombre_especialidad}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Contenido de la consulta -->
+                    <div class="consulta-contenido">
+                        <div class="diagnostico-principal">
+                            <h6><i class="bi bi-clipboard-check"></i>Diagnóstico</h6>
+                            <p>${consulta.diagnostico}</p>
+                        </div>
+                        
+                        ${consulta.tratamiento ? `
+                            <div class="tratamiento-info">
+                                <h6><i class="bi bi-prescription2"></i>Tratamiento</h6>
+                                <p>${consulta.tratamiento}</p>
+                            </div>
+                        ` : ''}
+                        
+                        ${consulta.observaciones ? `
+                            <div class="observaciones-info">
+                                <h6><i class="bi bi-chat-square-text"></i>Observaciones</h6>
+                                <p>${consulta.observaciones}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Footer de la consulta -->
+                    <div class="consulta-footer">
+                        <div class="consulta-stats">
+                            <span class="stat-item">
+                                <i class="bi bi-clock-history"></i>
+                                Hace ${calcularTiempoTranscurrido(consulta.fecha_cita)}
+                            </span>
+                            ${consulta.precio_consulta ? `
+                                <span class="stat-item">
+                                    <i class="bi bi-currency-dollar"></i>
+                                    $${consulta.precio_consulta}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -503,6 +731,21 @@ function mostrarHistorialPaciente(historial) {
     container.html(html);
 }
 
+// Función auxiliar para calcular tiempo transcurrido
+function calcularTiempoTranscurrido(fecha) {
+    const ahora = new Date();
+    const fechaConsulta = new Date(fecha);
+    const diferencia = ahora - fechaConsulta;
+    
+    const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+    const meses = Math.floor(dias / 30);
+    const años = Math.floor(dias / 365);
+    
+    if (años > 0) return `${años} año${años > 1 ? 's' : ''}`;
+    if (meses > 0) return `${meses} mes${meses > 1 ? 'es' : ''}`;
+    if (dias > 0) return `${dias} día${dias > 1 ? 's' : ''}`;
+    return 'Hoy';
+}
 // ===== ABRIR MODAL CONSULTA =====
 function abrirModalConsulta(idCita) {
     console.log('🪟 Abriendo modal para cita:', idCita);

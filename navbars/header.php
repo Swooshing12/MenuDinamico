@@ -247,8 +247,9 @@ $id_usuario = $_SESSION['id_usuario'];
                         </div>
                     </li>
                     <li><hr class="dropdown-divider"></li>
+               <li>
                     <li>
-                        <a class="dropdown-item" href="#" onclick="verPerfil()">
+                        <a class="dropdown-item" href="/MenuDinamico/vistas/perfil.php" onclick="showToast('Redirigiendo a tu perfil...', 'info');">
                             <div class="menu-icon">
                                 <i class="bi bi-person-circle"></i>
                             </div>
@@ -783,11 +784,28 @@ function verTodasNotificaciones() {
 }
 
 // Funciones de usuario
+// Función de perfil mejorada
 function verPerfil() {
-   showToast('Abriendo perfil de usuario...', 'info');
-   // Aquí implementar navegación al perfil
+    showToast('Redirigiendo a tu perfil...', 'info');
+    
+    // Detectar la ruta actual y ajustar
+    const currentPath = window.location.pathname;
+    let perfilUrl;
+    
+    if (currentPath.includes('/vistas/')) {
+        // Estamos en una vista, usar ruta relativa
+        perfilUrl = 'perfil.php';
+    } else if (currentPath.includes('/gestion/')) {
+        // Estamos en gestión, subir un nivel
+        perfilUrl = '../perfil.php';
+    } else {
+        // Usar ruta absoluta como fallback
+        perfilUrl = '/MenuDinamico/vistas/perfil.php';
+    }
+    
+    console.log('Redirigiendo a:', perfilUrl); // Para debug
+    window.location.href = perfilUrl;
 }
-
 function abrirConfiguracion() {
    showToast('Abriendo configuración del sistema...', 'info');
    // Aquí implementar navegación a configuración

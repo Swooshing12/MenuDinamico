@@ -189,7 +189,7 @@ class RecepcionistaController {
     }
     
     // ===== MÉTODOS PARA GESTIÓN DE CITAS =====
-    private function registrarCita() {
+private function registrarCita() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
         return;
@@ -278,7 +278,7 @@ class RecepcionistaController {
             'fecha_hora' => $fecha_hora,
             'motivo' => trim($_POST['motivo']),
             'tipo_cita' => $_POST['id_tipo_cita'] == 1 ? 'presencial' : 'virtual',
-            'estado' => 'Pendiente',
+            'estado' => 'Confirmada', // ✅ CAMBIO: Estado automático a "Confirmada"
             'notas' => trim($_POST['notas'] ?? ''),
             'prioridad' => $_POST['prioridad'] ?? 'normal'
         ];
@@ -293,23 +293,29 @@ class RecepcionistaController {
         }
         
         // Registrar la cita
-                    // Registrar la cita
-            $id_cita = $this->citasModel->crear($datos_cita);
+        $id_cita = $this->citasModel->crear($datos_cita);
 
-            if ($id_cita) {
-                // ✅ CORREGIR: Enviar notificación si se solicitó
-                if (isset($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] === 'true') {
-                    $this->enviarNotificacionCita($id_cita, 'confirmacion'); // ← DESCOMENTAR ESTA LÍNEA
-                }
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => 'Cita registrada exitosamente',
-                    'data' => [
-                        'id_cita' => $id_cita,
-                        'fecha_hora' => $fecha_hora
-                    ]
-                ]);
+        if ($id_cita) {
+            // ✅ CAMBIO: Enviar notificación SIEMPRE (sin checkbox)
+            $notificacionEnviada = $this->enviarNotificacionCita($id_cita, 'confirmacion');
+            
+            // Log del resultado del envío
+            if ($notificacionEnviada['success']) {
+                error_log("✅ Notificación enviada exitosamente para cita ID: $id_cita");
+            } else {
+                error_log("⚠️ Error enviando notificación para cita ID: $id_cita - " . $notificacionEnviada['message']);
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita registrada y confirmada exitosamente',
+                'data' => [
+                    'id_cita' => $id_cita,
+                    'fecha_hora' => $fecha_hora,
+                    'estado' => 'Confirmada', // ✅ Confirmar el estado en la respuesta
+                    'notificacion_enviada' => $notificacionEnviada['success'] // ✅ Info del envío
+                ]
+            ]);
         } else {
             $this->responderJSON([
                 'success' => false,

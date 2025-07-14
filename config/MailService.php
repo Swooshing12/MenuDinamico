@@ -352,16 +352,14 @@ class MailService {
  * Generar plantilla HTML para emails de citas
  */
 private function generarPlantillaCita($datos) {
-    // Generar token seguro para confirmación
-    $token = $this->generarTokenConfirmacion($datos['id_cita']);
-    $enlaceConfirmacion = "http://localhost/MenuDinamico/vistas/confirmar_cita.php?token=" . $token;
+    // Ya no necesitamos generar token ni enlace de confirmación
     
     $html = '<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmación de Cita - MediSys</title>
+    <title>Cita Confirmada - MediSys</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f7fb;">
     <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f5f7fb;">
@@ -370,24 +368,24 @@ private function generarPlantillaCita($datos) {
                 <table width="600" border="0" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     
                     <!-- Header -->
-                    <!-- Header -->
-<tr>
-    <td style="background-color: #007bff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">🏥 MediSys</h1>
-        <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Sistema de Gestión Hospitalaria</p>
-    </td>
-</tr>
+                    <tr>
+                        <td style="background-color: #007bff; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">🏥 MediSys</h1>
+                            <p style="color: #ffffff; margin: 10px 0 0 0; font-size: 16px;">Sistema de Gestión Hospitalaria</p>
+                        </td>
+                    </tr>
+                    
                     <!-- Content -->
                     <tr>
                         <td style="padding: 30px;">
-                            <h2 style="color: #333; margin-top: 0;">¡Hola ' . htmlspecialchars($datos['paciente_nombre']) . '!</h2>';
-    
-    // Contenido específico según el tipo
-    if ($datos['tipo'] === 'confirmacion') {
-        $html .= '<p style="color: #666; line-height: 1.6;">Te confirmamos que tu cita médica ha sido <strong>registrada exitosamente</strong>. Para completar el proceso, necesitamos que confirmes tu asistencia.</p>';
-    }
-    
-    $html .= '
+                            <h2 style="color: #333; margin-top: 0;">¡Hola ' . htmlspecialchars($datos['paciente_nombre']) . '!</h2>
+                            
+                            <!-- Mensaje de confirmación automática -->
+                            <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0;">
+                                <h3 style="color: #155724; margin-top: 0;">✅ Tu cita está confirmada</h3>
+                                <p style="color: #155724; margin-bottom: 0;">Tu cita médica ha sido <strong>registrada y confirmada exitosamente</strong>. No necesitas realizar ninguna acción adicional.</p>
+                            </div>
+                            
                             <!-- Detalles de la Cita -->
                             <table width="100%" border="0" cellpadding="15" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; margin: 20px 0;">
                                 <tr>
@@ -446,36 +444,6 @@ private function generarPlantillaCita($datos) {
                             </table>';
     }
     
-    // Sección de confirmación (solo para citas pendientes)
-    if ($datos['tipo'] === 'confirmacion') {
-        $html .= '
-                            <!-- Confirmación -->
-                            <table width="100%" border="0" cellpadding="20" cellspacing="0" style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; margin: 20px 0;">
-                                <tr>
-                                    <td style="text-align: center;">
-                                        <h3 style="color: #155724; margin-top: 0;">✅ Confirma tu Asistencia</h3>
-                                        <p style="color: #155724; margin: 15px 0;">Para asegurar tu cita, por favor confirma tu asistencia haciendo clic en el siguiente botón:</p>
-                                        
-                                        <table border="0" cellpadding="0" cellspacing="0" style="margin: 20px auto;">
-                                            <tr>
-                                                <td style="background-color: #28a745; border-radius: 8px;">
-                                                    <a href="' . $enlaceConfirmacion . '" style="display: inline-block; padding: 15px 30px; color: white; text-decoration: none; font-weight: bold; font-size: 16px;">✅ CONFIRMAR MI CITA</a>
-                                                </td>
-                                            </tr>
-                                        </table>
-                                        
-                                        <p style="color: #856404; font-size: 14px; margin: 15px 0;">
-                                            ⚠️ <strong>Importante:</strong> Este enlace expira en 48 horas.<br>
-                                            Si no confirmas tu cita, podría ser cancelada automáticamente.
-                                        </p>
-                                        <p style="color: #856404; font-size: 14px; margin: 10px 0;">
-                                            📱 También puedes confirmar llamando al: <strong>+593-2-XXX-XXXX</strong>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>';
-    }
-    
     $html .= '
                             <!-- Recomendaciones -->
                             <table width="100%" border="0" cellpadding="20" cellspacing="0" style="background-color: #fff3cd; border-radius: 8px; margin: 20px 0;">
@@ -497,9 +465,21 @@ private function generarPlantillaCita($datos) {
                                 </tr>
                             </table>
                             
-                            <p style="color: #666; line-height: 1.6;">Si tienes alguna pregunta o necesitas reprogramar tu cita, no dudes en contactarnos.</p>
+                            <!-- Información de contacto -->
+                            <table width="100%" border="0" cellpadding="15" cellspacing="0" style="background-color: #f0f8ff; border-radius: 8px; margin: 20px 0;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <h4 style="color: #0066cc; margin-top: 0;">📞 ¿Necesitas hacer cambios?</h4>
+                                        <p style="color: #333; margin: 10px 0;">Si necesitas reprogramar o cancelar tu cita, contáctanos:</p>
+                                        <p style="color: #0066cc; font-weight: bold; margin: 5px 0;">📱 Teléfono: +593-2-XXX-XXXX</p>
+                                        <p style="color: #0066cc; font-weight: bold; margin: 5px 0;">📧 Email: info@medisys.com</p>
+                                    </td>
+                                </tr>
+                            </table>
                             
-                            <p style="color: #999; font-size: 12px;">📧 ID de Cita: #' . htmlspecialchars($datos['id_cita']) . '</p>
+                            <p style="color: #666; line-height: 1.6; text-align: center;">Te esperamos en la fecha y hora programada. ¡Que tengas un excelente día! 😊</p>
+                            
+                            <p style="color: #999; font-size: 12px; text-align: center;">📧 ID de Cita: #' . htmlspecialchars($datos['id_cita']) . '</p>
                         </td>
                     </tr>
                     
