@@ -627,11 +627,7 @@ if (!isset($doctores)) {
                                 Duración por cita (minutos)
                             </label>
                             <select class="form-select" id="duracionCita">
-                                <option value="15">15 minutos</option>
-                                <option value="20">20 minutos</option>
                                 <option value="30" selected>30 minutos</option>
-                                <option value="45">45 minutos</option>
-                                <option value="60">60 minutos</option>
                             </select>
                         </div>
                     </div>

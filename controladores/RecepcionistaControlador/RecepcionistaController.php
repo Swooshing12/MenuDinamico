@@ -54,12 +54,13 @@ class RecepcionistaController {
                 case 'editarCita':
                     $this->editarCita();
                     break;
-                case 'cancelarCita':
-                    $this->cancelarCita();
-                    break;
+           case 'cancelarCita':
+                $this->cancelarCita();
+                break;
                 case 'confirmarCita':
                     $this->confirmarCita();
                     break;
+                    
                 
                 // === TIPOS DE CITA ===
                 case 'obtenerTiposCita':
@@ -330,6 +331,7 @@ private function registrarCita() {
     }
 }
     
+
     private function obtenerCitas() {
     try {
         $filtros = [];
@@ -393,6 +395,8 @@ private function registrarCita() {
         ]);
     }
 }
+
+
     
     private function editarCita() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -517,51 +521,87 @@ private function registrarCita() {
         }
     }
     
-    private function cancelarCita() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
-            return;
-        }
-        
-        $this->verificarPermisos('eliminar');
-        
-        if (empty($_POST['id_cita'])) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'ID de cita requerido'
-            ]);
-            return;
-        }
-        
-        try {
-            $id_cita = (int)$_POST['id_cita'];
-            
-            // Cambiar estado a "Cancelada"
-            $resultado = $this->citasModel->cambiarEstado($id_cita, 'Cancelada');
-            
-            if ($resultado) {
-                // Enviar notificación de cancelación si está habilitada
-                if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
-                    $this->enviarNotificacionCita($id_cita, 'cancelacion');
-                }
-                
-                $this->responderJSON([
-                    'success' => true,
-                    'message' => 'Cita cancelada exitosamente'
-                ]);
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al cancelar la cita'
-                ]);
-            }
-        } catch (Exception $e) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ]);
-        }
+   private function cancelarCita() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON(['success' => false, 'message' => 'Método no permitido']);
+        return;
     }
+    
+    $this->verificarPermisos('eliminar');
+    
+    if (empty($_POST['id_cita'])) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'ID de cita requerido'
+        ]);
+        return;
+    }
+    
+    try {
+        $id_cita = (int)$_POST['id_cita'];
+        $motivo_cancelacion = $_POST['motivo_cancelacion'] ?? 'Sin motivo especificado';
+        
+        // Verificar que la cita existe
+        $cita = $this->citasModel->obtenerPorId($id_cita);
+        if (!$cita) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Cita no encontrada'
+            ]);
+            return;
+        }
+        
+        // Verificar que no esté ya cancelada
+        if ($cita['estado'] === 'Cancelada') {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'La cita ya está cancelada'
+            ]);
+            return;
+        }
+        
+        // Cambiar estado a "Cancelada"
+        $resultado = $this->citasModel->cambiarEstado($id_cita, 'Cancelada');
+        
+        if ($resultado) {
+            // Registrar motivo en las notas
+            $motivo_completo = "[CANCELADA " . date('Y-m-d H:i:s') . "] " . $motivo_cancelacion;
+            $this->citasModel->agregarNota($id_cita, $motivo_completo);
+            
+            // Enviar notificación si está habilitada
+            if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
+                try {
+                    $resultadoNotificacion = $this->enviarNotificacionCita($id_cita, 'cancelacion');
+                    error_log("✅ Resultado notificación cancelación: " . json_encode($resultadoNotificacion));
+                } catch (Exception $e) {
+                    error_log("⚠️ Error enviando notificación de cancelación: " . $e->getMessage());
+                    // No fallar la cancelación por error de notificación
+                }
+            }
+            
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Cita cancelada exitosamente',
+                'data' => [
+                    'id_cita' => $id_cita,
+                    'estado' => 'Cancelada',
+                    'motivo' => $motivo_cancelacion
+                ]
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al cancelar la cita en la base de datos'
+            ]);
+        }
+    } catch (Exception $e) {
+        error_log("❌ Error cancelando cita: " . $e->getMessage());
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error interno: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function confirmarCita() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1357,6 +1397,7 @@ private function registrarCita() {
        
        return $id_submenu;
    }
+   
    
 /**
  * Generar enlace virtual según la plataforma

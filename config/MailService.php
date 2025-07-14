@@ -192,37 +192,41 @@ class MailService {
     /**
      * Enviar cancelación de cita
      */
-    public function enviarCancelacionCita($cita, $paciente) {
-        try {
-            $fecha = new DateTime($cita['fecha_hora']);
-            $fechaFormateada = $fecha->format('l, d \d\e F \d\e Y');
-            $horaFormateada = $fecha->format('H:i');
-            
-            $subject = "❌ Cita Médica Cancelada - MediSys";
-            
-            $htmlBody = $this->generarPlantillaCita([
-                'tipo' => 'cancelacion',
-                'paciente_nombre' => $paciente['nombres'] . ' ' . $paciente['apellidos'],
-                'fecha' => $fechaFormateada,
-                'hora' => $horaFormateada,
-                'doctor' => $cita['doctor_nombres'] . ' ' . $cita['doctor_apellidos'],
-                'especialidad' => $cita['nombre_especialidad'],
-                'sucursal' => $cita['nombre_sucursal'],
-                'id_cita' => $cita['id_cita']
-            ]);
-            
-            return $this->enviarEmail(
-                $paciente['correo'],
-                $paciente['nombres'] . ' ' . $paciente['apellidos'],
-                $subject,
-                $htmlBody
-            );
-            
-        } catch (Exception $e) {
-            error_log("Error enviando cancelación: " . $e->getMessage());
-            return false;
-        }
+    /**
+ * Enviar cancelación de cita (ACTUALIZADO)
+ */
+public function enviarCancelacionCita($cita, $paciente) {
+    try {
+        $fecha = new DateTime($cita['fecha_hora']);
+        $fechaFormateada = $fecha->format('d/m/Y');
+        $horaFormateada = $fecha->format('H:i');
+        
+        $subject = "❌ Cita Médica Cancelada - MediSys";
+        
+        // ✅ USAR LA NUEVA FUNCIÓN ESPECÍFICA
+        $htmlBody = $this->generarPlantillaCancelacion([
+            'paciente_nombre' => $paciente['nombres'] . ' ' . $paciente['apellidos'],
+            'fecha' => $fechaFormateada,
+            'hora' => $horaFormateada,
+            'doctor' => ($cita['doctor_nombres'] ?? '') . ' ' . ($cita['doctor_apellidos'] ?? ''),
+            'especialidad' => $cita['nombre_especialidad'] ?? 'No especificada',
+            'sucursal' => $cita['nombre_sucursal'] ?? 'No especificada',
+            'tipo_cita' => ($cita['id_tipo_cita'] == 2) ? 'Virtual' : 'Presencial',
+            'id_cita' => $cita['id_cita']
+        ]);
+        
+        return $this->enviarEmail(
+            $paciente['correo'],
+            $paciente['nombres'] . ' ' . $paciente['apellidos'],
+            $subject,
+            $htmlBody
+        );
+        
+    } catch (Exception $e) {
+        error_log("Error enviando cancelación: " . $e->getMessage());
+        return false;
     }
+}
     
     // ===== PLANTILLAS HTML =====
     
@@ -503,6 +507,248 @@ private function generarPlantillaCita($datos) {
     return $html;
 }
 
+
+/**
+ * Generar plantilla HTML específica para cancelación de citas
+ */
+private function generarPlantillaCancelacion($datos) {
+    $html = '<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cita Cancelada - MediSys</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f8f9fa; 
+            line-height: 1.6;
+        }
+        .email-container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: #ffffff; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header { 
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            padding: 30px; 
+            text-align: center; 
+            color: white; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: bold;
+        }
+        .header p { 
+            margin: 10px 0 0 0; 
+            font-size: 16px; 
+            opacity: 0.9;
+        }
+        .content { 
+            padding: 30px; 
+        }
+        .alert-cancelacion {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            border: 1px solid #f5c6cb;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cita-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .cita-info h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .info-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .info-table td:first-child {
+            font-weight: bold;
+            color: #495057;
+            width: 30%;
+        }
+        .info-table td:last-child {
+            color: #212529;
+        }
+        .contacto-box {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 1px solid #ffeaa7;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .contacto-box h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .btn-reprogramar {
+            display: inline-block;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 25px;
+            text-align: center;
+            border-top: 1px solid #dee2e6;
+        }
+        .footer p {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .id-cita {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>❌ MediSys</h1>
+            <p>Sistema de Gestión Hospitalaria</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <h2 style="color: #dc3545; margin-top: 0; font-size: 24px;">
+                Cita Médica Cancelada
+            </h2>
+            
+            <p style="font-size: 16px; color: #333;">
+                Estimado/a <strong>' . htmlspecialchars($datos['paciente_nombre']) . '</strong>,
+            </p>
+            
+            <div class="alert-cancelacion">
+                <h3 style="margin: 0; font-size: 18px;">⚠️ CITA CANCELADA</h3>
+                <p style="margin: 10px 0 0 0; font-size: 14px;">
+                    Lamentamos informarte que tu cita médica ha sido cancelada.
+                </p>
+            </div>
+            
+            <p style="font-size: 16px; color: #333; margin: 20px 0;">
+                A continuación te mostramos los detalles de la cita que fue cancelada:
+            </p>
+            
+            <!-- Información de la cita cancelada -->
+            <div class="cita-info">
+                <h3>📋 Detalles de la Cita Cancelada</h3>
+                <table class="info-table">
+                    <tr>
+                        <td>🗓️ Fecha:</td>
+                        <td><strong>' . $datos['fecha'] . '</strong></td>
+                    </tr>
+                    <tr>
+                        <td>🕒 Hora:</td>
+                        <td><strong>' . $datos['hora'] . '</strong></td>
+                    </tr>
+                    <tr>
+                        <td>👨‍⚕️ Doctor:</td>
+                        <td>Dr. ' . htmlspecialchars($datos['doctor']) . '</td>
+                    </tr>
+                    <tr>
+                        <td>🩺 Especialidad:</td>
+                        <td>' . htmlspecialchars($datos['especialidad']) . '</td>
+                    </tr>
+                    <tr>
+                        <td>🏥 Centro Médico:</td>
+                        <td>' . htmlspecialchars($datos['sucursal']) . '</td>
+                    </tr>
+                    <tr>
+                        <td>📱 Tipo de Cita:</td>
+                        <td>' . $datos['tipo_cita'] . '</td>
+                    </tr>
+                    <tr>
+                        <td>🆔 ID de Cita:</td>
+                        <td><span class="id-cita">#' . $datos['id_cita'] . '</span></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Información de contacto para reprogramar -->
+            <div class="contacto-box">
+                <h4>📞 ¿Necesitas Reprogramar tu Cita?</h4>
+                <p style="margin: 10px 0;">
+                    Puedes contactarnos a través de los siguientes medios para agendar una nueva cita:
+                </p>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                    <li><strong>Teléfono:</strong> (02) 123-4567</li>
+                    <li><strong>Email:</strong> citas@medisys.com</li>
+                    <li><strong>WhatsApp:</strong> +593 99 123-4567</li>
+                </ul>
+                <p style="margin: 10px 0; font-size: 14px;">
+                    <strong>Horario de Atención:</strong><br>
+                    Lunes a Viernes: 8:00 AM - 6:00 PM<br>
+                    Sábados: 9:00 AM - 2:00 PM
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="tel:+59323456789" class="btn-reprogramar" style="color: white;">
+                    📞 Llamar para Reprogramar
+                </a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+            
+            <p style="font-size: 14px; color: #6c757d; margin-bottom: 0;">
+                Lamentamos cualquier inconveniente que esta cancelación pueda causarte.<br><br>
+                
+                Saludos cordiales,<br>
+                <strong style="color: #dc3545;">Equipo MediSys</strong><br>
+                <em>Cuidando tu salud con tecnología</em>
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>MediSys - Sistema de Gestión Hospitalaria</strong></p>
+            <p>© ' . date('Y') . ' Todos los derechos reservados</p>
+            <p style="margin-top: 15px;">
+                Este es un correo automático generado por el sistema.<br>
+                Por favor, no respondas directamente a este mensaje.
+            </p>
+        </div>
+    </div>
+</body>
+</html>';
+    
+    return $html;
+}
 /**
  * Generar token seguro para confirmación de cita
  */

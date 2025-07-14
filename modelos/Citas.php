@@ -632,7 +632,42 @@ public function verificarDisponibilidad($id_doctor, $fecha_hora, $id_cita_exclui
         }
     }
     
-    
+    /**
+ * Registrar motivo de cancelación
+ */
+public function registrarMotivoCancelacion($id_cita, $motivo) {
+    try {
+        $query = "UPDATE citas SET 
+                  notas = CONCAT(COALESCE(notas, ''), '\n[CANCELADA] ', :motivo)
+                  WHERE id_cita = :id_cita";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':id_cita' => $id_cita,
+            ':motivo' => $motivo
+        ]);
+    } catch (PDOException $e) {
+        error_log("Error registrando motivo de cancelación: " . $e->getMessage());
+        return false;
+    }
+}
+/**
+ * Agregar una nota a una cita
+ */
+public function agregarNota($id_cita, $nueva_nota) {
+    try {
+        $query = "UPDATE citas SET 
+                  notas = CONCAT(COALESCE(notas, ''), CASE WHEN notas IS NOT NULL AND notas != '' THEN '\n' ELSE '' END, :nueva_nota)
+                  WHERE id_cita = :id_cita";
+        $stmt = $this->conn->prepare($query);
+        return $stmt->execute([
+            ':id_cita' => $id_cita,
+            ':nueva_nota' => $nueva_nota
+        ]);
+    } catch (PDOException $e) {
+        error_log("Error agregando nota a cita: " . $e->getMessage());
+        return false;
+    }
+}
     /**
      * Obtener tipo de cita por ID
      */

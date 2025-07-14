@@ -1223,6 +1223,96 @@ if (!isset($sucursales)) {
    </div>
 </div>
 
+<!-- Modal Cancelar Cita -->
+<div class="modal fade" id="modalCancelarCita" tabindex="-1" aria-labelledby="modalCancelarCitaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="modalCancelarCitaLabel">
+                    <i class="bi bi-x-circle me-2"></i>Cancelar Cita Médica
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Alerta de advertencia -->
+                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
+                    <div>
+                        <strong>¡Atención!</strong> Esta acción no se puede deshacer. La cita será cancelada permanentemente.
+                    </div>
+                </div>
+
+                <!-- Información de la cita -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Información de la Cita</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Paciente:</strong></p>
+                                <p class="text-primary" id="nombrePacienteCancelar">-</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Fecha y Hora:</strong></p>
+                                <p class="text-info" id="fechaHoraCancelar">-</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Doctor:</strong></p>
+                                <p id="doctorCancelar">-</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Estado Actual:</strong></p>
+                                <span class="badge bg-secondary" id="estadoActualCancelar">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulario de cancelación -->
+                <form id="formCancelarCita">
+                    <input type="hidden" id="idCitaCancelar" name="id_cita">
+                    
+                    <div class="mb-4">
+                        <label for="motivoCancelacion" class="form-label fw-bold">
+                            <i class="bi bi-chat-left-text me-2"></i>Motivo de Cancelación <span class="text-danger">*</span>
+                        </label>
+                        <textarea 
+                            class="form-control" 
+                            id="motivoCancelacion" 
+                            name="motivo_cancelacion" 
+                            rows="4" 
+                            placeholder="Describa detalladamente el motivo de la cancelación de la cita..."
+                            required 
+                            maxlength="500"></textarea>
+                        <div class="form-text">
+                            <span id="contadorCaracteres">0/500 caracteres</span> - Mínimo 10 caracteres requeridos
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enviarNotificacionCancelacion" name="enviar_notificacion" checked>
+                            <label class="form-check-label" for="enviarNotificacionCancelacion">
+                                <i class="bi bi-envelope me-2"></i>Enviar notificación al paciente por email
+                            </label>
+                        </div>
+                        <small class="text-muted">El paciente será informado automáticamente sobre la cancelación</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-arrow-left me-2"></i>No, Mantener Cita
+                </button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarCancelacion">
+                    <i class="bi bi-trash3 me-2"></i>Sí, Cancelar Cita
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

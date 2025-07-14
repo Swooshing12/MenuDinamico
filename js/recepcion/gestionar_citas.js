@@ -1827,24 +1827,165 @@ function confirmarCita() {
 }
 
 function cancelarCita() {
-   if (!citaSeleccionada) return;
-   
-   Swal.fire({
-       title: '¿Cancelar cita?',
-       text: 'Esta acción cancelará la cita médica',
-       icon: 'warning',
-       showCancelButton: true,
-       confirmButtonColor: '#dc3545',
-       cancelButtonColor: '#6c757d',
-       confirmButtonText: 'Sí, cancelar',
-       cancelButtonText: 'No cancelar'
-   }).then((result) => {
-       if (result.isConfirmed) {
-           ejecutarAccionCita('cancelarCita', citaSeleccionada.id_cita, 'Cita cancelada exitosamente');
-       }
-   });
+    if (!citaSeleccionada) {
+        mostrarError('No hay ninguna cita seleccionada');
+        return;
+    }
+    
+    console.log('🔍 Cita seleccionada para cancelar:', citaSeleccionada);
+    
+    // Obtener datos de la cita
+    const nombrePaciente = obtenerNombrePaciente(citaSeleccionada);
+    const fechaHora = obtenerFechaHoraCita(citaSeleccionada);
+    const doctorNombre = obtenerNombreDoctor(citaSeleccionada);
+    const estadoActual = citaSeleccionada.estado || citaSeleccionada.extendedProps?.estado || 'No disponible';
+    
+    // Llenar datos en el modal
+    $('#nombrePacienteCancelar').text(nombrePaciente);
+    $('#fechaHoraCancelar').text(fechaHora);
+    $('#doctorCancelar').text(doctorNombre);
+    $('#estadoActualCancelar').text(estadoActual);
+    
+    // Configurar badge de estado
+    const badgeClass = obtenerClaseBadgeEstado(estadoActual);
+    $('#estadoActualCancelar').removeClass().addClass(`badge ${badgeClass}`);
+    
+    // Establecer ID de cita
+    const idCita = citaSeleccionada.id_cita || citaSeleccionada.id || citaSeleccionada.extendedProps?.id_cita;
+    $('#idCitaCancelar').val(idCita);
+    
+    // Limpiar formulario
+    $('#motivoCancelacion').val('');
+    $('#enviarNotificacionCancelacion').prop('checked', true);
+    $('#contadorCaracteres').text('0/500 caracteres');
+    
+    // Mostrar modal
+    $('#modalCancelarCita').modal('show');
 }
 
+// Funciones auxiliares para obtener datos
+function obtenerNombrePaciente(cita) {
+    if (cita.nombres_paciente && cita.apellidos_paciente) {
+        return `${cita.nombres_paciente} ${cita.apellidos_paciente}`;
+    } else if (cita.paciente_nombres && cita.paciente_apellidos) {
+        return `${cita.paciente_nombres} ${cita.paciente_apellidos}`;
+    } else if (cita.title) {
+        return cita.title;
+    } else if (cita.extendedProps?.nombres_paciente && cita.extendedProps?.apellidos_paciente) {
+        return `${cita.extendedProps.nombres_paciente} ${cita.extendedProps.apellidos_paciente}`;
+    }
+    return 'Paciente no identificado';
+}
+
+function obtenerFechaHoraCita(cita) {
+    let fecha = null;
+    
+    if (cita.fecha_hora) {
+        fecha = new Date(cita.fecha_hora);
+    } else if (cita.start) {
+        fecha = new Date(cita.start);
+    } else if (cita.extendedProps?.fecha_hora) {
+        fecha = new Date(cita.extendedProps.fecha_hora);
+    }
+    
+    if (fecha) {
+        const fechaStr = fecha.toLocaleDateString('es-ES', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        const horaStr = fecha.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        return `${fechaStr} a las ${horaStr}`;
+    }
+    
+    return 'Fecha no disponible';
+}
+
+function obtenerNombreDoctor(cita) {
+    if (cita.nombres_doctor && cita.apellidos_doctor) {
+        return `Dr. ${cita.nombres_doctor} ${cita.apellidos_doctor}`;
+    } else if (cita.doctor_nombres && cita.doctor_apellidos) {
+        return `Dr. ${cita.doctor_nombres} ${cita.doctor_apellidos}`;
+    } else if (cita.extendedProps?.nombres_doctor && cita.extendedProps?.apellidos_doctor) {
+        return `Dr. ${cita.extendedProps.nombres_doctor} ${cita.extendedProps.apellidos_doctor}`;
+    }
+    return 'Doctor no identificado';
+}
+
+function obtenerClaseBadgeEstado(estado) {
+    const clases = {
+        'Pendiente': 'bg-warning text-dark',
+        'Confirmada': 'bg-success',
+        'Completada': 'bg-info',
+        'Cancelada': 'bg-danger'
+    };
+    return clases[estado] || 'bg-secondary';
+}
+
+function ejecutarCancelacion(idCita, motivo, enviarNotificacion, callback) {
+    $.ajax({
+        url: '../../controladores/RecepcionistaControlador/RecepcionistaController.php',
+        type: 'POST',
+        data: {
+            action: 'cancelarCita',
+            id_cita: idCita,
+            motivo_cancelacion: motivo,
+            enviar_notificacion: enviarNotificacion ? 'true' : 'false',
+            submenu_id: window.recepcionConfig.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (callback) callback();
+            
+            if (response.success) {
+                // Cerrar modal
+                $('#modalCancelarCita').modal('hide');
+                
+                // Mostrar éxito
+                Swal.fire({
+                    title: '✅ Cita Cancelada',
+                    text: 'La cita ha sido cancelada exitosamente',
+                    icon: 'success',
+                    timer: 2500,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+                
+                // Recargar datos
+                if (typeof calendario !== 'undefined') {
+                    calendario.refetchEvents();
+                }
+                cargarEstadisticas();
+                
+                // Cerrar modal de detalles si está abierto
+                $('#modalVerCita').modal('hide');
+                
+                // Limpiar cita seleccionada
+                citaSeleccionada = null;
+                
+                console.log('✅ Cita cancelada exitosamente');
+            } else {
+                mostrarError(response.message || 'Error al cancelar la cita');
+            }
+        },
+        error: function(xhr, status, error) {
+            if (callback) callback();
+            console.error('Error cancelando cita:', error);
+            
+            let mensaje = 'Error de conexión al cancelar la cita';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                mensaje = xhr.responseJSON.message;
+            }
+            
+            mostrarError(mensaje);
+        }
+    });
+}
 function editarCita() {
    if (!citaSeleccionada) return;
    
@@ -2793,6 +2934,82 @@ function debugCompleto() {
     console.log('  - fecha campo:', !!fecha);
     console.log('  - hora campo:', !!hora);
     console.log('  - Condición que falla:', (!slot || !fecha || !hora));
+}
+
+// ===== EVENTOS DEL MODAL CANCELAR CITA =====
+$(document).ready(function() {
+    // Contador de caracteres en tiempo real
+    $('#motivoCancelacion').on('input', function() {
+        const length = $(this).val().length;
+        const contador = $('#contadorCaracteres');
+        
+        contador.text(`${length}/500 caracteres`);
+        
+        if (length < 10) {
+            contador.removeClass('text-muted text-success').addClass('text-danger');
+        } else {
+            contador.removeClass('text-danger text-muted').addClass('text-success');
+        }
+        
+        // Habilitar/deshabilitar botón según validación
+        const btnConfirmar = $('#btnConfirmarCancelacion');
+        if (length >= 10) {
+            btnConfirmar.prop('disabled', false);
+        } else {
+            btnConfirmar.prop('disabled', true);
+        }
+    });
+    
+    // Evento para confirmar cancelación
+    $('#btnConfirmarCancelacion').on('click', function() {
+        procesarCancelacionCita();
+    });
+    
+    // Auto-focus en el textarea cuando se abre el modal
+    $('#modalCancelarCita').on('shown.bs.modal', function() {
+        $('#motivoCancelacion').focus();
+    });
+    
+    // Validar formulario cuando se envía
+    $('#formCancelarCita').on('submit', function(e) {
+        e.preventDefault();
+        procesarCancelacionCita();
+    });
+});
+
+function procesarCancelacionCita() {
+    const motivo = $('#motivoCancelacion').val().trim();
+    const enviarNotificacion = $('#enviarNotificacionCancelacion').is(':checked');
+    const idCita = $('#idCitaCancelar').val();
+    
+    // Validaciones
+    if (!motivo) {
+        mostrarError('El motivo de cancelación es obligatorio');
+        $('#motivoCancelacion').focus();
+        return;
+    }
+    
+    if (motivo.length < 10) {
+        mostrarError('El motivo debe tener al menos 10 caracteres');
+        $('#motivoCancelacion').focus();
+        return;
+    }
+    
+    if (!idCita) {
+        mostrarError('Error: No se pudo identificar la cita a cancelar');
+        return;
+    }
+    
+    // Deshabilitar botón para evitar doble clic
+    const $btn = $('#btnConfirmarCancelacion');
+    const textoOriginal = $btn.html();
+    $btn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-2"></i>Cancelando...');
+    
+    // Ejecutar cancelación
+    ejecutarCancelacion(idCita, motivo, enviarNotificacion, function() {
+        // Callback para restaurar botón
+        $btn.prop('disabled', false).html(textoOriginal);
+    });
 }
 
 // Hacer disponible globalmente
