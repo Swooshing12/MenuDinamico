@@ -224,7 +224,7 @@ private function obtenerHorarios() {
         ]);
     }
 }
-    private function crear() {
+   private function crear() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         $this->responderJSON([
             'success' => false, 
@@ -237,13 +237,21 @@ private function obtenerHorarios() {
     $this->verificarPermisos('crear');
     
     // Validar datos requeridos
-    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'correo', 'id_especialidad'];
     $camposFaltantes = [];
     
     foreach ($camposRequeridos as $campo) {
         if (empty($_POST[$campo])) {
             $camposFaltantes[] = $campo;
         }
+    }
+    
+    // 🔥 VALIDACIÓN ESPECIAL PARA NACIONALIDAD (select normal o hidden)
+    $nacionalidad = !empty($_POST['nacionalidad']) ? $_POST['nacionalidad'] : 
+                    (!empty($_POST['nacionalidad_hidden']) ? $_POST['nacionalidad_hidden'] : '');
+    
+    if (empty($nacionalidad)) {
+        $camposFaltantes[] = 'nacionalidad';
     }
     
     if (!empty($camposFaltantes)) {
@@ -288,7 +296,7 @@ private function obtenerHorarios() {
             'nombres' => trim($_POST['nombres']),
             'apellidos' => trim($_POST['apellidos']),
             'sexo' => $_POST['sexo'],
-            'nacionalidad' => trim($_POST['nacionalidad']),
+            'nacionalidad' => trim($nacionalidad), // 🔥 USAR LA VARIABLE VALIDADA
             'correo' => trim($_POST['correo']),
             'password' => password_hash($passwordGenerada, PASSWORD_DEFAULT),
             'id_estado' => isset($_POST['id_estado']) ? (int)$_POST['id_estado'] : 1
@@ -311,9 +319,8 @@ private function obtenerHorarios() {
             $horarios = [];
         }
         // DEBUG
-error_log("📦 Horarios recibidos: " . $horariosJson);
-error_log("📋 Horarios procesados: " . print_r($horarios, true));
-        
+        error_log("📦 Horarios recibidos: " . $horariosJson);
+        error_log("📋 Horarios procesados: " . print_r($horarios, true));
         
         // Validar que tenga al menos una sucursal
         if (empty($sucursales)) {
@@ -389,7 +396,6 @@ error_log("📋 Horarios procesados: " . print_r($horarios, true));
         ]);
     }
 }
-    
     /**
  * ✅ EDITAR DOCTOR - MÉTODO COMPLETO
  */

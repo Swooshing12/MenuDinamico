@@ -248,17 +248,40 @@ async function buscarPorCedulaDoctor() {
         $('#nombres').val(palabras.slice(2).join(' ')).prop('readonly', true);
         $('#cedula').prop('readonly', true);
         
-        // 🔥 NACIONALIDAD: Si es ciudadano ecuatoriano
-        if (datos.condicionCiudadano.toUpperCase() === 'CIUDADANO') {
-            // Seleccionar "Ecuadorian" en el Select2
-            $('#nacionalidad').val('Ecuadorian').trigger('change');
-            $('#nacionalidad').prop('disabled', true);
-            
-            if (config.debug) {
-                console.log('Nacionalidad seleccionada automáticamente: Ecuadorian');
-            }
+       if (datos.condicionCiudadano.toUpperCase() === 'CIUDADANO') {
+    console.log('🇪🇨 Seleccionando nacionalidad ecuatoriana...');
+    
+    setTimeout(() => {
+        const $nacionalidad = $('#nacionalidad');
+        const valorNacionalidad = 'Ecuadorean'; // o 'Ecuadorian' según tu BD
+        
+        // ✅ SELECCIONAR VALOR
+        $nacionalidad.val(valorNacionalidad).trigger('change');
+        $nacionalidad.removeClass('is-invalid').addClass('is-valid');
+        
+        // ✅ DESHABILITAR SELECT
+        $nacionalidad.prop('disabled', true);
+        $nacionalidad.addClass('bg-light text-muted');
+        
+        // 🔥 NUEVO: Guardar valor en input hidden
+        $('#nacionalidad_hidden').val(valorNacionalidad);
+        
+        // ✅ INDICADOR VISUAL
+        if (!$nacionalidad.siblings('.readonly-indicator').length) {
+            $nacionalidad.after(`
+                <small class="readonly-indicator text-warning mt-1">
+                    <i class="bi bi-lock-fill me-1"></i>
+                    Detectado automáticamente del registro civil
+                </small>
+            `);
         }
         
+        console.log('✅ Nacionalidad en readonly:', $nacionalidad.val());
+        console.log('✅ Valor guardado en hidden:', $('#nacionalidad_hidden').val());
+        
+    }, 300);
+}
+                    
         // 🔥 ESTILOS VISUALES
         $('#cedula, #nombres, #apellidos').addClass('bg-light text-muted');
         

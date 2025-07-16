@@ -96,21 +96,23 @@ $(document).ready(function() {
         });
         
         // Validación para URLs
-        ['url_submenu', 'edit_url_submenu'].forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener('input', function() {
-                    // Permitir caracteres válidos para URLs
-                    this.value = this.value.replace(/[^a-zA-Z0-9\-_./]/g, '');
-                    
-                    if (this.value.length > 0 && this.value.length < 5) {
-                        this.classList.add('is-invalid');
-                    } else {
-                        this.classList.remove('is-invalid');
-                    }
-                });
-            }
-        });
+        // Validación MÁS PERMISIVA para URLs
+            ['url_submenu', 'edit_url_submenu'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', function() {
+                        // ✅ PERMITIR TODOS LOS CARACTERES VÁLIDOS PARA URLs
+                        // Solo bloquear espacios y caracteres realmente problemáticos
+                        this.value = this.value.replace(/[\s<>"'`]/g, '');
+                        
+                        if (this.value.length > 0 && this.value.length < 5) {
+                            this.classList.add('is-invalid');
+                        } else {
+                            this.classList.remove('is-invalid');
+                        }
+                    });
+                }
+            });
     }
     
     // Configurar eventos

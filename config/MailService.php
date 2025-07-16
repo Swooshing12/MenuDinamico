@@ -195,7 +195,10 @@ class MailService {
     /**
  * Enviar cancelación de cita (ACTUALIZADO)
  */
-public function enviarCancelacionCita($cita, $paciente) {
+/**
+ * Enviar cancelación de cita (ACTUALIZADO CON MOTIVO)
+ */
+public function enviarCancelacionCita($cita, $paciente, $motivoCancelacion = '') {
     try {
         $fecha = new DateTime($cita['fecha_hora']);
         $fechaFormateada = $fecha->format('d/m/Y');
@@ -203,7 +206,7 @@ public function enviarCancelacionCita($cita, $paciente) {
         
         $subject = "❌ Cita Médica Cancelada - MediSys";
         
-        // ✅ USAR LA NUEVA FUNCIÓN ESPECÍFICA
+        // ✅ INCLUIR EL MOTIVO DE CANCELACIÓN
         $htmlBody = $this->generarPlantillaCancelacion([
             'paciente_nombre' => $paciente['nombres'] . ' ' . $paciente['apellidos'],
             'fecha' => $fechaFormateada,
@@ -212,7 +215,8 @@ public function enviarCancelacionCita($cita, $paciente) {
             'especialidad' => $cita['nombre_especialidad'] ?? 'No especificada',
             'sucursal' => $cita['nombre_sucursal'] ?? 'No especificada',
             'tipo_cita' => ($cita['id_tipo_cita'] == 2) ? 'Virtual' : 'Presencial',
-            'id_cita' => $cita['id_cita']
+            'id_cita' => $cita['id_cita'],
+            'motivo_cancelacion' => $motivoCancelacion // ✅ AGREGAR MOTIVO
         ]);
         
         return $this->enviarEmail(
@@ -590,6 +594,28 @@ private function generarPlantillaCancelacion($datos) {
         .info-table td:last-child {
             color: #212529;
         }
+        .motivo-cancelacion {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border: 1px solid #ffcc02;
+            border-left: 4px solid #ff9800;
+            color: #e65100;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .motivo-cancelacion h4 {
+            margin-top: 0;
+            color: #e65100;
+            font-size: 16px;
+        }
+        .motivo-text {
+            background: rgba(255, 255, 255, 0.7);
+            padding: 15px;
+            border-radius: 6px;
+            font-style: italic;
+            border-left: 3px solid #ff9800;
+            margin-top: 10px;
+        }
         .contacto-box {
             background: linear-gradient(135deg, #fff3cd, #ffeaa7);
             border: 1px solid #ffeaa7;
@@ -697,8 +723,24 @@ private function generarPlantillaCancelacion($datos) {
                         <td><span class="id-cita">#' . $datos['id_cita'] . '</span></td>
                     </tr>
                 </table>
-            </div>
+            </div>';
             
+    // ✅ AGREGAR MOTIVO DE CANCELACIÓN SI EXISTE
+    if (!empty($datos['motivo_cancelacion'])) {
+        $html .= '
+            <!-- Motivo de cancelación -->
+            <div class="motivo-cancelacion">
+                <h4>📝 Motivo de la Cancelación</h4>
+                <div class="motivo-text">
+                    "' . htmlspecialchars($datos['motivo_cancelacion']) . '"
+                </div>
+                <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.8;">
+                    <em>Información proporcionada por el centro médico</em>
+                </p>
+            </div>';
+    }
+            
+    $html .= '
             <!-- Información de contacto para reprogramar -->
             <div class="contacto-box">
                 <h4>📞 ¿Necesitas Reprogramar tu Cita?</h4>

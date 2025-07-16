@@ -569,15 +569,16 @@ private function registrarCita() {
             $this->citasModel->agregarNota($id_cita, $motivo_completo);
             
             // Enviar notificación si está habilitada
-            if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
-                try {
-                    $resultadoNotificacion = $this->enviarNotificacionCita($id_cita, 'cancelacion');
-                    error_log("✅ Resultado notificación cancelación: " . json_encode($resultadoNotificacion));
-                } catch (Exception $e) {
-                    error_log("⚠️ Error enviando notificación de cancelación: " . $e->getMessage());
-                    // No fallar la cancelación por error de notificación
-                }
-            }
+            // En el método cancelarCita(), donde envías la notificación:
+if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 'true') {
+    try {
+        // ✅ PASAR EL MOTIVO DE CANCELACIÓN AL MÉTODO
+        $resultadoNotificacion = $this->enviarNotificacionCita($id_cita, 'cancelacion', $motivo_cancelacion);
+        error_log("✅ Resultado notificación cancelación: " . json_encode($resultadoNotificacion));
+    } catch (Exception $e) {
+        error_log("⚠️ Error enviando notificación de cancelación: " . $e->getMessage());
+    }
+}
             
             $this->responderJSON([
                 'success' => true,
@@ -1200,7 +1201,7 @@ private function registrarCita() {
        }
    }
    
-   private function enviarNotificacionCita($id_cita, $tipo) {
+   private function enviarNotificacionCita($id_cita, $tipo, $motivoCancelacion = '') {
     try {
         error_log("🔍 DEBUG: Iniciando envío de notificación para cita: $id_cita, tipo: $tipo");
         
@@ -1233,11 +1234,6 @@ private function registrarCita() {
         ];
         
         error_log("🔍 DEBUG: Datos del paciente preparados: " . json_encode($paciente));
-        error_log("🔍 DEBUG: Datos de la cita: " . json_encode([
-            'fecha_hora' => $cita['fecha_hora'] ?? 'NO DEFINIDO',
-            'doctor_nombres' => $cita['doctor_nombres'] ?? 'NO DEFINIDO',
-            'id_tipo_cita' => $cita['id_tipo_cita'] ?? 'NO DEFINIDO'
-        ]));
         
         // Enviar email según el tipo
         $emailEnviado = false;
@@ -1254,8 +1250,10 @@ private function registrarCita() {
                 break;
                 
             case 'cancelacion':
-                error_log("🔍 DEBUG: Llamando a enviarCancelacionCita...");
-                $emailEnviado = $mailService->enviarCancelacionCita($cita, $paciente);
+                error_log("🔍 DEBUG: Llamando a enviarCancelacionCita con motivo: $motivoCancelacion");
+                // ✅ PASAR EL MOTIVO A LA FUNCIÓN DE CANCELACIÓN
+                $emailEnviado = $mailService->enviarCancelacionCita($cita, $paciente, $motivoCancelacion);
+                error_log("🔍 DEBUG: Resultado de enviarCancelacionCita: " . ($emailEnviado ? 'TRUE' : 'FALSE'));
                 break;
         }
         
@@ -1267,7 +1265,8 @@ private function registrarCita() {
                 'data' => [
                     'tipo' => $tipo,
                     'destinatario' => $cita['paciente_correo'],
-                    'cita_id' => $id_cita
+                    'cita_id' => $id_cita,
+                    'motivo_cancelacion' => $motivoCancelacion
                 ]
             ];
         } else {

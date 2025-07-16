@@ -160,18 +160,7 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
                                             </button>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
-                                        <div class="export-buttons">
-                                            <button class="btn btn-success" id="btnExportarPDF">
-                                                <i class="bi bi-file-pdf me-1"></i>
-                                                Exportar PDF
-                                            </button>
-                                            <button class="btn btn-info" id="btnExportarExcel">
-                                                <i class="bi bi-file-excel me-1"></i>
-                                                Excel
-                                            </button>
-                                        </div>
-                                    </div>
+                                    
                                 </div>
                             </div>
 

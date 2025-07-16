@@ -1665,6 +1665,95 @@ function mostrarExito(mensaje) {
    });
 }
 
+// ===== VALIDACIÓN PERSONALIZADA PARA FORMULARIO DOCTOR =====
+$(document).ready(function() {
+    
+    // Interceptar el submit del formulario
+    $('#formCrearDoctor').on('submit', function(e) {
+        console.log('📝 Validando formulario de doctor...');
+        
+        // Validar nacionalidad específicamente
+        if (!validarNacionalidadDoctor()) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        
+        // Si llegamos aquí, la nacionalidad está bien
+        console.log('✅ Nacionalidad válida, continuando con submit...');
+    });
+    
+});
+
+// ===== CONTROL DE SELECCIÓN ÚNICA DE SUCURSALES =====
+
+// Para modal de crear
+$(document).on('change', '#sucursalesCrear input[type="checkbox"]', function() {
+    if (this.checked) {
+        // Desmarcar todos los otros checkboxes
+        $('#sucursalesCrear input[type="checkbox"]').not(this).prop('checked', false);
+        
+        // Mensaje informativo
+        console.log('🏥 Sucursal seleccionada:', $(this).val());
+    }
+});
+
+// Para modal de editar
+$(document).on('change', '#sucursalesEditar input[type="checkbox"]', function() {
+    if (this.checked) {
+        // Desmarcar todos los otros checkboxes
+        $('#sucursalesEditar input[type="checkbox"]').not(this).prop('checked', false);
+        
+        // Mensaje informativo
+        console.log('🏥 Sucursal seleccionada para editar:', $(this).val());
+    }
+});
+
+// ===== FUNCIÓN ESPECÍFICA PARA VALIDAR NACIONALIDAD =====
+function validarNacionalidadDoctor() {
+    const $nacionalidad = $('#nacionalidad');
+    const valor = $nacionalidad.val();
+    
+    console.log('🔍 Validando nacionalidad:', valor);
+    
+    if (!valor || valor.trim() === '') {
+        // Mostrar error visual
+        $nacionalidad.addClass('is-invalid');
+        
+        // Crear o actualizar mensaje de error
+        let $errorMsg = $nacionalidad.siblings('.invalid-feedback');
+        if ($errorMsg.length === 0) {
+            $errorMsg = $('<div class="invalid-feedback">El campo nacionalidad es obligatorio.</div>');
+            $nacionalidad.after($errorMsg);
+        }
+        $errorMsg.show();
+        
+        // Scroll hacia el campo
+        $nacionalidad[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Mostrar SweetAlert
+        Swal.fire({
+            icon: 'error',
+            title: 'Campo requerido',
+            text: 'Por favor seleccione una nacionalidad',
+            timer: 3000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+        
+        console.log('❌ Nacionalidad inválida');
+        return false;
+    } else {
+        // Remover error visual
+        $nacionalidad.removeClass('is-invalid').addClass('is-valid');
+        $nacionalidad.siblings('.invalid-feedback').hide();
+        
+        console.log('✅ Nacionalidad válida:', valor);
+        return true;
+    }
+}
+
 // ===== FUNCIONES GLOBALES PARA ONCLICK =====
 window.cargarDoctoresPaginados = cargarDoctoresPaginados;
 window.abrirModalEditar = abrirModalEditar;

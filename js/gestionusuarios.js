@@ -568,15 +568,26 @@ function buscarPorCedula() {
             $('#cedula').prop('readonly', true);
             
             // 🔥 NACIONALIDAD: Si es ciudadano ecuatoriano
+            // ✅ EN AMBOS: gestionusuarios.js Y nacionalidades.js
             if (c.condicionCiudadano.toUpperCase() === 'CIUDADANO') {
-                // Seleccionar "Ecuadorean" en el select y bloquearlo
-                $('#nacionalidadSelect').val('Ecuadorean').prop('disabled', true);
+                // Seleccionar y dar estilo visual de disabled
+                $('#nacionalidadSelect, #nacionalidad').val('Ecuadorean')
+                    .addClass('bg-light text-muted')
+                    .css('pointer-events', 'none');
                 
-                if (config.debug) {
-                    console.log('Nacionalidad seleccionada automáticamente: Ecuadorean');
+                // ✅ CREAR INPUT HIDDEN PARA ENVIAR EL VALOR
+                const fieldName = $('#nacionalidadSelect').length ? 'nacionalidadSelect' : 'nacionalidad';
+                const hiddenId = fieldName + '_hidden';
+                
+                if (!$('#' + hiddenId).length) {
+                    $('#' + fieldName).after(`<input type="hidden" id="${hiddenId}" name="nacionalidad" value="Ecuadorean">`);
+                } else {
+                    $('#' + hiddenId).val('Ecuadorean');
                 }
+                
+                console.log('✅ Nacionalidad en hidden input:', $('#' + hiddenId).val());
             }
-            
+                        
             // 🔥 CAMBIAR ESTILOS VISUALES PARA INDICAR QUE ESTÁN BLOQUEADOS
             $('#cedula, #nombres, #apellidos').addClass('bg-light text-muted');
             $('#nacionalidadSelect').addClass('bg-light text-muted');

@@ -358,24 +358,27 @@ if (!isset($doctores)) {
                                     </div>
 
                                     <!-- Actualizar el campo de nacionalidad -->
-                                    <!-- Campo de nacionalidad con Select2 -->
-                                            <div class="col-md-6">
-                                                <label for="nacionalidad" class="form-label">
-                                                    <i class="bi bi-globe me-1"></i>
-                                                    Nacionalidad *
-                                                </label>
-                                                <select class="form-select" id="nacionalidad" name="nacionalidad" required 
-                                                        data-bs-theme="bootstrap-5">
-                                                    <option value="">Seleccionar nacionalidad...</option>
-                                                    <!-- Se llena dinámicamente -->
-                                                </select>
-                                                <div class="form-text">
-                                                    <i class="bi bi-search me-1"></i>
-                                                    Puedes buscar escribiendo el nombre del país o nacionalidad
-                                                </div>
-                                            </div>
-
-                            <div class="col-md-6">
+                                                                    <!-- Campo de nacionalidad con Select2 -->
+                                    <div class="col-md-6">
+                                        <label for="nacionalidad" class="form-label">
+                                            <i class="bi bi-globe me-1"></i>
+                                            Nacionalidad *
+                                        </label>
+                                        <select class="form-select" id="nacionalidad" name="nacionalidad" required 
+                                                data-bs-theme="bootstrap-5">
+                                            <option value="">Seleccionar nacionalidad...</option>
+                                            <!-- Se llena dinámicamente -->
+                                        </select>
+                                        
+                                        <!-- 🔥 NUEVO: Input hidden para cuando el select esté disabled -->
+                                        <input type="hidden" id="nacionalidad_hidden" name="nacionalidad_hidden">
+                                        
+                                        <div class="form-text">
+                                            <i class="bi bi-search me-1"></i>
+                                            Puedes buscar escribiendo el nombre del país o nacionalidad
+                                        </div>
+                                    </div>
+                                                                <div class="col-md-6">
                                 <div class="form-floating">
                                     <input type="text" class="form-control" id="nombres" name="nombres" 
                                            placeholder="Nombres" required maxlength="255">
