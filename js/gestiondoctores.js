@@ -1206,6 +1206,162 @@ function generarNuevaPassword() {
 
 // ===== FUNCIONES DE VALIDACIÓN =====
 
+// ===== VALIDACIONES EN TIEMPO REAL =====
+function inicializarValidacionesEnTiempoReal() {
+    console.log('🔧 Inicializando validaciones en tiempo real...');
+    
+    // 📱 VALIDACIÓN DE CÉDULA - Solo números, máximo 15 caracteres
+    $('#cedula, #editarCedula').on('input', function() {
+        let valor = this.value.replace(/[^0-9]/g, ''); // Solo números
+        
+        if (valor.length > 15) {
+            valor = valor.substring(0, 15); // Máximo 15 caracteres
+        }
+        
+        this.value = valor;
+        
+        // Validación visual
+        if (valor.length >= 10 && valor.length <= 15) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+            $(this).siblings('.invalid-feedback').hide();
+            $(this).siblings('.valid-feedback').show();
+        } else if (valor.length > 0) {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+            $(this).siblings('.valid-feedback').hide();
+            $(this).siblings('.invalid-feedback').show();
+        } else {
+            $(this).removeClass('is-valid is-invalid');
+            $(this).siblings('.valid-feedback, .invalid-feedback').hide();
+        }
+    });
+    
+    // 👤 VALIDACIÓN DE NOMBRES - Solo letras, espacios y acentos
+    $('#nombres, #editarNombres').on('input', function() {
+        let valor = this.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
+        
+        if (valor.length > 100) {
+            valor = valor.substring(0, 100);
+        }
+        
+        this.value = valor;
+        validarCampoTexto(this, 2, 100);
+    });
+    
+    // 👥 VALIDACIÓN DE APELLIDOS - Solo letras, espacios y acentos
+    $('#apellidos, #editarApellidos').on('input', function() {
+        let valor = this.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
+        
+        if (valor.length > 100) {
+            valor = valor.substring(0, 100);
+        }
+        
+        this.value = valor;
+        validarCampoTexto(this, 2, 100);
+    });
+    
+    // 👨‍⚕️ VALIDACIÓN DE TÍTULO PROFESIONAL - Letras, números, espacios, puntos, comas
+    $('#titulo_profesional, #editarTituloProfesional').on('input', function() {
+        let valor = this.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ0-9\s\.\,\-]/g, '');
+        
+        if (valor.length > 100) {
+            valor = valor.substring(0, 100);
+        }
+        
+        this.value = valor;
+        validarCampoTexto(this, 2, 100);
+    });
+    
+    // 📧 VALIDACIÓN DE CORREO ELECTRÓNICO EN TIEMPO REAL
+    $('#correo, #editarCorreo').on('input', function() {
+        const email = this.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
+        if (email.length === 0) {
+            $(this).removeClass('is-valid is-invalid');
+        } else if (emailRegex.test(email)) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+            $(this).siblings('.invalid-feedback').hide();
+            $(this).siblings('.valid-feedback').show();
+        } else {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+            $(this).siblings('.valid-feedback').hide();
+            $(this).siblings('.invalid-feedback').show();
+        }
+    });
+    
+    // 👨‍💼 VALIDACIÓN DE USERNAME - Letras, números, guiones bajos
+    $('#username, #editarUsername').on('input', function() {
+        let valor = this.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+        
+        if (valor.length > 50) {
+            valor = valor.substring(0, 50);
+        }
+        
+        this.value = valor;
+        
+        if (valor.length >= 3) {
+            verificarUsernameDisponible(valor, this);
+        } else if (valor.length > 0) {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+            $(this).siblings('.invalid-feedback').text('El username debe tener al menos 3 caracteres').show();
+            $(this).siblings('.valid-feedback').hide();
+        } else {
+            $(this).removeClass('is-valid is-invalid');
+            $(this).siblings('.valid-feedback, .invalid-feedback').hide();
+        }
+    });
+    
+    // ⏰ VALIDACIÓN DE HORARIOS
+    $('#horaInicio, #horaFin').on('change', function() {
+        validarHorarios();
+    });
+    
+    console.log('✅ Validaciones en tiempo real inicializadas');
+}
+
+// 🔍 FUNCIÓN AUXILIAR PARA VALIDAR CAMPOS DE TEXTO
+function validarCampoTexto(elemento, minLength = 2, maxLength = 100) {
+    const valor = elemento.value.trim();
+    
+    if (valor.length === 0) {
+        $(elemento).removeClass('is-valid is-invalid');
+        $(elemento).siblings('.valid-feedback, .invalid-feedback').hide();
+    } else if (valor.length >= minLength && valor.length <= maxLength) {
+        $(elemento).removeClass('is-invalid').addClass('is-valid');
+        $(elemento).siblings('.invalid-feedback').hide();
+        $(elemento).siblings('.valid-feedback').show();
+    } else {
+        $(elemento).removeClass('is-valid').addClass('is-invalid');
+        $(elemento).siblings('.valid-feedback').hide();
+        $(elemento).siblings('.invalid-feedback').show();
+    }
+}
+
+
+
+// ⏰ VALIDAR HORARIOS
+function validarHorarios() {
+    const horaInicio = $('#horaInicio').val();
+    const horaFin = $('#horaFin').val();
+    
+    if (horaInicio && horaFin) {
+        if (horaInicio >= horaFin) {
+            $('#horaFin').removeClass('is-valid').addClass('is-invalid');
+            $('#horaFin').siblings('.invalid-feedback').text('La hora de fin debe ser posterior a la de inicio').show();
+            return false;
+        } else {
+            $('#horaInicio, #horaFin').removeClass('is-invalid').addClass('is-valid');
+            $('#horaInicio, #horaFin').siblings('.invalid-feedback').hide();
+            return true;
+        }
+    }
+    return true;
+}
+
+// 🚀 INICIALIZAR VALIDACIONES CUANDO EL DOCUMENTO ESTÉ LISTO
+$(document).ready(function() {
+    inicializarValidacionesEnTiempoReal();
+});
 /**
 * Generar username automático
 */

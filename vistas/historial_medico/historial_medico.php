@@ -22,6 +22,9 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
 <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 <!-- SweetAlert2 CSS -->
 <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
+
 <!-- CSS personalizado -->
 <link href="../../estilos/historial_medico.css" rel="stylesheet">
 
@@ -143,28 +146,8 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
                                 </div>
                             </div>
 
-                            <!-- Búsqueda rápida -->
-                            <div class="quick-search mb-3">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <div class="input-group">
-                                            <span class="input-group-text">
-                                                <i class="bi bi-search"></i>
-                                            </span>
-                                            <input type="text" 
-                                                   class="form-control" 
-                                                   id="busquedaTermino" 
-                                                   placeholder="Buscar en diagnósticos, tratamientos, observaciones...">
-                                            <button class="btn btn-outline-primary" id="btnBuscarEnHistorial">
-                                                Buscar
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                </div>
-                            </div>
-
-                            <!-- Filtros avanzados (colapsable) -->
+                            
+                                                        <!-- Filtros avanzados (colapsable) -->
                             <div class="collapse" id="filtrosAvanzados">
                                 <div class="advanced-filters">
                                     <form id="formFiltros">
@@ -189,10 +172,11 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
                                                 <label class="form-label">Estado</label>
                                                 <select class="form-select" id="filtroEstado" name="estado">
                                                     <option value="">Todos los estados</option>
-                                                    <option value="Pendiente">Pendiente</option>
-                                                    <option value="Confirmada">Confirmada</option>
-                                                    <option value="Completada">Completada</option>
-                                                    <option value="Cancelada">Cancelada</option>
+                                                    <option value="Pendiente">⏳ Pendiente</option>
+                                                    <option value="Confirmada">📅 Confirmada</option>
+                                                    <option value="Completada">✅ Completada</option>
+                                                    <option value="Cancelada">❌ Cancelada</option>
+                                                    <option value="No Asistio">👻 No Asistió</option>
                                                 </select>
                                             </div>
                                             <div class="col-md-4">
@@ -336,6 +320,8 @@ include_once __DIR__ . '/../../navbars/sidebar.php';
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <!-- Script principal (DESPUÉS de todas las librerías) -->
 <script src="../../js/historial_medico/historial_medico.js"></script>

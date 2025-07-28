@@ -44,6 +44,7 @@ $(document).ready(function() {
     inicializarModal();
     cargarDatosIniciales();
     
+    
     console.log('✅ Sistema de consultas médicas inicializado completamente');
 });
 
@@ -63,10 +64,16 @@ function inicializarEventos() {
         cargarCitasConTriaje();
     });
     
-    // Eventos de filtros
+    // Evento para filtro de estado
     $('#filtroEstado').on('change', function() {
-        console.log('🔍 Filtro cambiado a:', $(this).val());
+        console.log('🔄 Filtro de estado cambiado:', $(this).val());
         filtrarCitas();
+    });
+    // Evento para búsqueda de paciente
+    $('#buscarPaciente').on('input keyup', function() {
+        const termino = $(this).val().trim();
+        console.log('🔍 Búsqueda de paciente:', termino);
+        buscarPaciente(termino);
     });
     
     // Eventos del formulario de consulta
@@ -794,14 +801,14 @@ function guardarConsulta() {
         console.error('❌ Formulario no encontrado');
         return;
     }
-    
+
     const formData = new FormData(form);
     formData.append('action', 'crearConsulta');
     formData.append('submenu_id', config.submenuId);
-    
+
     // 🔥 IMPORTANTE: Capturar el ID de la cita antes del envío
     const id_cita = formData.get('id_cita');
-    
+
     if (!id_cita) {
         Swal.fire({
             icon: 'error',
@@ -810,7 +817,7 @@ function guardarConsulta() {
         });
         return;
     }
-    
+
     // Mostrar loading
     Swal.fire({
         title: 'Guardando consulta...',
@@ -822,7 +829,7 @@ function guardarConsulta() {
             Swal.showLoading();
         }
     });
-    
+
     $.ajax({
         url: config.baseUrl,
         type: 'POST',
@@ -830,17 +837,17 @@ function guardarConsulta() {
         processData: false,
         contentType: false,
         dataType: 'json',
-        success: function(response) {
+        success: async function(response) {
             console.log('✅ Respuesta guardar consulta:', response);
-            
+
             if (response.success) {
                 Swal.close();
-                
+
                 // 🔥 MOSTRAR MENSAJE DE ÉXITO CON BOTÓN CORREGIDO
-                const mensajePDF = response.pdf_enviado ? 
+                const mensajePDF = response.pdf_enviado ?
                     '<span class="text-success">✅ PDF enviado automáticamente al correo del paciente.</span>' :
                     '<span class="text-warning">⚠️ Error al enviar PDF automáticamente.</span>';
-                
+
                 Swal.fire({
                     icon: 'success',
                     title: '¡Consulta Guardada Exitosamente!',
@@ -863,14 +870,43 @@ function guardarConsulta() {
                     confirmButtonText: 'Continuar',
                     confirmButtonColor: '#198754',
                     width: '500px'
-                }).then(() => {
-                    // Cerrar modal y recargar datos
+                }).then(async () => {
+                    // ✅ CERRAR MODAL
                     if (modalConsulta) {
                         modalConsulta.hide();
                     }
-                    cargarCitasDelDia();
+                    
+                    // ✅ RECARGAR DATOS ACTUALIZADOS
+                    console.log('🔄 Recargando citas después de guardar consulta...');
+                    await cargarCitasConTriaje();
+                    
+                    // ✅ MANTENER FILTROS APLICADOS
+                    const filtroActual = $('#filtroEstado').val();
+                    const fechaActual = $('#fechaConsulta').val();
+                    const busquedaActual = $('#buscarPaciente').val();
+                    
+                    // Pequeño delay para asegurar que los datos se cargaron
+                    setTimeout(() => {
+                        if (filtroActual && filtroActual !== 'todos') {
+                            console.log('🔄 Reaplicando filtro:', filtroActual);
+                            $('#filtroEstado').val(filtroActual).trigger('change');
+                        }
+                        
+                        if (busquedaActual) {
+                            console.log('🔄 Reaplicando búsqueda:', busquedaActual);
+                            $('#buscarPaciente').val(busquedaActual);
+                            buscarPaciente(busquedaActual);
+                        }
+                        
+                        // ✅ ACTUALIZAR CONTADORES
+                        actualizarContadores();
+                        
+                        // ✅ MENSAJE OPCIONAL
+                        mostrarExito('Datos actualizados correctamente');
+                        
+                    }, 1000);
                 });
-                
+
             } else {
                 Swal.fire({
                     icon: 'error',
@@ -882,7 +918,7 @@ function guardarConsulta() {
         error: function(xhr, status, error) {
             console.error('❌ Error AJAX guardar consulta:', error);
             console.error('❌ Respuesta del servidor:', xhr.responseText);
-            
+
             Swal.fire({
                 icon: 'error',
                 title: 'Error de conexión',
@@ -1241,43 +1277,186 @@ function getPrioridadColor(prioridad) {
         default: return 'secondary';
     }
 }
+function actualizarContadores() {
+    const total = citasDelDia.length;
+    
+    // Contar por estado real
+    const pendientes = citasDelDia.filter(c => c.estado === 'Pendiente').length;
+    const confirmadas = citasDelDia.filter(c => c.estado === 'Confirmada').length;
+    const completadas = citasDelDia.filter(c => c.estado === 'Completada').length;
+    const canceladas = citasDelDia.filter(c => c.estado === 'Cancelada').length;
+    
+    // Contar por proceso de consulta
+    const sinConsulta = citasDelDia.filter(c => !c.tiene_consulta || c.tiene_consulta == 0).length;
+    const conConsulta = citasDelDia.filter(c => c.tiene_consulta == 1).length;
+    
+    console.log(`📊 Contadores actualizados:
+    - Total: ${total}
+    - Pendientes: ${pendientes}
+    - Confirmadas: ${confirmadas} 
+    - Completadas: ${completadas}
+    - Canceladas: ${canceladas}
+    - Sin consulta: ${sinConsulta}
+    - Con consulta: ${conConsulta}`);
+    
+    // Actualizar badges en la interfaz si existen
+    $('#totalCitas').text(total);
+    $('#citasPendientes').text(pendientes);
+    $('#citasConfirmadas').text(confirmadas);
+    $('#citasCompletadas').text(completadas);
+    $('#citasSinConsulta').text(sinConsulta);
+    $('#citasConConsulta').text(conConsulta);
+}
 
 function filtrarCitas() {
     const filtro = $('#filtroEstado').val();
-    let citasFiltradas = citasDelDia;
+    console.log('🔍 ===== INICIANDO FILTRO =====');
+    console.log('🔍 Filtro seleccionado:', filtro);
+    console.log('📊 Total citas disponibles:', citasDelDia.length);
     
-    console.log('🔍 Filtrando citas por:', filtro);
+    // ✅ VERIFICAR QUE TENGAMOS DATOS
+    if (!citasDelDia || citasDelDia.length === 0) {
+        console.log('⚠️ No hay citas para filtrar');
+        mostrarCitas([]);
+        return;
+    }
     
+    // ✅ DEBUGGING: Mostrar estructura de datos
+    console.log('📋 Ejemplo de cita para debugging:', citasDelDia[0]);
+    const estadosDisponibles = [...new Set(citasDelDia.map(c => c.estado))];
+    console.log('🎯 Estados disponibles en los datos:', estadosDisponibles);
+    
+    let citasFiltradas = [];
+    
+    // ✅ FILTRAR SEGÚN OPCIÓN SELECCIONADA
     switch (filtro) {
-        case 'pendientes':
-            citasFiltradas = citasDelDia.filter(cita => cita.tiene_consulta == 0);
+        case 'Pendiente':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const coincide = cita.estado === 'Pendiente';
+                if (coincide) console.log('✅ Pendiente encontrada:', cita.id_cita, cita.nombres_paciente);
+                return coincide;
+            });
             break;
-        case 'consultados':
-            citasFiltradas = citasDelDia.filter(cita => cita.tiene_consulta == 1);
+            
+        case 'Confirmada':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const coincide = cita.estado === 'Confirmada';
+                if (coincide) console.log('✅ Confirmada encontrada:', cita.id_cita, cita.nombres_paciente);
+                return coincide;
+            });
             break;
+            
+        case 'Completada':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const coincide = cita.estado === 'Completada';
+                if (coincide) console.log('✅ Completada encontrada:', cita.id_cita, cita.nombres_paciente);
+                return coincide;
+            });
+            break;
+            
+        case 'Cancelada':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const coincide = cita.estado === 'Cancelada';
+                if (coincide) console.log('✅ Cancelada encontrada:', cita.id_cita, cita.nombres_paciente);
+                return coincide;
+            });
+            break;
+            
+        case 'No Asistio':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const coincide = cita.estado === 'No Asistio';
+                if (coincide) console.log('✅ No Asistió encontrada:', cita.id_cita, cita.nombres_paciente);
+                return coincide;
+            });
+            break;
+            
+        // ✅ FILTROS ESPECIALES POR CONSULTA
+        case 'sin_consulta':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const sinConsulta = !cita.tiene_consulta || 
+                                  cita.tiene_consulta == 0 || 
+                                  cita.tiene_consulta === false ||
+                                  !cita.id_consulta ||
+                                  cita.id_consulta === null;
+                if (sinConsulta) console.log('✅ Sin consulta:', cita.id_cita, cita.nombres_paciente);
+                return sinConsulta;
+            });
+            break;
+            
+        case 'con_consulta':
+            citasFiltradas = citasDelDia.filter(cita => {
+                const conConsulta = cita.tiene_consulta == 1 || 
+                                  cita.tiene_consulta === true ||
+                                  (cita.id_consulta && cita.id_consulta !== null);
+                if (conConsulta) console.log('✅ Con consulta:', cita.id_cita, cita.nombres_paciente);
+                return conConsulta;
+            });
+            break;
+            
+        case 'todos':
         default:
-            citasFiltradas = citasDelDia;
+            citasFiltradas = [...citasDelDia]; // Copia del array
+            console.log('✅ Mostrando todas las citas');
             break;
     }
     
-    console.log('🔍 Citas filtradas:', citasFiltradas.length);
+    console.log(`📊 Resultado del filtro "${filtro}": ${citasFiltradas.length} citas`);
+    
+    // ✅ DEBUGGING SI NO HAY RESULTADOS
+    if (citasFiltradas.length === 0 && filtro !== 'todos') {
+        console.log('⚠️ NO SE ENCONTRARON RESULTADOS PARA EL FILTRO');
+        console.log('🔍 Revisando si hay datos similares...');
+        
+        // Buscar variaciones del estado
+        const estadosParecidos = citasDelDia.filter(c => 
+            c.estado && c.estado.toLowerCase().includes(filtro.toLowerCase())
+        );
+        console.log(`🔍 Estados que contienen "${filtro}":`, estadosParecidos.length);
+        
+        if (estadosParecidos.length > 0) {
+            console.log('📋 Ejemplos de estados parecidos:', estadosParecidos.slice(0, 3).map(c => c.estado));
+        }
+    }
+    
+    // ✅ MOSTRAR RESULTADOS
     mostrarCitas(citasFiltradas);
+    actualizarContadores();
+    
+    console.log('🔍 ===== FIN DEL FILTRO =====');
 }
 
 function buscarPaciente(termino) {
-    console.log('🔍 Buscando paciente:', termino);
+    console.log('🔍 Buscando paciente con término:', termino);
     
-    if (!termino || termino.length < 3) {
+    // Si el término está vacío o es muy corto, mostrar todas las citas
+    if (!termino || termino.length < 2) {
+        console.log('🔄 Término muy corto, mostrando todas las citas');
         mostrarCitas(citasDelDia);
         return;
     }
     
     const terminoLower = termino.toLowerCase();
+    console.log('🔍 Buscando en', citasDelDia.length, 'citas');
+    
     const citasFiltradas = citasDelDia.filter(cita => {
-        return cita.nombres_paciente.toLowerCase().includes(terminoLower) ||
-               cita.apellidos_paciente.toLowerCase().includes(terminoLower) ||
-               cita.cedula_paciente.includes(termino) ||
-               cita.motivo.toLowerCase().includes(terminoLower);
+        // Normalizar los campos para búsqueda
+        const nombres = (cita.nombres_paciente || '').toLowerCase();
+        const apellidos = (cita.apellidos_paciente || '').toLowerCase();
+        const cedula = (cita.cedula_paciente || '').toString();
+        const motivo = (cita.motivo || '').toLowerCase();
+        
+        // Buscar en múltiples campos
+        const coincidencia = nombres.includes(terminoLower) ||
+                           apellidos.includes(terminoLower) ||
+                           cedula.includes(termino) ||
+                           motivo.includes(terminoLower) ||
+                           (nombres + ' ' + apellidos).includes(terminoLower);
+        
+        if (coincidencia) {
+            console.log('✅ Coincidencia encontrada:', cita.nombres_paciente, cita.apellidos_paciente);
+        }
+        
+        return coincidencia;
     });
     
     console.log('🔍 Resultados búsqueda:', citasFiltradas.length);

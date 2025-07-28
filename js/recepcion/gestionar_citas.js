@@ -314,18 +314,62 @@ function seleccionarTipoCita() {
 }
 
 // ===== GENERAR RESUMEN DE CITA =====
+// ===== GENERAR RESUMEN DE CITA (SOLO CAMBIO EN FECHA) =====
 function generarResumenCita() {
-    const fecha = new Date(datosCitaWizard.fecha + ' ' + datosCitaWizard.hora);
-    const fechaFormateada = fecha.toLocaleDateString('es-ES', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    const horaFormateada = fecha.toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    // 🔧 FIX: Solo arreglar la creación de la fecha
+    let fechaFormateada = 'Fecha no disponible';
+    let horaFormateada = 'Hora no disponible';
+    
+    try {
+        // Verificar que tenemos los datos
+        if (datosCitaWizard.fecha && datosCitaWizard.hora) {
+            console.log('🔍 Datos originales:', {
+                fecha: datosCitaWizard.fecha,
+                hora: datosCitaWizard.hora
+            });
+            
+            let fechaParaDate;
+            
+            // Detectar y convertir formato de fecha
+            if (datosCitaWizard.fecha.includes('/')) {
+                // Si viene DD/MM/YYYY convertir a YYYY-MM-DD
+                const [dia, mes, año] = datosCitaWizard.fecha.split('/');
+                fechaParaDate = `${año}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+            } else {
+                // Si ya viene en YYYY-MM-DD, usar tal como está
+                fechaParaDate = datosCitaWizard.fecha;
+            }
+            
+            // Crear fecha con el formato correcto
+            const fecha = new Date(fechaParaDate + ' ' + datosCitaWizard.hora);
+            
+            if (!isNaN(fecha.getTime())) {
+                fechaFormateada = fecha.toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                horaFormateada = fecha.toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                console.log('✅ Fecha procesada correctamente');
+            } else {
+                throw new Error('Fecha inválida');
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error procesando fecha:', error);
+        
+        // Fallback simple
+        if (datosCitaWizard.fecha && datosCitaWizard.hora) {
+            fechaFormateada = datosCitaWizard.fecha;
+            horaFormateada = datosCitaWizard.hora;
+        }
+    }
+    
+    // 🔧 RESTO DEL CÓDIGO EXACTAMENTE IGUAL QUE TENÍAS
     
     // Resumen del paciente
     const resumenPaciente = `
@@ -792,6 +836,50 @@ function inicializarEventos() {
         e.preventDefault();
         aplicarFiltros();
     });
+
+       // NUEVO: Eventos para búsqueda por cédula
+    $('#btnBuscarCedula').click(function(e) {
+        e.preventDefault();
+        buscarPorCedula();
+    });
+    
+    // Búsqueda al presionar Enter
+    $('#filtroCedula').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            buscarPorCedula();
+        }
+    });
+    
+    // Búsqueda automática mientras se escribe (con debounce)
+    let timeoutCedula;
+    $('#filtroCedula').on('input', function() {
+        const valor = $(this).val().trim();
+        
+        // Limpiar timeout anterior
+        clearTimeout(timeoutCedula);
+        
+        // Si está vacío, mostrar todas las citas
+        if (valor === '') {
+            aplicarFiltros();
+            return;
+        }
+        
+        // Esperar 500ms después del último carácter
+        timeoutCedula = setTimeout(() => {
+            if (valor.length >= 3) {
+                buscarPorCedula();
+            }
+        }, 500);
+    });
+    
+    // Limpiar campo con Escape
+    $('#filtroCedula').on('keydown', function(e) {
+        if (e.which === 27) { // Tecla Escape
+            $(this).val('');
+            aplicarFiltros();
+        }
+    });
     
     // Botón limpiar filtros
     $('#btnLimpiarFiltros').click(function(e) {
@@ -872,6 +960,120 @@ function inicializarSelect2() {
         placeholder: 'Seleccione una opción',
         allowClear: true
     });
+}
+
+// ===== NUEVA FUNCIÓN: Buscar por Cédula =====
+function buscarPorCedula() {
+    const cedula = $('#filtroCedula').val().trim();
+    
+    console.log('🔍 Buscando por cédula:', cedula);
+    
+    // Validaciones
+    if (!cedula) {
+        mostrarToast('Ingrese una cédula para buscar', 'warning');
+        return;
+    }
+    
+    if (cedula.length < 3) {
+        mostrarToast('Ingrese al menos 3 dígitos', 'warning');
+        return;
+    }
+    
+    // Validar que solo sean números
+    if (!/^\d+$/.test(cedula)) {
+        mostrarToast('La cédula debe contener solo números', 'warning');
+        return;
+    }
+    
+    // Aplicar filtros con la cédula
+    aplicarFiltrosConCedula(cedula);
+    
+    // Mostrar indicador visual
+    $('#btnBuscarCedula').html('<i class="bi bi-hourglass-split"></i>').prop('disabled', true);
+    
+    setTimeout(() => {
+        $('#btnBuscarCedula').html('<i class="bi bi-search"></i>').prop('disabled', false);
+    }, 1000);
+}
+
+// ===== FUNCIÓN MOSTRAR TOAST =====
+function mostrarToast(mensaje, tipo = 'info') {
+    // Crear contenedor de toasts si no existe
+    if (!$('#toastContainer').length) {
+        $('body').append(`
+            <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+            </div>
+        `);
+    }
+    
+    // Definir clases y iconos según el tipo
+    const configuraciones = {
+        success: {
+            clase: 'success',
+            icono: 'bi-check-circle-fill',
+            titulo: 'Éxito'
+        },
+        error: {
+            clase: 'danger',
+            icono: 'bi-exclamation-triangle-fill',
+            titulo: 'Error'
+        },
+        warning: {
+            clase: 'warning',
+            icono: 'bi-exclamation-diamond-fill',
+            titulo: 'Advertencia'
+        },
+        info: {
+            clase: 'info',
+            icono: 'bi-info-circle-fill',
+            titulo: 'Información'
+        }
+    };
+    
+    const config = configuraciones[tipo] || configuraciones.info;
+    
+    // Crear el toast
+    const toastId = 'toast-' + Date.now();
+    const toast = $(`
+        <div id="${toastId}" class="toast align-items-center text-bg-${config.clase} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body d-flex align-items-center">
+                    <i class="bi ${config.icono} me-2"></i>
+                    <div>
+                        <strong>${config.titulo}:</strong> ${mensaje}
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `);
+    
+    // Añadir al contenedor
+    $('#toastContainer').append(toast);
+    
+    // Inicializar y mostrar el toast
+    const bsToast = new bootstrap.Toast(toast[0], {
+        autohide: true,
+        delay: tipo === 'error' ? 5000 : 3000 // Errores se muestran más tiempo
+    });
+    
+    bsToast.show();
+    
+    // Remover del DOM después de ocultarse
+    toast.on('hidden.bs.toast', function() {
+        $(this).remove();
+        
+        // Si no hay más toasts, remover el contenedor
+        if ($('#toastContainer .toast').length === 0) {
+            setTimeout(() => {
+                if ($('#toastContainer .toast').length === 0) {
+                    $('#toastContainer').remove();
+                }
+            }, 300);
+        }
+    });
+    
+    console.log(`📢 Toast mostrado: ${tipo} - ${mensaje}`);
 }
 
 // ⭐ ACTUALIZAR LA FUNCIÓN DE BÚSQUEDA PARA MEJOR UX
@@ -1168,13 +1370,85 @@ function cargarDoctoresPorEspecialidad() {
 }
 
 // ===== GENERAR CALENDARIO SEMANAL =====
-// ===== GENERAR CALENDARIO SEMANAL CORREGIDO =====
+// ===== GENERAR CALENDARIO SEMANAL DINÁMICO BASADO EN HORARIOS REALES =====
 function generarCalendarioSemanal(datosHorarios) {
     console.log('🔄 Datos recibidos del servidor:', datosHorarios);
     
     const inicioSemana = obtenerInicioSemana(semanaActual);
     const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     const hoy = new Date();
+    
+    // ✅ OBTENER RANGO DINÁMICO DE LOS HORARIOS DEL DOCTOR
+    let horaMinima = 24;
+    let horaMaxima = 0;
+    let minutosMinimos = 59;
+    let minutosMaximos = 0;
+    
+    console.log('📊 Analizando horarios del doctor:', datosHorarios.horarios);
+    
+    // Encontrar el rango de horas real del doctor
+    if (datosHorarios.horarios && datosHorarios.horarios.length > 0) {
+        datosHorarios.horarios.forEach(horario => {
+            // Procesar hora de inicio
+            const [horaIniStr, minIniStr] = horario.hora_inicio.split(':');
+            const horaIni = parseInt(horaIniStr);
+            const minIni = parseInt(minIniStr);
+            
+            // Procesar hora de fin
+            const [horaFinStr, minFinStr] = horario.hora_fin.split(':');
+            const horaFin = parseInt(horaFinStr);
+            const minFin = parseInt(minFinStr);
+            
+            // Encontrar mínimos
+            if (horaIni < horaMinima || (horaIni === horaMinima && minIni < minutosMinimos)) {
+                horaMinima = horaIni;
+                minutosMinimos = minIni;
+            }
+            
+            // Encontrar máximos
+            if (horaFin > horaMaxima || (horaFin === horaMaxima && minFin > minutosMaximos)) {
+                horaMaxima = horaFin;
+                minutosMaximos = minFin;
+            }
+            
+            console.log(`📅 Horario analizado: ${horario.hora_inicio} - ${horario.hora_fin}`);
+        });
+    }
+    
+    // Si no hay horarios, usar rango por defecto
+    if (horaMinima === 24) {
+        console.log('⚠️ No se encontraron horarios, usando rango por defecto');
+        horaMinima = 8;
+        horaMaxima = 20;
+        minutosMinimos = 0;
+        minutosMaximos = 0;
+    }
+    
+    // Ajustar para incluir slots de 30 minutos
+    // Si los minutos mínimos no son 0 o 30, ajustar al slot anterior
+    if (minutosMinimos > 30) {
+        minutosMinimos = 30;
+    } else if (minutosMinimos > 0 && minutosMinimos <= 30) {
+        minutosMinimos = 0;
+    }
+    
+    // Si los minutos máximos indican que hay actividad después de :30, incluir la siguiente hora
+    if (minutosMaximos > 30) {
+        horaMaxima += 1;
+        minutosMaximos = 0;
+    } else if (minutosMaximos > 0 && minutosMaximos <= 30) {
+        minutosMaximos = 30;
+    }
+    
+    // Agregar un pequeño margen para mejor visualización
+    const margenAntes = 1; // 1 hora antes
+    const margenDespues = 1; // 1 hora después
+    
+    const horaInicio = Math.max(6, horaMinima - margenAntes);
+    const horaFin = Math.min(23, horaMaxima + margenDespues);
+    
+    console.log(`✅ Rango dinámico calculado: ${horaInicio}:00 a ${horaFin}:00`);
+    console.log(`📊 Basado en horarios reales: ${horaMinima}:${minutosMinimos.toString().padStart(2, '0')} a ${horaMaxima}:${minutosMaximos.toString().padStart(2, '0')}`);
     
     let html = '<div class="semana-container">';
     
@@ -1199,11 +1473,8 @@ function generarCalendarioSemanal(datosHorarios) {
     // Grid de horarios
     html += '<div class="horarios-grid">';
     
-    // Generar slots por hora (8:00 - 19:00, cada 30 minutos)
-    const horaInicio = 8;
-    const horaFin = 19;
-    
-    for (let hora = horaInicio; hora < horaFin; hora++) {
+    // ✅ GENERAR SLOTS DINÁMICAMENTE CADA 30 MINUTOS
+    for (let hora = horaInicio; hora <= horaFin; hora++) {
         for (let minutos = 0; minutos < 60; minutos += 30) {
             const horaStr = `${hora.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
             
@@ -1233,24 +1504,33 @@ function generarCalendarioSemanal(datosHorarios) {
     
     html += '</div>';
     
-    // Leyenda
+    // Leyenda con información adicional
     html += `
         <div class="leyenda-horarios">
-            <div class="leyenda-item">
-                <div class="leyenda-color" style="background-color: #d4edda;"></div>
-                <span>Disponible</span>
+            <div class="leyenda-info mb-2">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Horarios del doctor: ${horaMinima}:${minutosMinimos.toString().padStart(2, '0')} - ${horaMaxima}:${minutosMaximos.toString().padStart(2, '0')} 
+                    | Mostrando: ${horaInicio}:00 - ${horaFin}:00
+                </small>
             </div>
-            <div class="leyenda-item">
-                <div class="leyenda-color" style="background-color: #f8d7da;"></div>
-                <span>Ocupado</span>
-            </div>
-            <div class="leyenda-item">
-                <div class="leyenda-color" style="background-color: #e9ecef;"></div>
-                <span>No disponible</span>
-            </div>
-            <div class="leyenda-item">
-                <div class="leyenda-color" style="background-color: #007bff;"></div>
-                <span>Seleccionado</span>
+            <div class="leyenda-items d-flex flex-wrap gap-3">
+                <div class="leyenda-item">
+                    <div class="leyenda-color" style="background-color: #d4edda;"></div>
+                    <span>Disponible</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color" style="background-color: #f8d7da;"></div>
+                    <span>Ocupado</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color" style="background-color: #e9ecef;"></div>
+                    <span>No disponible</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color" style="background-color: #007bff;"></div>
+                    <span>Seleccionado</span>
+                </div>
             </div>
         </div>
     `;
@@ -1264,7 +1544,8 @@ function generarCalendarioSemanal(datosHorarios) {
         seleccionarSlotHorario(this);
     });
     
-    console.log('📅 Calendario semanal generado correctamente');
+    console.log(`📅 Calendario semanal generado dinámicamente - Rango: ${horaInicio}:00 a ${horaFin}:00`);
+    console.log(`🎯 Total de slots generados: ${(horaFin - horaInicio + 1) * 2 * 7} slots`);
 }
 // ===== SELECCIONAR SLOT DE HORARIO - CORREGIDO =====
 function seleccionarSlotHorario(elemento) {
@@ -2089,14 +2370,32 @@ function cargarDatosParaEdicion(cita) {
 
 // ===== FILTROS =====
 // 🔧 CORREGIR: Función para obtener filtros activos
+// ===== MODIFICAR: Función obtenerFiltrosActivos =====
 function obtenerFiltrosActivos() {
     return {
         estado: $('#filtroEstado').val() || '',
         id_sucursal: $('#filtroSucursal').val() || '',
-        tipo_cita: $('#filtroTipoCita').val() || '', // 🔧 IMPORTANTE
+        tipo_cita: $('#filtroTipoCita').val() || '',
         id_especialidad: $('#filtroEspecialidad').val() || '',
-        id_doctor: $('#filtroDoctor').val() || ''
+        id_doctor: $('#filtroDoctor').val() || '',
+        cedula_paciente: $('#filtroCedula').val().trim() || '' // NUEVO
     };
+}
+// ===== NUEVA FUNCIÓN: Aplicar filtros con cédula =====
+function aplicarFiltrosConCedula(cedula) {
+    console.log('🔍 Aplicando filtros con cédula:', cedula);
+    
+    // Mostrar indicador de carga
+    mostrarIndicadorCarga();
+    
+    // Recargar calendario con filtros
+    calendario.refetchEvents();
+    
+    // Actualizar estadísticas
+    setTimeout(() => {
+        cargarEstadisticas();
+        ocultarIndicadorCarga();
+    }, 500);
 }
 
 // 🔧 NUEVA FUNCIÓN: Validar fechas y horas pasadas
@@ -2144,24 +2443,50 @@ function aplicarFiltros() {
     cargarEstadisticas();
 }
 
-// Función para limpiar filtros
+// ===== MODIFICAR: Función limpiarFiltros =====
 function limpiarFiltros() {
     console.log('🧹 Limpiando filtros...');
     
-    // Resetear todos los selects
+    // Resetear todos los campos incluido el nuevo
     $('#filtroSucursal').val('');
     $('#filtroTipoCita').val('');
     $('#filtroEspecialidad').val('');
     $('#filtroEstado').val('');
     $('#filtroDoctor').val('');
+    $('#filtroCedula').val(''); // NUEVO
     
-    // Recargar todos los doctores (sin filtro de especialidad)
+    // Recargar todos los doctores
     cargarTodosLosDoctores();
     
-    // Aplicar los filtros (ahora vacíos)
+    // Aplicar filtros vacíos
     aplicarFiltros();
     
     console.log('✅ Filtros limpiados');
+    mostrarToast('Filtros limpiados correctamente', 'success');
+}
+
+// ===== NUEVAS FUNCIONES DE APOYO =====
+function mostrarIndicadorCarga() {
+    if (!$('#indicadorCarga').length) {
+        $('body').append(`
+            <div id="indicadorCarga" class="position-fixed top-50 start-50 translate-middle" 
+                 style="z-index: 9999;">
+                <div class="bg-primary text-white p-3 rounded shadow">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Buscando...</span>
+                        </div>
+                        <span>Filtrando citas...</span>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+    $('#indicadorCarga').show();
+}
+
+function ocultarIndicadorCarga() {
+    $('#indicadorCarga').fadeOut(300);
 }
 function cargarDoctoresParaFiltro() {
    $.ajax({
@@ -2848,6 +3173,17 @@ $(document).ready(function() {
         $('#textoEstadoCita').text('Cargando...');
     });
     
+    // NUEVO: Tooltip para el campo de cédula
+    $('#filtroCedula').tooltip({
+        title: 'Ingrese la cédula del paciente (mínimo 3 dígitos)',
+        placement: 'top',
+        trigger: 'focus'
+    });
+    
+    $('#btnBuscarCedula').tooltip({
+        title: 'Buscar citas por cédula de paciente',
+        placement: 'top'
+    });
     // Cuando se cierra el modal
     $('#modalVerCita').on('hidden.bs.modal', function() {
         console.log('❌ Cerrando modal de detalles...');

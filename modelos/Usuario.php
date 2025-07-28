@@ -78,6 +78,43 @@ class Usuario {
         return $stmt->execute();
     }
 
+
+     /**
+     * 🔹 Crear un nuevo usuario (estado Pendiente = 3)
+     */
+    public function crearUsuario2(
+        int    $cedula,
+        string $username,
+        string $nombres,
+        string $apellidos,
+        string $sexo,
+        string $nacionalidad,
+        string $correo,
+        string $password,
+        int    $id_rol
+    ): bool {
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $estadoPendiente = 1;
+
+        $query = "INSERT INTO usuarios 
+            (cedula, username, nombres, apellidos, sexo, nacionalidad, correo, password, id_rol, id_estado)
+          VALUES
+            (:cedula, :username, :nombres, :apellidos, :sexo, :nacionalidad, :correo, :password, :id_rol, :id_estado)";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":cedula",       $cedula,             PDO::PARAM_INT);
+        $stmt->bindParam(":username",     $username);
+        $stmt->bindParam(":nombres",      $nombres);
+        $stmt->bindParam(":apellidos",    $apellidos);
+        $stmt->bindParam(":sexo",         $sexo);
+        $stmt->bindParam(":nacionalidad", $nacionalidad);
+        $stmt->bindParam(":correo",       $correo);
+        $stmt->bindParam(":password",     $hash);
+        $stmt->bindParam(":id_rol",       $id_rol,             PDO::PARAM_INT);
+        $stmt->bindParam(":id_estado",    $estadoPendiente,    PDO::PARAM_INT);
+
+        return $stmt->execute();
+    }
+
     /**
      * 🔹 Editar usuario (sin cambiar contraseña)
      */

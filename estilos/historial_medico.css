@@ -1549,3 +1549,23 @@
     color: #2d3436;
     font-weight: 600;
 }
+
+/* Estilos para nacionalidad con bandera */
+.nacionalidad-elemento {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+.nacionalidad-elemento:hover {
+    background-color: #e9ecef;
+}
+
+.nacionalidad-elemento img {
+    object-fit: cover;
+    vertical-align: middle;
+}

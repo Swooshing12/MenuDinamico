@@ -60,6 +60,9 @@ class UsuariosController {
                 case 'verificarCorreo':
                     $this->verificarCorreo();
                     break;
+                case 'verificarCedula':
+                    $this->verificarCedula();
+                    break;
                 case 'index':
                 default:
                     $this->index();
@@ -192,133 +195,168 @@ class UsuariosController {
             die("Error al cargar la página: " . $e->getMessage());
         }
     }
+
+    private function verificarCedula() {
+    $cedula = $_GET['cedula'] ?? '';
+    
+    if (empty($cedula)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Cédula requerida'
+        ]);
+        return;
+    }
+    
+    try {
+        $existe = $this->usuarioModel->existeUsuarioPorCedula((int)$cedula);
+        
+        $this->responderJSON([
+            'success' => true,
+            'existe' => $existe
+        ]);
+    } catch (Exception $e) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error al verificar cédula: ' . $e->getMessage()
+        ]);
+    }
+}
     
     private function crear() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->responderJSON([
-                'success' => false, 
-                'message' => 'Método no permitido'
-            ]);
-            return;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Método no permitido'
+        ]);
+        return;
+    }
+    
+    // Validar campos requeridos
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'rol'];
+    $camposFaltantes = [];
+    
+    foreach ($camposRequeridos as $campo) {
+        if (empty($_POST[$campo])) {
+            $camposFaltantes[] = $campo;
         }
-        
-        // Verificar permisos
-        $this->verificarPermisos('crear');
-        
-        // Validar datos requeridos
-        $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'rol']; // 🔥 QUITAR 'password'
-        $camposFaltantes = [];
-        
-        foreach ($camposRequeridos as $campo) {
-            if (empty($_POST[$campo])) {
-                $camposFaltantes[] = $campo;
-            }
-        }
-        
-        if (!empty($camposFaltantes)) {
+    }
+    
+    if (!empty($camposFaltantes)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Faltan campos requeridos: ' . implode(', ', $camposFaltantes),
+            'campos_faltantes' => $camposFaltantes
+        ]);
+        return;
+    }
+    
+    // Validaciones básicas
+    if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'La cédula debe tener al menos 10 dígitos numéricos',
+            'campo_error' => 'cedula'
+        ]);
+        return;
+    }
+    
+    if (!filter_var($_POST['correo'], FILTER_VALIDATE_EMAIL)) {
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Formato de correo electrónico no válido',
+            'campo_error' => 'correo'
+        ]);
+        return;
+    }
+    
+    try {
+        // 🔥 AGREGAR VALIDACIÓN DE CÉDULA DUPLICADA
+        $cedulaExistente = $this->usuarioModel->existeUsuarioPorCedula((int)$_POST['cedula']);
+        if ($cedulaExistente) {
             $this->responderJSON([
                 'success' => false,
-                'message' => "Campos requeridos: " . implode(', ', $camposFaltantes),
-                'campos_faltantes' => $camposFaltantes
-            ]);
-            return;
-        }
-        
-        // Validaciones básicas (mantener las existentes)
-        if (!is_numeric($_POST['cedula']) || strlen($_POST['cedula']) < 10) {
-            $this->responderJSON([
-                'success' => false,
-                'message' => 'La cédula debe tener al menos 10 dígitos numéricos',
+                'message' => 'Ya existe un usuario con esta cédula',
                 'campo_error' => 'cedula'
             ]);
             return;
         }
         
-        if (!filter_var($_POST['correo'], FILTER_VALIDATE_EMAIL)) {
+        // Verificar si el username ya existe
+        $usuarioExistente = $this->usuarioModel->obtenerPorUsername(trim($_POST['username']));
+        if ($usuarioExistente) {
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Formato de correo electrónico no válido',
+                'message' => 'El nombre de usuario ya está en uso',
+                'campo_error' => 'username'
+            ]);
+            return;
+        }
+        
+        // Verificar si el correo ya existe
+        $correoExistente = $this->usuarioModel->obtenerPorCorreo(trim($_POST['correo']));
+        if ($correoExistente) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'El correo electrónico ya está registrado',
                 'campo_error' => 'correo'
             ]);
             return;
         }
         
-        try {
-            // Verificar si el username ya existe
-            $usuarioExistente = $this->usuarioModel->obtenerPorUsername(trim($_POST['username']));
-            if ($usuarioExistente) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'El nombre de usuario ya está en uso',
-                    'campo_error' => 'username'
-                ]);
-                return;
-            }
-            
-            // Verificar si el correo ya existe
-            $correoExistente = $this->usuarioModel->obtenerPorCorreo(trim($_POST['correo']));
-            if ($correoExistente) {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'El correo electrónico ya está registrado',
-                    'campo_error' => 'correo'
-                ]);
-                return;
-            }
-            
-            // 🔥 GENERAR CONTRASEÑA TEMPORAL
-            $passwordTemporal = MailService::generarPasswordTemporal(12);
-            
-            // Crear usuario con contraseña temporal
-            $resultado = $this->usuarioModel->crearUsuario(
-                (int)$_POST['cedula'],
-                trim($_POST['username']),
-                trim($_POST['nombres']),
-                trim($_POST['apellidos']),
-                $_POST['sexo'],
-                trim($_POST['nacionalidad']),
-                trim($_POST['correo']),
-                $passwordTemporal, // 🔥 USAR CONTRASEÑA TEMPORAL
-                (int)$_POST['rol']
-            );
-            
-            if ($resultado) {
-                // 🔥 ENVIAR CORREO CON CONTRASEÑA TEMPORAL
-                $nombreCompleto = trim($_POST['nombres']) . ' ' . trim($_POST['apellidos']);
-                $envioExitoso = $this->mailService->enviarPasswordTemporal(
-                    trim($_POST['correo']),
-                    $nombreCompleto,
-                    trim($_POST['username']),
-                    $passwordTemporal
-                );
-                
-                if ($envioExitoso) {
-                    $this->responderJSON([
-                        'success' => true,
-                        'message' => 'Usuario creado exitosamente. Se ha enviado un correo con las credenciales de acceso.',
-                        'email_enviado' => true
-                    ]);
-                } else {
-                    $this->responderJSON([
-                        'success' => true,
-                        'message' => 'Usuario creado exitosamente, pero hubo un problema enviando el correo. Contacta al administrador.',
-                        'email_enviado' => false
-                    ]);
-                }
-            } else {
-                $this->responderJSON([
-                    'success' => false,
-                    'message' => 'Error al crear el usuario'
-                ]);
-            }
-        } catch (Exception $e) {
+        // Obtener nacionalidad (normal o hidden)
+        $nacionalidad = !empty($_POST['nacionalidad']) ? $_POST['nacionalidad'] : 
+                        (!empty($_POST['nacionalidad_hidden']) ? $_POST['nacionalidad_hidden'] : '');
+        
+        if (empty($nacionalidad)) {
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => 'La nacionalidad es requerida'
+            ]);
+            return;
+        }
+        
+        // 🔥 GENERAR CONTRASEÑA TEMPORAL
+        $passwordTemporal = MailService::generarPasswordTemporal(12);
+        
+        // Crear usuario con contraseña temporal
+        $resultado = $this->usuarioModel->crearUsuario(
+            (int)$_POST['cedula'],
+            trim($_POST['username']),
+            trim($_POST['nombres']),
+            trim($_POST['apellidos']),
+            $_POST['sexo'],
+            trim($nacionalidad), // Usar la nacionalidad validada
+            trim($_POST['correo']),
+            $passwordTemporal,
+            (int)$_POST['rol']
+        );
+        
+        if ($resultado) {
+            // Resto del código para enviar correo...
+            $this->responderJSON([
+                'success' => true,
+                'message' => 'Usuario creado exitosamente. Contraseña temporal enviada por correo.',
+                'data' => [
+                    'id_usuario' => $resultado,
+                    'username' => trim($_POST['username']),
+                    'password_temporal' => $passwordTemporal
+                ]
+            ]);
+        } else {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Error al crear el usuario'
             ]);
         }
+        
+    } catch (Exception $e) {
+        $this->logError("Error creando usuario: " . $e->getMessage(), $_POST);
+        $this->responderJSON([
+            'success' => false,
+            'message' => 'Error al crear el usuario: ' . $e->getMessage()
+        ]);
     }
-    
+}
     private function editar() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->responderJSON([

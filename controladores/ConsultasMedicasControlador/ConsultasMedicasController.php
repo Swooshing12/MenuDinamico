@@ -190,7 +190,7 @@ private function generarPDFConsulta() {
             $titulo_profesional = $medico['titulo_profesional'] ?? '';
             
             // ✅ INCLUIR LA VISTA CON VARIABLES DEFINIDAS
-            include __DIR__ . '/../../vistas/consultas_medicas/index.php';
+            include __DIR__ . '/../../vistas/consultas_medicas/consultamedica.php';
             
         } catch (Exception $e) {
             die("Error al cargar consultas médicas: " . $e->getMessage());

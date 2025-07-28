@@ -119,6 +119,10 @@ async function buscarPaciente(e) {
             pacienteActual = response.data.paciente;
             mostrarInformacionPaciente(response.data.paciente, response.data.estadisticas);
             await cargarHistorialPaciente(pacienteActual.id_paciente);
+            
+            // 🔧 AGREGAR ESTA LÍNEA:
+            await cargarDoctoresPaciente(pacienteActual.id_paciente);
+            
             mostrarSeccionesPaciente();
         } else {
             mostrarError(response.error || 'No se encontró el paciente');
@@ -132,6 +136,51 @@ async function buscarPaciente(e) {
     } finally {
         mostrarLoading(false);
     }
+}
+
+// ===== FUNCIÓN PARA MOSTRAR BANDERAS EN LA TABLA =====
+function mostrarBanderasEnTabla() {
+    console.log('🌍 Iniciando procesamiento de banderas en la tabla...');
+    
+    fetch("https://restcountries.com/v2/all?fields=name,alpha2Code,flag,demonym")
+        .then(response => response.json())
+        .then(paises => {
+            console.log('🌍 Países cargados para banderas:', paises.length);
+            
+            // Buscar todos los elementos con nacionalidad
+            const elementos = document.querySelectorAll('[data-nacionalidad]');
+            console.log('🔍 Elementos con nacionalidad encontrados:', elementos.length);
+            
+            elementos.forEach(elemento => {
+                try {
+                    const nacionalidad = elemento.dataset.nacionalidad.toLowerCase();
+                    console.log('🔍 Procesando nacionalidad:', nacionalidad);
+                    
+                    const pais = paises.find(p => {
+                        if (!p.demonym) return false;
+                        return p.demonym.toLowerCase() === nacionalidad;
+                    });
+
+                    if (pais) {
+                        console.log('✅ País encontrado:', pais.name, 'para nacionalidad:', nacionalidad);
+                        elemento.innerHTML = `
+                            <img src="${pais.flag}" 
+                                 alt="${pais.name}" 
+                                 style="width: 20px; height: 15px; margin-right: 8px; border-radius: 2px; border: 1px solid #ddd;"> 
+                            ${elemento.dataset.nacionalidad}
+                        `;
+                    } else {
+                        console.log('❌ No se encontró país para:', nacionalidad);
+                        elemento.innerHTML += ' <span title="No se encontró bandera">🌐</span>';
+                    }
+                } catch (error) {
+                    console.error('❌ Error procesando bandera:', error, elemento);
+                }
+            });
+        })
+        .catch(err => {
+            console.error('❌ Error cargando banderas:', err);
+        });
 }
 
 function mostrarInformacionPaciente(paciente, estadisticas) {
@@ -176,10 +225,14 @@ function mostrarInformacionPaciente(paciente, estadisticas) {
                         </span>
                     </span>
                 </div>
-                <div class="info-row-horizontal">
-                    <span class="info-label">Nacionalidad</span>
-                    <span class="info-value">${paciente.nacionalidad || 'No especificada'}</span>
-                </div>
+              <div class="info-row-horizontal">
+    <span class="info-label">Nacionalidad</span>
+    <span class="info-value">
+        <span data-nacionalidad="${paciente.nacionalidad || ''}" class="nacionalidad-elemento">
+            ${paciente.nacionalidad || 'No especificada'}
+        </span>
+    </span>
+</div>
             </div>
         </div>
         
@@ -284,6 +337,11 @@ function mostrarInformacionPaciente(paciente, estadisticas) {
     
     // Insertar la información del paciente
     $('#pacienteInfo').html(infoHtml);
+    
+    // 🌍 PROCESAR BANDERAS DESPUÉS DE INSERTAR EL HTML
+    setTimeout(() => {
+        mostrarBanderasEnTabla();
+    }, 100);
     
     // Mostrar estadísticas si están disponibles
     if (estadisticas) {
@@ -436,7 +494,7 @@ function mostrarHistorialEnTabla(historial) {
                     </div>
                 </td>
                 <td>
-                    ${getEstadoBadge(cita.estado_proceso)}
+                    ${getEstadoBadge(cita.estado_cita)}
                 </td>
                 <td class="text-center">
                     ${cita.id_triage ? 
@@ -457,7 +515,6 @@ function mostrarHistorialEnTabla(historial) {
                                 title="Ver detalle completo">
                             <i class="bi bi-eye"></i>
                         </button>
-                    
                     </div>
                 </td>
             </tr>
@@ -471,7 +528,6 @@ function mostrarHistorialEnTabla(historial) {
         inicializarDataTable();
     }
 }
-
 function mostrarHistorialVacio() {
     $('#historialTableBody').empty();
     $('#historialVacio').show();
@@ -1551,13 +1607,38 @@ function imprimirDetalle() {
 
 // ===== FUNCIONES AUXILIARES =====
 function getEstadoBadge(estado) {
-   const badges = {
-       'Consulta Completada': '<span class="badge estado-completada">Consulta Completada</span>',
-       'Triaje Completado': '<span class="badge estado-triaje">Triaje Completado</span>',
-       'Cita Programada': '<span class="badge estado-programada">Cita Programada</span>'
-   };
-   
-   return badges[estado] || `<span class="badge bg-secondary">${estado}</span>`;
+    // Depurar el estado recibido
+    console.log('🔍 getEstadoBadge - Estado recibido:', `"${estado}"`, 'Tipo:', typeof estado);
+    
+    // Normalizar el estado que llega - IMPORTANTE: usar el nombre correcto del campo
+    const estadoNormalizado = estado ? estado.toString().trim() : '';
+    
+    const badges = {
+        // Estados de citas (tal como están en la BD)
+        'Pendiente': '<span class="badge bg-warning text-dark">⏳ Pendiente</span>',
+        'Confirmada': '<span class="badge bg-info">📅 Confirmada</span>',
+        'Completada': '<span class="badge bg-success">✅ Completada</span>',
+        'Cancelada': '<span class="badge bg-danger">❌ Cancelada</span>',
+        'No Asistio': '<span class="badge bg-dark">👻 No Asistió</span>',
+        
+        // Estados de proceso adicionales
+        'Consulta Completada': '<span class="badge estado-completada">✅ Consulta Completada</span>',
+        'Triaje Completado': '<span class="badge estado-triaje">🩺 Triaje Completado</span>',
+        'Cita Programada': '<span class="badge estado-programada">📅 Cita Programada</span>',
+        'En Proceso': '<span class="badge bg-primary">🔄 En Proceso</span>'
+    };
+    
+    // Buscar el estado exacto
+    const badge = badges[estadoNormalizado];
+    
+    if (badge) {
+        console.log('✅ Badge encontrado para:', `"${estadoNormalizado}"`);
+        return badge;
+    } else {
+        console.log('⚠️ Badge NO encontrado para:', `"${estadoNormalizado}"`);
+        console.log('Estados disponibles:', Object.keys(badges));
+        return `<span class="badge bg-secondary">${estadoNormalizado || 'Sin Estado'}</span>`;
+    }
 }
 
 function getNivelUrgenciaBadge(nivel) {

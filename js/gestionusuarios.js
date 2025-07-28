@@ -201,6 +201,195 @@ function configurarBusqueda() {
             $('#debugInfo').removeClass('d-none');
         }
     }
+
+    // ===== VALIDACIONES EN TIEMPO REAL =====
+
+/**
+ * Validar cédula en tiempo real
+ */
+function validarCedula() {
+    const campo = $(this);
+    const cedula = campo.val().trim();
+    
+    // Limpiar validaciones anteriores
+    campo.removeClass('is-invalid is-valid');
+    campo.next('.invalid-feedback').remove();
+    
+    if (!cedula) {
+        return;
+    }
+    
+    // Validación básica de formato
+    if (!/^\d{10}$/.test(cedula)) {
+        mostrarErrorCampo(campo[0], 'La cédula debe tener exactamente 10 dígitos');
+        return;
+    }
+    
+    // Verificar si ya existe (solo para crear, no para editar)
+    const esEdicion = campo.closest('#editarUsuarioModal').length > 0;
+    
+    if (!esEdicion) {
+        verificarCedulaExistente(cedula, campo);
+    }
+}
+
+/**
+ * Validar username en tiempo real
+ */
+function validarUsername() {
+    const campo = $(this);
+    const username = campo.val().trim();
+    
+    // Limpiar validaciones anteriores
+    campo.removeClass('is-invalid is-valid');
+    campo.next('.invalid-feedback').remove();
+    
+    if (!username) {
+        return;
+    }
+    
+    // Validación básica de formato
+    if (username.length < 3) {
+        mostrarErrorCampo(campo[0], 'El username debe tener al menos 3 caracteres');
+        return;
+    }
+    
+    if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+        mostrarErrorCampo(campo[0], 'Solo se permiten letras, números, puntos, guiones y guiones bajos');
+        return;
+    }
+    
+    // Verificar si ya existe
+    const esEdicion = campo.closest('#editarUsuarioModal').length > 0;
+    const idExcluir = esEdicion ? $('#edit_id').val() : null;
+    
+    verificarUsernameExistente(username, campo, idExcluir);
+}
+
+/**
+ * Validar correo en tiempo real
+ */
+function validarCorreo() {
+    const campo = $(this);
+    const correo = campo.val().trim();
+    
+    // Limpiar validaciones anteriores
+    campo.removeClass('is-invalid is-valid');
+    campo.next('.invalid-feedback').remove();
+    
+    if (!correo) {
+        return;
+    }
+    
+    // Validación básica de formato
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+        mostrarErrorCampo(campo[0], 'Formato de correo electrónico inválido');
+        return;
+    }
+    
+    // Verificar si ya existe
+    const esEdicion = campo.closest('#editarUsuarioModal').length > 0;
+    const idExcluir = esEdicion ? $('#edit_id').val() : null;
+    
+    verificarCorreoExistente(correo, campo, idExcluir);
+}
+
+/**
+ * Verificar si la cédula ya existe
+ */
+function verificarCedulaExistente(cedula, campo) {
+    $.ajax({
+        url: `../../controladores/UsuariosControlador/UsuariosController.php?submenu_id=${config.submenuId}`,
+        type: 'GET',
+        data: {
+            action: 'verificarCedula',
+            cedula: cedula
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                if (response.existe) {
+                    mostrarErrorCampo(campo[0], 'Ya existe un usuario con esta cédula');
+                } else {
+                    campo.removeClass('is-invalid').addClass('is-valid');
+                }
+            }
+        },
+        error: function() {
+            console.warn('No se pudo verificar la cédula');
+        }
+    });
+}
+
+/**
+ * Verificar si el username ya existe
+ */
+function verificarUsernameExistente(username, campo, idExcluir = null) {
+    $.ajax({
+        url: `../../controladores/UsuariosControlador/UsuariosController.php?submenu_id=${config.submenuId}`,
+        type: 'GET',
+        data: {
+            action: 'verificarUsername',
+            username: username,
+            id_usuario: idExcluir
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                if (response.existe) {
+                    mostrarErrorCampo(campo[0], 'Ya existe un usuario con este nombre de usuario');
+                } else {
+                    campo.removeClass('is-invalid').addClass('is-valid');
+                }
+            }
+        },
+        error: function() {
+            console.warn('No se pudo verificar el username');
+        }
+    });
+}
+
+/**
+ * Verificar si el correo ya existe
+ */
+function verificarCorreoExistente(correo, campo, idExcluir = null) {
+    $.ajax({
+        url: `../../controladores/UsuariosControlador/UsuariosController.php?submenu_id=${config.submenuId}`,
+        type: 'GET',
+        data: {
+            action: 'verificarCorreo',
+            correo: correo,
+            id_usuario: idExcluir
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                if (response.existe) {
+                    mostrarErrorCampo(campo[0], 'Ya existe un usuario con este correo electrónico');
+                } else {
+                    campo.removeClass('is-invalid').addClass('is-valid');
+                }
+            }
+        },
+        error: function() {
+            console.warn('No se pudo verificar el correo');
+        }
+    });
+}
+
+/**
+ * Mostrar error en campo
+ */
+function mostrarErrorCampo(campo, mensaje) {
+    $(campo).addClass('is-invalid').removeClass('is-valid');
+    
+    // Remover mensaje de error anterior
+    $(campo).next('.invalid-feedback').remove();
+    
+    // Agregar nuevo mensaje de error
+    $(campo).after(`<div class="invalid-feedback">${mensaje}</div>`);
+}
     
     // Función para cargar usuarios paginados con búsqueda
     // VERSIÓN SIMPLIFICADA Y SUAVE para cargarUsuariosPaginados

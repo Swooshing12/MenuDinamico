@@ -77,6 +77,7 @@ public function obtenerCitasConTriaje($id_doctor, $fecha = null) {
     try {
         $fecha = $fecha ?: date('Y-m-d');
         
+        // ✅ CONSULTA CORREGIDA - INCLUIR TODOS LOS ESTADOS
         $query = "SELECT c.id_cita, c.fecha_hora, c.motivo, c.estado,
                          c.id_paciente,  -- ⭐ IMPORTANTE: AGREGAR ESTA LÍNEA
                          p.nombres as nombres_paciente, p.apellidos as apellidos_paciente,
@@ -87,12 +88,13 @@ public function obtenerCitasConTriaje($id_doctor, $fecha = null) {
                          t.peso, t.talla, t.presion_arterial, t.frecuencia_cardiaca,
                          t.temperatura, t.frecuencia_respiratoria, t.saturacion_oxigeno,
                          t.nivel_urgencia, t.observaciones, t.imc,
-                         CASE 
-                           WHEN t.nivel_urgencia >= 4 THEN 'Urgente'
-                           WHEN t.nivel_urgencia = 3 THEN 'Moderada' 
-                           ELSE 'Baja'
+                         CASE
+                            WHEN t.nivel_urgencia >= 4 THEN 'Urgente'
+                            WHEN t.nivel_urgencia = 3 THEN 'Moderada'
+                            ELSE 'Baja'
                          END as prioridad,
                          hc.id_historial,
+                         cm.id_consulta,  -- ✅ AGREGAR ID DE CONSULTA
                          CASE WHEN cm.id_consulta IS NOT NULL THEN 1 ELSE 0 END as tiene_consulta
                   FROM citas c
                   INNER JOIN pacientes pac ON c.id_paciente = pac.id_paciente
@@ -104,10 +106,18 @@ public function obtenerCitasConTriaje($id_doctor, $fecha = null) {
                   LEFT JOIN historiales_clinicos hc ON pac.id_paciente = hc.id_paciente
                   LEFT JOIN consultas_medicas cm ON c.id_cita = cm.id_cita
                   WHERE c.id_doctor = :id_doctor 
-                  AND DATE(c.fecha_hora) = :fecha
-                  AND c.estado IN ('Pendiente', 'Confirmada')
-                  ORDER BY 
-                    t.nivel_urgencia DESC,
+                   AND DATE(c.fecha_hora) = :fecha
+                   -- ✅ QUITAR EL FILTRO RESTRICTIVO O AMPLIARLO
+                   AND c.estado IN ('Pendiente', 'Confirmada', 'Completada', 'Cancelada', 'No Asistio')
+                  ORDER BY
+                     CASE c.estado 
+                         WHEN 'Pendiente' THEN 1
+                         WHEN 'Confirmada' THEN 2  
+                         WHEN 'Completada' THEN 3
+                         WHEN 'Cancelada' THEN 4
+                         ELSE 5
+                     END,
+                     t.nivel_urgencia DESC,
                     c.fecha_hora ASC";
         
         $stmt = $this->conn->prepare($query);
@@ -116,10 +126,23 @@ public function obtenerCitasConTriaje($id_doctor, $fecha = null) {
             ':fecha' => $fecha
         ]);
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // ✅ DEBUGGING
+        error_log("🔍 Consulta ejecutada para fecha: " . $fecha);
+        error_log("🔍 Doctor ID: " . $id_doctor);
+        error_log("🔍 Resultados encontrados: " . count($resultados));
+        
+        if (count($resultados) > 0) {
+            $estados = array_unique(array_column($resultados, 'estado'));
+            error_log("🔍 Estados encontrados: " . implode(', ', $estados));
+        }
+        
+        return $resultados;
         
     } catch (PDOException $e) {
         error_log("ERROR SQL en obtenerCitasConTriaje: " . $e->getMessage());
+        error_log("ERROR SQL Query: " . $query);
         throw new Exception("Error al obtener las citas: " . $e->getMessage());
     }
 }

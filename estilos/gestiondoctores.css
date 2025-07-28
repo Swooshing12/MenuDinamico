@@ -1299,3 +1299,200 @@ i.bi {
 .modal-backdrop:nth-of-type(2) {
     z-index: 1055 !important;
 }
+
+/* Estilos adicionales para los modales mejorados */
+.modal-content {
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.card {
+    border-radius: 15px;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.sucursal-card:hover {
+    border-color: #0d6efd !important;
+    background-color: #f8f9ff;
+}
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    color: #0d6efd;
+    transform: scale(.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+.form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.25rem rgba(40, 167, 69, 0.25);
+}
+
+.form-check-input-lg {
+    width: 1.5em;
+    height: 1.5em;
+}
+
+.text-purple {
+   color: #6f42c1 !important;
+}
+
+.bg-purple {
+   background-color: #6f42c1 !important;
+}
+
+/* Efectos de hover para botones */
+.btn {
+   transition: all 0.3s ease;
+}
+
+.btn:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Animaciones para validaciones */
+.form-control.is-valid, 
+.form-select.is-valid {
+   border-color: #28a745;
+   box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+   animation: validPulse 0.5s ease;
+}
+
+.form-control.is-invalid, 
+.form-select.is-invalid {
+   border-color: #dc3545;
+   box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+   animation: invalidShake 0.5s ease;
+}
+
+@keyframes validPulse {
+   0% { transform: scale(1); }
+   50% { transform: scale(1.02); }
+   100% { transform: scale(1); }
+}
+
+@keyframes invalidShake {
+   0%, 100% { transform: translateX(0); }
+   25% { transform: translateX(-5px); }
+   75% { transform: translateX(5px); }
+}
+
+/* Estilos para las tarjetas de sucursales */
+.sucursal-card {
+   cursor: pointer;
+   border: 2px solid #e9ecef;
+   transition: all 0.3s ease;
+}
+
+.sucursal-card:has(.form-check-input:checked) {
+   border-color: #28a745 !important;
+   background: linear-gradient(145deg, #f8fff8 0%, #e8f5e8 100%);
+   box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+}
+
+/* Mejoras para el container de horarios */
+#horariosContainer::-webkit-scrollbar {
+   width: 8px;
+}
+
+#horariosContainer::-webkit-scrollbar-track {
+   background: #f1f1f1;
+   border-radius: 10px;
+}
+
+#horariosContainer::-webkit-scrollbar-thumb {
+   background: #888;
+   border-radius: 10px;
+}
+
+#horariosContainer::-webkit-scrollbar-thumb:hover {
+   background: #555;
+}
+
+/* Estilos para alerts mejorados */
+.alert {
+   border-radius: 12px;
+   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.alert-info {
+   background: linear-gradient(145deg, #d1ecf1 0%, #bee5eb 100%);
+   border-color: #17a2b8;
+   color: #0c5460;
+}
+
+.alert-warning {
+   background: linear-gradient(145deg, #fff3cd 0%, #ffeaa7 100%);
+   border-color: #ffc107;
+   color: #856404;
+}
+
+.alert-secondary {
+   background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
+   border-color: #6c757d;
+   color: #495057;
+}
+
+/* Efectos para inputs de tiempo */
+input[type="time"] {
+   font-size: 1.1rem;
+   font-weight: 600;
+}
+
+input[type="time"]:focus {
+   background-color: #fff;
+   box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+   .modal-dialog {
+       margin: 0.5rem;
+   }
+   
+   .card-body {
+       padding: 1rem;
+   }
+   
+   .btn-lg {
+       padding: 0.5rem 1rem;
+       font-size: 1rem;
+   }
+}
+
+/* Loading spinner para validaciones async */
+.spinner-border-sm {
+   width: 1rem;
+   height: 1rem;
+}
+
+/* Mejoras para feedback de validación */
+.valid-feedback, .invalid-feedback {
+   display: block;
+   font-size: 0.875rem;
+   margin-top: 0.25rem;
+   font-weight: 500;
+}
+
+.valid-feedback {
+   color: #28a745;
+}
+
+.invalid-feedback {
+   color: #dc3545;
+}
+
+/* Estilo para campos obligatorios */
+.form-label:has(+ .form-control[required])::after,
+.form-label[for*="required"]::after {
+   content: " *";
+   color: #dc3545;
+   font-weight: bold;
+}
+

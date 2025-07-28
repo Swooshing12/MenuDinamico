@@ -116,7 +116,7 @@ class MailService {
         $fechaFormateada = $fecha->format('d/m/Y');
         $horaFormateada = $fecha->format('H:i');
         
-        $subject = "✅ Confirma tu Cita Médica - MediSys";
+        $subject = "✅ Tu Cita Médica ha sido Confirmada - MediSys";
         
         $htmlBody = $this->generarPlantillaCita([
             'tipo' => 'confirmacion',

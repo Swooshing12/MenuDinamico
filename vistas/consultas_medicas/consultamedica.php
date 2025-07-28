@@ -159,12 +159,19 @@ require_once "../../helpers/permisos.php";
                                 <label class="form-label">Fecha de Consulta</label>
                                 <input type="date" id="fechaConsulta" class="form-control" value="<?php echo date('Y-m-d'); ?>">
                             </div>
-                            <div class="col-md-4">
+                           <div class="col-md-4">
                                 <label class="form-label">Filtrar por Estado</label>
                                 <select id="filtroEstado" class="form-select">
-                                    <option value="todos">Todos los pacientes</option>
-                                    <option value="pendientes">Solo pendientes</option>
-                                    <option value="consultados">Solo consultados</option>
+                                    <option value="todos">Todos los estados</option>
+                                    <option value="Pendiente">⏳ Pendiente</option>
+                                    <option value="Confirmada">📅 Confirmada</option>
+                                    <option value="Completada">✅ Completada</option>
+                                    <option value="Cancelada">❌ Cancelada</option>
+                                    <option value="No Asistio">👻 No Asistió</option>
+                                    <!-- Filtros adicionales por proceso de consulta -->
+                                    <option value="">── Filtros especiales ──</option>
+                                    <option value="sin_consulta">🔴 Sin consulta médica</option>
+                                    <option value="con_consulta">🟢 Con consulta realizada</option>
                                 </select>
                             </div>
                             <div class="col-md-4">
@@ -519,15 +526,7 @@ require_once "../../helpers/permisos.php";
                                 <div class="form-help">Opcional</div>
                             </div>
                             
-                            <div class="form-group-enhanced seguimiento-group">
-                                <label class="form-label-enhanced">
-                                    <i class="bi bi-calendar-event"></i>
-                                    <span>Fecha de Seguimiento</span>
-                                </label>
-                                <input type="date" name="fecha_seguimiento" class="form-control-enhanced" 
-                                       min="<?php echo date('Y-m-d'); ?>">
-                                <div class="form-help">Opcional - Programar próxima consulta</div>
-                            </div>
+                          
                         </div>
                     </div>
                 </form>

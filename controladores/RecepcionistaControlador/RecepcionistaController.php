@@ -811,7 +811,7 @@ if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 't
                 trim($_POST['nombres']),
                 trim($_POST['apellidos']),
                 $_POST['genero'],
-                'Ecuatoriana', // Nacionalidad por defecto
+                'Ecuadorean', // Nacionalidad por defecto
                 !empty($_POST['correo']) ? trim($_POST['correo']) : null,
                 $passwordTemporal,
                 $rolPaciente['id_rol']

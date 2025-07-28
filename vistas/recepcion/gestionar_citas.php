@@ -213,6 +213,30 @@ if (!isset($sucursales)) {
                     </select>
                 </div>
 
+                <!-- NUEVO: Filtro por Cédula de Paciente -->
+<div class="mb-3">
+    <label for="filtroCedula" class="form-label fw-semibold">
+        <i class="bi bi-person-vcard me-1 text-warning"></i>Cédula Paciente
+    </label>
+    <div class="input-group">
+        <span class="input-group-text">
+            <i class="bi bi-credit-card text-muted"></i>
+        </span>
+        <input type="text" class="form-control" id="filtroCedula" 
+               placeholder="Ej: 1234567890" 
+               pattern="[0-9]*" 
+               maxlength="10"
+               autocomplete="off">
+        <button class="btn btn-outline-primary" type="button" id="btnBuscarCedula" title="Buscar">
+            <i class="bi bi-search"></i>
+        </button>
+    </div>
+    <small class="form-text text-muted">
+        <i class="bi bi-info-circle me-1"></i>
+        Busque las citas de un paciente específico
+    </small>
+</div>
+
                 <!-- Botones de Control -->
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-primary" id="btnAplicarFiltros">
@@ -534,7 +558,7 @@ if (!isset($sucursales)) {
                                            <div class="alert alert-info">
                                                <i class="bi bi-info-circle me-2"></i>
                                                <strong>Nota:</strong> El enlace de la videollamada se enviará al paciente por email 
-                                               y SMS 24 horas antes de la cita.
+                                               24 horas antes de la cita.
                                            </div>
                                        </div>
                                    </div>
@@ -727,7 +751,7 @@ if (!isset($sucursales)) {
                                        <div class="form-check mt-2">
                                            <input class="form-check-input" type="checkbox" id="enviarNotificacion" checked>
                                            <label class="form-check-label" for="enviarNotificacion">
-                                               Enviar notificación al paciente por email y SMS
+                                               Enviar notificación al paciente por email
                                            </label>
                                        </div>
                                        <div class="form-check mt-2" id="checkRecordarVirtual" style="display: none;">

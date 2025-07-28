@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../config/config.php";
 
 if (!isset($_SESSION['id_rol'])) {
-    header('Location: ' . BASE_URL . '/login.php');
+    header('Location: ' . BASE_URL . '/vistas/login.php');
     exit;
 }
 

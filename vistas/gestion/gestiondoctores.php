@@ -303,278 +303,362 @@ if (!isset($doctores)) {
         </div>
     </div>
 
-    <!-- Modal Crear Doctor -->
-    <div class="modal fade" id="crearDoctorModal" tabindex="-1" aria-labelledby="crearDoctorModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="crearDoctorModalLabel">
-                        <i class="bi bi-plus-circle me-2"></i>
-                        Registrar Nuevo Doctor
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                
-                <form id="formCrearDoctor">
-                    <div class="modal-body">
-                        <div class="row g-4">
-                            <!-- Información Personal -->
-                            <div class="col-12">
-                                <h6 class="text-success border-bottom pb-2 mb-3">
-                                    <i class="bi bi-person me-2"></i>
-                                    Información Personal
-                                </h6>
-                            </div>
-                            
-                            <!-- En la sección de cédula del modal crear doctor -->
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        <input type="number" class="form-control" id="cedula" name="cedula" 
-                                            placeholder="Cédula" required maxlength="10" min="1000000000" max="9999999999">
-                                        <label for="cedula">
-                                            <i class="bi bi-card-text me-1"></i>
-                                            Cédula *
-                                        </label>
-                                    </div>
-                                    <div class="mt-2">
-                                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnBuscarCedulaDoctor">
-                                            <i class="bi bi-search me-1"></i>
-                                            Buscar datos
-                                        </button>
-                                    </div>
+  <!-- Modal Crear Doctor - DISEÑO MEJORADO COMPLETO -->
+<div class="modal fade" id="crearDoctorModal" tabindex="-1" aria-labelledby="crearDoctorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content border-0 shadow-lg">
+            <!-- Header con gradiente -->
+            <div class="modal-header bg-gradient" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                <h5 class="modal-title text-black fw-bold" id="crearDoctorModalLabel">
+                    <i class="bi bi-plus-circle-fill me-2"></i>
+                    ✨ Registrar Nuevo Doctor
+                </h5>
+                <button type="button" class="btn-close btn-close-black" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            
+            <form id="formCrearDoctor">
+                <div class="modal-body" style="background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);">
+                    <div class="row g-4">
+                        
+                        <!-- SECCIÓN 1: INFORMACIÓN PERSONAL -->
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header text-white" style="background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);">
+                                    <h6 class="mb-0 fw-bold">
+                                        <i class="bi bi-person-fill me-2"></i>
+                                        👤 Información Personal
+                                    </h6>
                                 </div>
+                                <div class="card-body bg-light">
+                                    <div class="row g-3">
+                                        
+                                        <!-- Cédula -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control border-2" id="cedula" name="cedula" 
+                                                    placeholder="Cédula" required maxlength="15">
+                                                <label for="cedula" class="text-primary fw-semibold">
+                                                    <i class="bi bi-card-text me-1"></i>
+                                                    🆔 Cédula de Identidad *
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Cédula válida
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ La cédula debe tener entre 10 y 15 dígitos
+                                            </div>
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" id="btnBuscarCedulaDoctor">
+                                                    <i class="bi bi-search me-1"></i>
+                                                    🔍 Buscar datos
+                                                </button>
+                                            </div>
+                                        </div>
 
-                                    <!-- Actualizar el campo de username para mostrar feedback -->
-                                    <div class="col-md-6">
-                                        <div class="form-floating">
-                                            <input type="text" class="form-control" id="username" name="username" 
-                                                placeholder="Username" required maxlength="50">
-                                            <label for="username">
-                                                <i class="bi bi-person-badge me-1"></i>
-                                                Nombre de Usuario *
+                                        <!-- Username -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control border-2" id="username" name="username" 
+                                                    placeholder="Username" required maxlength="50">
+                                                <label for="username" class="text-primary fw-semibold">
+                                                    <i class="bi bi-person-badge me-1"></i>
+                                                    👨‍💼 Nombre de Usuario *
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Username disponible
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ Username no válido o ya existe
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-info-circle me-1"></i>
+                                                Solo letras, números y guiones bajos. Mínimo 3 caracteres.
+                                            </small>
+                                        </div>
+
+                                        <!-- Nombres -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control border-2" id="nombres" name="nombres" 
+                                                    placeholder="Nombres" required maxlength="100">
+                                                <label for="nombres" class="text-primary fw-semibold">
+                                                    <i class="bi bi-person me-1"></i>
+                                                    👤 Nombres *
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Nombres válidos
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ Solo se permiten letras y espacios
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Apellidos -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control border-2" id="apellidos" name="apellidos" 
+                                                    placeholder="Apellidos" required maxlength="100">
+                                                <label for="apellidos" class="text-primary fw-semibold">
+                                                    <i class="bi bi-person me-1"></i>
+                                                    👥 Apellidos *
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Apellidos válidos
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ Solo se permiten letras y espacios
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Sexo -->
+                                        <div class="col-md-4">
+                                            <div class="form-floating">
+                                                <select class="form-select border-2" id="sexo" name="sexo" required>
+                                                    <option value="">Seleccionar...</option>
+                                                    <option value="M">👨 Masculino</option>
+                                                    <option value="F">👩 Femenino</option>
+                                                </select>
+                                                <label for="sexo" class="text-primary fw-semibold">
+                                                    <i class="bi bi-gender-ambiguous me-1"></i>
+                                                    ⚧️ Sexo *
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Nacionalidad -->
+                                        <div class="col-md-4">
+                                            <label for="nacionalidad" class="form-label text-primary fw-semibold">
+                                                <i class="bi bi-globe me-1"></i>
+                                                🌍 Nacionalidad *
                                             </label>
+                                            <select class="form-select border-2" id="nacionalidad" name="nacionalidad" required>
+                                                <option value="">🌎 Seleccionar nacionalidad...</option>
+                                                <!-- Se llena dinámicamente -->
+                                            </select>
+                                            <input type="hidden" id="nacionalidad_hidden" name="nacionalidad_hidden">
+                                            <small class="text-muted">
+                                                <i class="bi bi-search me-1"></i>
+                                                Busca escribiendo el nombre del país
+                                            </small>
                                         </div>
-                                        <div id="usernameFeedback" class="form-text"></div>
-                                    </div>
-
-                                    <!-- Actualizar el campo de nacionalidad -->
-                                                                    <!-- Campo de nacionalidad con Select2 -->
-                                    <div class="col-md-6">
-                                        <label for="nacionalidad" class="form-label">
-                                            <i class="bi bi-globe me-1"></i>
-                                            Nacionalidad *
-                                        </label>
-                                        <select class="form-select" id="nacionalidad" name="nacionalidad" required 
-                                                data-bs-theme="bootstrap-5">
-                                            <option value="">Seleccionar nacionalidad...</option>
-                                            <!-- Se llena dinámicamente -->
-                                        </select>
                                         
-                                        <!-- 🔥 NUEVO: Input hidden para cuando el select esté disabled -->
-                                        <input type="hidden" id="nacionalidad_hidden" name="nacionalidad_hidden">
+                                        <!-- Estado -->
+                                        <div class="col-md-4">
+                                            <div class="form-floating">
+                                                <select class="form-select border-2" id="id_estado" name="id_estado">
+                                                    <option value="1" selected>✅ Activo</option>
+                                                    <option value="2">🚫 Bloqueado</option>
+                                                    <option value="3">⏳ Pendiente</option>
+                                                    <option value="4">❌ Inactivo</option>
+                                                </select>
+                                                <label for="id_estado" class="text-primary fw-semibold">
+                                                    <i class="bi bi-toggle-on me-1"></i>
+                                                    🔄 Estado
+                                                </label>
+                                            </div>
+                                        </div>
                                         
-                                        <div class="form-text">
-                                            <i class="bi bi-search me-1"></i>
-                                            Puedes buscar escribiendo el nombre del país o nacionalidad
+                                        <!-- Correo -->
+                                        <div class="col-12">
+                                            <div class="form-floating">
+                                                <input type="email" class="form-control border-2" id="correo" name="correo" 
+                                                    placeholder="Correo electrónico" required maxlength="255">
+                                                <label for="correo" class="text-primary fw-semibold">
+                                                    <i class="bi bi-envelope me-1"></i>
+                                                    📧 Correo Electrónico *
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Correo válido
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ Ingrese un correo electrónico válido
+                                            </div>
                                         </div>
                                     </div>
-                                                                <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="nombres" name="nombres" 
-                                           placeholder="Nombres" required maxlength="255">
-                                    <label for="nombres">
-                                        <i class="bi bi-person me-1"></i>
-                                        Nombres *
-                                    </label>
                                 </div>
                             </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="apellidos" name="apellidos" 
-                                           placeholder="Apellidos" required maxlength="255">
-                                    <label for="apellidos">
-                                        <i class="bi bi-person me-1"></i>
-                                        Apellidos *
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="form-floating">
-                                    <select class="form-select" id="sexo" name="sexo" required>
-                                        <option value="">Seleccionar...</option>
-                                        <option value="M">Masculino</option>
-                                        <option value="F">Femenino</option>
-                                    </select>
-                                    <label for="sexo">
-                                        <i class="bi bi-gender-ambiguous me-1"></i>
-                                        Sexo *
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            
-                            <div class="col-md-4">
-                                <div class="form-floating">
-                                    <select class="form-select" id="id_estado" name="id_estado">
-                                        <option value="1" selected>Activo</option>
-                                        <option value="2">Bloqueado</option>
-                                        <option value="3">Pendiente</option>
-                                        <option value="4">Inactivo</option>
-                                    </select>
-                                    <label for="id_estado">
-                                        <i class="bi bi-toggle-on me-1"></i>
-                                        Estado
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="email" class="form-control" id="correo" name="correo" 
-                                           placeholder="Correo electrónico" required maxlength="255">
-                                    <label for="correo">
-                                        <i class="bi bi-envelope me-1"></i>
-                                        Correo Electrónico *
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <!-- Información Médica -->
-                            <div class="col-12">
-                                <h6 class="text-success border-bottom pb-2 mb-3 mt-3">
-                                    <i class="bi bi-journal-medical me-2"></i>
-                                    Información Médica
-                                </h6>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <select class="form-select" id="id_especialidad" name="id_especialidad" required>
-                                        <option value="">Seleccionar especialidad...</option>
-                                        <?php foreach ($especialidades as $especialidad): ?>
-                                        <option value="<?= $especialidad['id_especialidad'] ?>">
-                                            <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <label for="id_especialidad">
-                                        <i class="bi bi-journal-medical me-1"></i>
-                                        Especialidad Médica *
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-floating">
-                                    <input type="text" class="form-control" id="titulo_profesional" name="titulo_profesional" 
-                                           placeholder="Título profesional" maxlength="100">
-                                    <label for="titulo_profesional">
-                                        <i class="bi bi-mortarboard me-1"></i>
-                                        Título Profesional
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <!-- ASIGNACIÓN DE SUCURSALES -->
-                        <div class="col-12">
-                            <h6 class="text-success border-bottom pb-2 mb-3">
-                                <i class="bi bi-building me-2"></i>
-                                Asignación de Sucursales
-                            </h6>
                         </div>
                         
+                        <!-- SECCIÓN 2: INFORMACIÓN MÉDICA -->
                         <div class="col-12">
-                            <div class="row" id="sucursalesCrear">
-                                <?php foreach ($sucursales as $sucursal): ?>
-                                <div class="col-md-6 mb-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" 
-                                               value="<?= $sucursal['id_sucursal'] ?>" 
-                                               id="sucursal_<?= $sucursal['id_sucursal'] ?>"
-                                               name="sucursales[]">
-                                        <label class="form-check-label" for="sucursal_<?= $sucursal['id_sucursal'] ?>">
-                                            <strong><?= htmlspecialchars($sucursal['nombre_sucursal']) ?></strong><br>
-                                            <small class="text-muted"><?= htmlspecialchars($sucursal['direccion']) ?></small>
-                                        </label>
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header text-white" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                                    <h6 class="mb-0 fw-bold">
+                                        <i class="bi bi-journal-medical me-2"></i>
+                                        🩺 Información Médica
+                                    </h6>
+                                </div>
+                                <div class="card-body bg-light">
+                                    <div class="row g-3">
+                                        
+                                        <!-- Especialidad -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <select class="form-select border-2" id="id_especialidad" name="id_especialidad" required>
+                                                    <option value="">🏥 Seleccionar especialidad...</option>
+                                                    <?php foreach ($especialidades as $especialidad): ?>
+                                                    <option value="<?= $especialidad['id_especialidad'] ?>">
+                                                        🩺 <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <label for="id_especialidad" class="text-info fw-semibold">
+                                                    <i class="bi bi-journal-medical me-1"></i>
+                                                    🎓 Especialidad Médica *
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Título Profesional -->
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control border-2" id="titulo_profesional" name="titulo_profesional" 
+                                                    placeholder="Título profesional" maxlength="100">
+                                                <label for="titulo_profesional" class="text-info fw-semibold">
+                                                    <i class="bi bi-mortarboard me-1"></i>
+                                                    🎓 Título Profesional
+                                                </label>
+                                            </div>
+                                            <div class="valid-feedback">
+                                                <i class="bi bi-check-circle-fill me-1"></i>✅ Título válido
+                                            </div>
+                                            <div class="invalid-feedback">
+                                                <i class="bi bi-x-circle-fill me-1"></i>❌ Solo letras, números y signos básicos
+                                            </div>
+                                            <small class="text-muted">
+                                                <i class="bi bi-lightbulb me-1"></i>
+                                                Ej: MSc Cardiólogo, Dr. en Medicina, etc.
+                                            </small>
+                                        </div>
                                     </div>
                                 </div>
-                                <?php endforeach; ?>
                             </div>
                         </div>
 
-                        <!-- 🕒 GESTIÓN DE HORARIOS -->
+                        <!-- SECCIÓN 3: ASIGNACIÓN DE SUCURSALES - ESTRUCTURA ORIGINAL -->
+<div class="col-12">
+    <div class="card border-0 shadow-sm">
+        <div class="card-header text-dark" style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);">
+            <h6 class="mb-0 fw-bold">
+                <i class="bi bi-building me-2"></i>
+                🏢 Asignación de Sucursales
+            </h6>
+        </div>
+        <div class="card-body bg-light">
+            <div class="alert alert-info border-0 shadow-sm">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <strong>📍 Instrucciones:</strong> Seleccione las sucursales donde el doctor trabajará.
+            </div>
+            
+            <!-- MANTENER TU ESTRUCTURA ORIGINAL -->
+            <div class="row" id="sucursalesCrear">
+                <?php foreach ($sucursales as $sucursal): ?>
+                <div class="col-md-6 mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" 
+                               value="<?= $sucursal['id_sucursal'] ?>" 
+                               id="sucursal_<?= $sucursal['id_sucursal'] ?>"
+                               name="sucursales[]">
+                        <label class="form-check-label" for="sucursal_<?= $sucursal['id_sucursal'] ?>">
+                            <strong><?= htmlspecialchars($sucursal['nombre_sucursal']) ?></strong><br>
+                            <small class="text-muted"><?= htmlspecialchars($sucursal['direccion']) ?></small>
+                        </label>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+                        <!-- SECCIÓN 4: CONFIGURACIÓN DE HORARIOS -->
                         <div class="col-12">
-                            <h6 class="text-success border-bottom pb-2 mb-3">
-                                <i class="bi bi-clock me-2"></i>
-                                Configuración de Horarios
-                            </h6>
-                        </div>
-                        
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <i class="bi bi-info-circle me-2"></i>
-                                <strong>Instrucciones:</strong> Configure los horarios de atención por sucursal y día de la semana. 
-                                Puede agregar múltiples turnos por día.
-                            </div>
-                        </div>
-                        
-                        <!-- Selector de sucursal para horarios -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-building me-1"></i>
-                                Sucursal para horarios:
-                            </label>
-                            <select class="form-select" id="sucursalHorarios">
-                                <option value="">Seleccione una sucursal...</option>
-                                <?php foreach ($sucursales as $sucursal): ?>
-                                <option value="<?= $sucursal['id_sucursal'] ?>">
-                                    <?= htmlspecialchars($sucursal['nombre_sucursal']) ?>
-                                </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small class="text-muted">Primero marque las sucursales arriba</small>
-                        </div>
-                        
-                        <div class="col-md-8">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-bold mb-0">Horarios configurados:</label>
-                                <button type="button" class="btn btn-primary btn-sm" id="btnAgregarHorario">
-                                    <i class="bi bi-plus-circle me-1"></i>
-                                    Agregar Horario
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Container de horarios -->
-                        <div class="col-12">
-                            <div id="horariosContainer" class="border rounded p-3" style="min-height: 200px; max-height: 400px; overflow-y: auto;">
-                                <div class="text-center text-muted py-4" id="noHorariosMessage">
-                                    <i class="bi bi-clock-history display-4 d-block mb-2"></i>
-                                    <p>No hay horarios configurados</p>
-                                    <small>Seleccione una sucursal y agregue horarios</small>
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header text-white" style="background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);">
+                                    <h6 class="mb-0 fw-bold">
+                                        <i class="bi bi-clock-fill me-2"></i>
+                                        🕒 Configuración de Horarios
+                                    </h6>
+                                </div>
+                                <div class="card-body bg-light">
+                                    <div class="alert alert-info border-0 shadow-sm">
+                                        <i class="bi bi-info-circle-fill me-2"></i>
+                                        <strong>⏰ Instrucciones:</strong> Configure los horarios de atención por sucursal y día de la semana. 
+                                        Puede agregar múltiples turnos por día.
+                                    </div>
+                                    
+                                    <div class="row g-3">
+                                        <!-- Selector de sucursal para horarios -->
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold text-purple">
+                                                <i class="bi bi-building me-1"></i>
+                                                🏢 Sucursal para horarios:
+                                            </label>
+                                            <select class="form-select border-2" id="sucursalHorarios">
+                                                <option value="">🏥 Seleccione una sucursal...</option>
+                                                <?php foreach ($sucursales as $sucursal): ?>
+                                                <option value="<?= $sucursal['id_sucursal'] ?>">
+                                                    🏢 <?= htmlspecialchars($sucursal['nombre_sucursal']) ?>
+                                                </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <small class="text-muted">
+                                                <i class="bi bi-arrow-up me-1"></i>
+                                                Primero marque las sucursales arriba
+                                            </small>
+                                        </div>
+                                        
+                                        <div class="col-md-8">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="form-label fw-bold mb-0 text-purple">
+                                                    <i class="bi bi-calendar-week me-1"></i>
+                                                    📅 Horarios configurados:
+                                                </label>
+                                                <button type="button" class="btn btn-primary btn-sm rounded-pill shadow-sm" id="btnAgregarHorario">
+                                                    <i class="bi bi-plus-circle-fill me-1"></i>
+                                                    ➕ Agregar Horario
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Container de horarios -->
+                                        <div class="col-12">
+                                            <div id="horariosContainer" class="border-2 rounded-3 p-4 bg-white shadow-sm" 
+                                                 style="min-height: 200px; max-height: 400px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-4" id="noHorariosMessage">
+                                                    <i class="bi bi-clock-history display-1 text-purple mb-3"></i>
+                                                    <h5 class="text-muted">⏰ No hay horarios configurados</h5>
+                                                    <p class="mb-0">Seleccione una sucursal y agregue horarios de atención</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <!-- Footer mejorado -->
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary btn-lg rounded-pill px-4" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle me-1"></i>
-                        Cancelar
+                        ❌ Cancelar
                     </button>
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill px-4 shadow">
                         <i class="bi bi-save me-1"></i>
-                        Registrar Doctor
+                        ✅ Registrar Doctor
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-
 <!-- Modal para agregar/editar horario individual -->
 <div class="modal fade" id="modalHorario" tabindex="-1">
     <div class="modal-dialog">
