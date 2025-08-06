@@ -36,7 +36,7 @@ public function crearConHorarios($datosUsuario, $datosDoctor, $sucursales = [], 
             ':nacionalidad' => $datosUsuario['nacionalidad'],
             ':correo' => $datosUsuario['correo'],
             ':password' => $datosUsuario['password'],
-            ':id_estado' => $datosUsuario['id_estado'] ?? 1
+            ':id_estado' => $datosUsuario['id_estado'] ?? 3
         ]);
         
         $id_usuario = $this->conn->lastInsertId();

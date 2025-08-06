@@ -1,3 +1,3 @@
 <?php
-define("BASE_URL", "http://localhost/MenuDinamico");
+define("BASE_URL", "http://localhost/MenuDinamico/");
 ?>

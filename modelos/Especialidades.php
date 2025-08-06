@@ -571,5 +571,39 @@ class Especialidades {
             throw new Exception("Error al obtener especialidades disponibles");
         }
     }
+
+    /**
+     * Obtener especialidades disponibles en una sucursal específica
+     */
+    // En modelos/Especialidades.php - agregar logging
+public function obtenerEspecialidadesPorSucursal($id_sucursal) {
+    error_log("🔍 === DEBUGGING MODELO ESPECIALIDADES ===");
+    error_log("🔍 ID Sucursal recibido en modelo: " . $id_sucursal);
+    
+    try {
+        $query = "SELECT DISTINCT e.id_especialidad, e.nombre_especialidad, e.descripcion
+                  FROM especialidades e
+                  INNER JOIN especialidades_sucursales es ON e.id_especialidad = es.id_especialidad
+                  WHERE es.id_sucursal = :id_sucursal
+                  ORDER BY e.nombre_especialidad";
+        
+        error_log("🔍 Query a ejecutar: " . $query);
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_sucursal' => $id_sucursal]);
+        
+        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        error_log("✅ Resultados obtenidos: " . count($resultados));
+        error_log("📊 Datos: " . print_r($resultados, true));
+        
+        return $resultados;
+        
+    } catch (PDOException $e) {
+        error_log("❌ Error SQL: " . $e->getMessage());
+        error_log("❌ Query: " . $query);
+        throw new Exception("Error al obtener especialidades de la sucursal: " . $e->getMessage());
+    }
+}
 }
 ?>

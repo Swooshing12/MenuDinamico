@@ -484,7 +484,48 @@ if (!isset($doctores)) {
                             </div>
                         </div>
                         
-                        <!-- SECCIÓN 2: INFORMACIÓN MÉDICA -->
+                        <!-- SECCIÓN 2: ASIGNACIÓN DE SUCURSAL (MODIFICADO) -->
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header text-dark" style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);">
+                                    <h6 class="mb-0 fw-bold">
+                                        <i class="bi bi-building me-2"></i>
+                                        🏢 Asignación de Sucursal
+                                    </h6>
+                                </div>
+                                <div class="card-body bg-light">
+                                    <div class="alert alert-info border-0 shadow-sm">
+                                        <i class="bi bi-info-circle-fill me-2"></i>
+                                        <strong>📍 Instrucciones:</strong> Seleccione la sucursal donde trabajará el doctor.
+                                    </div>
+                                    
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <div class="form-floating">
+                                                <select class="form-select border-2" id="id_sucursal" name="id_sucursal" required>
+                                                    <option value="">🏥 Seleccionar sucursal...</option>
+                                                    <?php foreach ($sucursales as $sucursal): ?>
+                                                    <option value="<?= $sucursal['id_sucursal'] ?>">
+                                                        🏢 <?= htmlspecialchars($sucursal['nombre_sucursal']) ?> - <?= htmlspecialchars($sucursal['direccion']) ?>
+                                                    </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <label for="id_sucursal" class="text-warning fw-semibold">
+                                                    <i class="bi bi-building me-1"></i>
+                                                    🏥 Sucursal de Trabajo *
+                                                </label>
+                                            </div>
+                                            <small class="text-muted mt-2 d-block">
+                                                <i class="bi bi-lightbulb me-1"></i>
+                                                Primero seleccione la sucursal para cargar las especialidades disponibles
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECCIÓN 3: INFORMACIÓN MÉDICA (MODIFICADO) -->
                         <div class="col-12">
                             <div class="card border-0 shadow-sm">
                                 <div class="card-header text-white" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
@@ -496,22 +537,21 @@ if (!isset($doctores)) {
                                 <div class="card-body bg-light">
                                     <div class="row g-3">
                                         
-                                        <!-- Especialidad -->
+                                        <!-- Especialidad (se carga dinámicamente) -->
                                         <div class="col-md-6">
                                             <div class="form-floating">
-                                                <select class="form-select border-2" id="id_especialidad" name="id_especialidad" required>
-                                                    <option value="">🏥 Seleccionar especialidad...</option>
-                                                    <?php foreach ($especialidades as $especialidad): ?>
-                                                    <option value="<?= $especialidad['id_especialidad'] ?>">
-                                                        🩺 <?= htmlspecialchars($especialidad['nombre_especialidad']) ?>
-                                                    </option>
-                                                    <?php endforeach; ?>
+                                                <select class="form-select border-2" id="id_especialidad" name="id_especialidad" required disabled>
+                                                    <option value="">🔄 Primero seleccione una sucursal...</option>
                                                 </select>
                                                 <label for="id_especialidad" class="text-info fw-semibold">
                                                     <i class="bi bi-journal-medical me-1"></i>
                                                     🎓 Especialidad Médica *
                                                 </label>
                                             </div>
+                                            <small class="text-muted mt-2 d-block">
+                                                <i class="bi bi-arrow-up me-1"></i>
+                                                Las especialidades se cargarán según la sucursal seleccionada
+                                            </small>
                                         </div>
                                         
                                         <!-- Título Profesional -->
@@ -540,43 +580,7 @@ if (!isset($doctores)) {
                             </div>
                         </div>
 
-                        <!-- SECCIÓN 3: ASIGNACIÓN DE SUCURSALES - ESTRUCTURA ORIGINAL -->
-<div class="col-12">
-    <div class="card border-0 shadow-sm">
-        <div class="card-header text-dark" style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);">
-            <h6 class="mb-0 fw-bold">
-                <i class="bi bi-building me-2"></i>
-                🏢 Asignación de Sucursales
-            </h6>
-        </div>
-        <div class="card-body bg-light">
-            <div class="alert alert-info border-0 shadow-sm">
-                <i class="bi bi-info-circle-fill me-2"></i>
-                <strong>📍 Instrucciones:</strong> Seleccione las sucursales donde el doctor trabajará.
-            </div>
-            
-            <!-- MANTENER TU ESTRUCTURA ORIGINAL -->
-            <div class="row" id="sucursalesCrear">
-                <?php foreach ($sucursales as $sucursal): ?>
-                <div class="col-md-6 mb-2">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" 
-                               value="<?= $sucursal['id_sucursal'] ?>" 
-                               id="sucursal_<?= $sucursal['id_sucursal'] ?>"
-                               name="sucursales[]">
-                        <label class="form-check-label" for="sucursal_<?= $sucursal['id_sucursal'] ?>">
-                            <strong><?= htmlspecialchars($sucursal['nombre_sucursal']) ?></strong><br>
-                            <small class="text-muted"><?= htmlspecialchars($sucursal['direccion']) ?></small>
-                        </label>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-</div>
-
-                        <!-- SECCIÓN 4: CONFIGURACIÓN DE HORARIOS -->
+                        <!-- SECCIÓN 4: CONFIGURACIÓN DE HORARIOS (SIMPLIFICADO) -->
                         <div class="col-12">
                             <div class="card border-0 shadow-sm">
                                 <div class="card-header text-white" style="background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%);">
@@ -588,52 +592,43 @@ if (!isset($doctores)) {
                                 <div class="card-body bg-light">
                                     <div class="alert alert-info border-0 shadow-sm">
                                         <i class="bi bi-info-circle-fill me-2"></i>
-                                        <strong>⏰ Instrucciones:</strong> Configure los horarios de atención por sucursal y día de la semana. 
+                                        <strong>⏰ Instrucciones:</strong> Configure los horarios de atención para la sucursal seleccionada. 
                                         Puede agregar múltiples turnos por día.
                                     </div>
                                     
                                     <div class="row g-3">
-                                        <!-- Selector de sucursal para horarios -->
-                                        <div class="col-md-4">
-                                            <label class="form-label fw-bold text-purple">
-                                                <i class="bi bi-building me-1"></i>
-                                                🏢 Sucursal para horarios:
-                                            </label>
-                                            <select class="form-select border-2" id="sucursalHorarios">
-                                                <option value="">🏥 Seleccione una sucursal...</option>
-                                                <?php foreach ($sucursales as $sucursal): ?>
-                                                <option value="<?= $sucursal['id_sucursal'] ?>">
-                                                    🏢 <?= htmlspecialchars($sucursal['nombre_sucursal']) ?>
-                                                </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <small class="text-muted">
-                                                <i class="bi bi-arrow-up me-1"></i>
-                                                Primero marque las sucursales arriba
-                                            </small>
+                                        <!-- Mensaje para seleccionar sucursal -->
+                                        <div class="col-12" id="mensajeSucursalHorarios">
+                                            <div class="text-center text-muted py-4">
+                                                <i class="bi bi-building display-1 text-warning mb-3"></i>
+                                                <h5 class="text-muted">🏥 Seleccione una sucursal primero</h5>
+                                                <p class="mb-0">Los horarios se configurarán para la sucursal seleccionada arriba</p>
+                                            </div>
                                         </div>
                                         
-                                        <div class="col-md-8">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <label class="form-label fw-bold mb-0 text-purple">
-                                                    <i class="bi bi-calendar-week me-1"></i>
-                                                    📅 Horarios configurados:
-                                                </label>
+                                        <!-- Controles de horarios (ocultos inicialmente) -->
+                                        <div class="col-12 d-none" id="controlesHorarios">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <div>
+                                                    <h6 class="mb-1 fw-bold text-purple">
+                                                        <i class="bi bi-calendar-week me-1"></i>
+                                                        📅 Horarios para: <span id="nombreSucursalSeleccionada" class="text-primary"></span>
+                                                    </h6>
+                                                    <small class="text-muted">Configure los días y horarios de atención</small>
+                                                </div>
                                                 <button type="button" class="btn btn-primary btn-sm rounded-pill shadow-sm" id="btnAgregarHorario">
                                                     <i class="bi bi-plus-circle-fill me-1"></i>
                                                     ➕ Agregar Horario
                                                 </button>
                                             </div>
-                                        </div>
-                                        
-                                        <!-- Container de horarios -->
-                                        <div class="col-12">
+                                            
+                                            <!-- Container de horarios -->
                                             <div id="horariosContainer" class="border-2 rounded-3 p-4 bg-white shadow-sm" 
                                                  style="min-height: 200px; max-height: 400px; overflow-y: auto;">
                                                 <div class="text-center text-muted py-4" id="noHorariosMessage">
                                                     <i class="bi bi-clock-history display-1 text-purple mb-3"></i>
                                                     <h5 class="text-muted">⏰ No hay horarios configurados</h5>
-                                                    <p class="mb-0">Seleccione una sucursal y agregue horarios de atención</p>
+                                                    <p class="mb-0">Haga clic en "Agregar Horario" para comenzar</p>
                                                 </div>
                                             </div>
                                         </div>

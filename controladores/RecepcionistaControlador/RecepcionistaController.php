@@ -805,7 +805,7 @@ if (!empty($_POST['enviar_notificacion']) && $_POST['enviar_notificacion'] == 't
                 throw new Exception("No se encontró el rol 'Paciente' en el sistema");
             }
             
-            $resultado = $this->usuarioModel->crearUsuario(
+            $resultado = $this->usuarioModel->crearUsuario2(
                 (int)$_POST['cedula'],
                 $username,
                 trim($_POST['nombres']),

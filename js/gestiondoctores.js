@@ -44,6 +44,119 @@ $(document).ready(function() {
 });
 });
 
+// ===== NUEVA FUNCIONALIDAD: MANEJO DE SUCURSAL Y ESPECIALIDADES =====
+
+$(document).ready(function() {
+    // Event listener para cambio de sucursal en modal crear
+    $('#id_sucursal').on('change', function() {
+        const idSucursal = $(this).val();
+        const nombreSucursal = $(this).find('option:selected').text();
+        
+        console.log('🏥 Sucursal seleccionada:', idSucursal, nombreSucursal);
+        
+        if (idSucursal) {
+            // Cargar especialidades para esta sucursal
+            cargarEspecialidadesPorSucursal(idSucursal);
+            
+            // Mostrar controles de horarios
+            $('#mensajeSucursalHorarios').addClass('d-none');
+            $('#controlesHorarios').removeClass('d-none');
+            $('#nombreSucursalSeleccionada').text(nombreSucursal.replace('🏢 ', ''));
+            
+            // Limpiar horarios existentes
+            if (typeof window.limpiarHorarios === 'function') {
+                window.limpiarHorarios();
+            }
+        } else {
+            // Ocultar controles y limpiar especialidades
+            $('#controlesHorarios').addClass('d-none');
+            $('#mensajeSucursalHorarios').removeClass('d-none');
+            $('#id_especialidad').html('<option value="">🔄 Primero seleccione una sucursal...</option>').prop('disabled', true);
+            
+            // Limpiar horarios
+            if (typeof window.limpiarHorarios === 'function') {
+                window.limpiarHorarios();
+            }
+        }
+    });
+
+    // Event listener para cambio de sucursal en modal editar (si existe)
+    $('#editarIdSucursal').on('change', function() {
+        const idSucursal = $(this).val();
+        const nombreSucursal = $(this).find('option:selected').text();
+        
+        console.log('🏥 Sucursal seleccionada para edición:', idSucursal, nombreSucursal);
+        
+        if (idSucursal) {
+            // Cargar especialidades para esta sucursal
+            cargarEspecialidadesPorSucursalEditar(idSucursal);
+            
+            // Mostrar controles de horarios en edición (si existen)
+            $('#editarMensajeSucursalHorarios').addClass('d-none');
+            $('#editarControlesHorarios').removeClass('d-none');
+            $('#editarNombreSucursalSeleccionada').text(nombreSucursal.replace('🏢 ', ''));
+            
+            // Limpiar horarios existentes
+            if (typeof window.limpiarHorarios === 'function') {
+                window.limpiarHorarios();
+            }
+        } else {
+            // Ocultar controles y limpiar especialidades
+            $('#editarControlesHorarios').addClass('d-none');
+            $('#editarMensajeSucursalHorarios').removeClass('d-none');
+            $('#editarIdEspecialidad').html('<option value="">🔄 Primero seleccione una sucursal...</option>').prop('disabled', true);
+            
+            // Limpiar horarios
+            if (typeof window.limpiarHorarios === 'function') {
+                window.limpiarHorarios();
+            }
+        }
+    });
+});
+
+// ===== FUNCIÓN PARA CARGAR ESPECIALIDADES POR SUCURSAL =====
+function cargarEspecialidadesPorSucursal(idSucursal) {
+    console.log('🔍 Cargando especialidades para sucursal:', idSucursal);
+    
+    // Mostrar loading en select de especialidades
+    $('#id_especialidad').html('<option value="">🔄 Cargando especialidades...</option>').prop('disabled', true);
+    
+    $.ajax({
+        url: config.baseUrl,
+        type: 'POST',
+        data: {
+            action: 'obtenerEspecialidadesPorSucursal',
+            id_sucursal: idSucursal,
+            submenu_id: config.submenuId
+        },
+        dataType: 'json',
+        success: function(response) {
+            console.log('📥 Respuesta especialidades:', response);
+            
+            if (response.success && response.data) {
+                let options = '<option value="">🩺 Seleccionar especialidad...</option>';
+                
+                response.data.forEach(especialidad => {
+                    options += `<option value="${especialidad.id_especialidad}">
+                        🩺 ${especialidad.nombre_especialidad}
+                    </option>`;
+                });
+                
+                $('#id_especialidad').html(options).prop('disabled', false);
+                console.log(`✅ ${response.data.length} especialidades cargadas`);
+            } else {
+                $('#id_especialidad').html('<option value="">❌ No hay especialidades disponibles</option>');
+                console.warn('⚠️ No se encontraron especialidades para esta sucursal');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error cargando especialidades:', error);
+            $('#id_especialidad').html('<option value="">❌ Error cargando especialidades</option>');
+            Swal.fire('Error', 'No se pudieron cargar las especialidades', 'error');
+        }
+    });
+}
+
 // ===== EVENTOS =====
 function inicializarEventos() {
     // Formularios
@@ -425,9 +538,8 @@ function mostrarDoctores(doctores) {
 }
 
 /**
- * Crear nuevo doctor
+ * Crear nuevo doctor - VERSIÓN CORREGIDA PARA SUCURSAL ÚNICA
  */
-// ===== CREAR DOCTOR CON HORARIOS - VERSIÓN CORREGIDA =====
 function crearDoctor(e) {
     e.preventDefault();
     
@@ -435,18 +547,14 @@ function crearDoctor(e) {
         return;
     }
     
-    // Obtener sucursales seleccionadas
-    const sucursalesSeleccionadas = [];
-    $('#sucursalesCrear input[type="checkbox"]:checked').each(function() {
-        sucursalesSeleccionadas.push($(this).val());
-    });
+    // ✅ NUEVA LÓGICA: Obtener una sola sucursal
+    const idSucursal = $('#id_sucursal').val();
     
-    // Validar que tenga al menos una sucursal
-    if (sucursalesSeleccionadas.length === 0) {
+    if (!idSucursal) {
         Swal.fire({
             icon: 'warning',
-            title: 'Sucursales requeridas',
-            text: 'Debe seleccionar al menos una sucursal para el doctor'
+            title: 'Sucursal requerida',
+            text: 'Debe seleccionar una sucursal para el doctor'
         });
         return;
     }
@@ -481,10 +589,8 @@ function crearDoctor(e) {
     formData.append('action', 'crear');
     formData.append('submenu_id', config.submenuId);
     
-    // Agregar sucursales al FormData
-    sucursalesSeleccionadas.forEach(suc => {
-        formData.append('sucursales[]', suc);
-    });
+    // ✅ CAMBIO: Agregar UNA sola sucursal
+    formData.append('id_sucursal', idSucursal);
     
     // 🔥 AGREGAR HORARIOS COMO JSON
     const horariosJson = JSON.stringify(horarios);
@@ -497,7 +603,7 @@ function crearDoctor(e) {
         for (let pair of formData.entries()) {
             console.log(`${pair[0]}: ${pair[1]}`);
         }
-        console.log('🏥 Sucursales:', sucursalesSeleccionadas);
+        console.log('🏥 Sucursal seleccionada:', idSucursal);
         console.log('🕒 Horarios:', horarios);
     }
     
@@ -517,6 +623,9 @@ function crearDoctor(e) {
             console.log('📥 Respuesta del servidor:', response);
             
             if (response.success) {
+                // ✅ OBTENER NOMBRE DE LA SUCURSAL PARA MOSTRAR
+                const nombreSucursal = $('#id_sucursal option:selected').text().replace('🏢 ', '');
+                
                 Swal.fire({
                     icon: 'success',
                     title: '¡Doctor registrado!',
@@ -525,7 +634,7 @@ function crearDoctor(e) {
                             <p><strong>Doctor creado exitosamente</strong></p>
                             <ul class="list-unstyled">
                                 <li><i class="bi bi-person-check text-success me-1"></i> Información personal guardada</li>
-                                <li><i class="bi bi-building text-primary me-1"></i> ${sucursalesSeleccionadas.length} sucursal(es) asignada(s)</li>
+                                <li><i class="bi bi-building text-primary me-1"></i> Asignado a: ${nombreSucursal}</li>
                                 <li><i class="bi bi-clock text-info me-1"></i> ${horarios.length} horario(s) configurado(s)</li>
                             </ul>
                             <small class="text-muted">${response.message}</small>
@@ -536,10 +645,23 @@ function crearDoctor(e) {
                     confirmButtonText: 'Entendido'
                 }).then(() => {
                     $('#crearDoctorModal').modal('hide');
-                    cargarDoctoresPaginados(1);
-                    cargarEstadisticas();
                     
-                    // Limpiar horarios
+                    // Recargar lista de doctores
+                    if (typeof cargarDoctoresPaginados === 'function') {
+                        cargarDoctoresPaginados(1);
+                    }
+                    
+                    // Recargar estadísticas si existe la función
+                    if (typeof cargarEstadisticas === 'function') {
+                        cargarEstadisticas();
+                    }
+                    
+                    // Limpiar formulario y horarios
+                    document.getElementById('formCrearDoctor').reset();
+                    $('#id_especialidad').html('<option value="">🔄 Primero seleccione una sucursal...</option>').prop('disabled', true);
+                    $('#controlesHorarios').addClass('d-none');
+                    $('#mensajeSucursalHorarios').removeClass('d-none');
+                    
                     if (typeof window.limpiarTodosLosHorarios === 'function') {
                         window.limpiarTodosLosHorarios();
                     }
@@ -1576,17 +1698,7 @@ function validarFormulario(formId) {
        }
    });
    
-   // Validar que al menos una sucursal esté seleccionada
-   const sucursalesSeleccionadas = $(form).find('input[name="sucursales[]"]:checked').length;
-   if (sucursalesSeleccionadas === 0) {
-       Swal.fire({
-           icon: 'warning',
-           title: 'Sucursales requeridas',
-           text: 'Debe asignar al menos una sucursal al doctor'
-       });
-       esValido = false;
-   }
-   
+ 
    return esValido;
 }
 
@@ -1841,29 +1953,7 @@ $(document).ready(function() {
     
 });
 
-// ===== CONTROL DE SELECCIÓN ÚNICA DE SUCURSALES =====
 
-// Para modal de crear
-$(document).on('change', '#sucursalesCrear input[type="checkbox"]', function() {
-    if (this.checked) {
-        // Desmarcar todos los otros checkboxes
-        $('#sucursalesCrear input[type="checkbox"]').not(this).prop('checked', false);
-        
-        // Mensaje informativo
-        console.log('🏥 Sucursal seleccionada:', $(this).val());
-    }
-});
-
-// Para modal de editar
-$(document).on('change', '#sucursalesEditar input[type="checkbox"]', function() {
-    if (this.checked) {
-        // Desmarcar todos los otros checkboxes
-        $('#sucursalesEditar input[type="checkbox"]').not(this).prop('checked', false);
-        
-        // Mensaje informativo
-        console.log('🏥 Sucursal seleccionada para editar:', $(this).val());
-    }
-});
 
 // ===== FUNCIÓN ESPECÍFICA PARA VALIDAR NACIONALIDAD =====
 function validarNacionalidadDoctor() {

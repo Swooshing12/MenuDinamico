@@ -92,6 +92,9 @@ class DoctoresController {
                  case 'actualizar':
                     $this->actualizar();
                         break;
+                case 'obtenerEspecialidadesPorSucursal':
+                    $this->obtenerEspecialidadesPorSucursal();
+                    break;
                 case 'index':
                 default:
                     $this->index();
@@ -149,6 +152,66 @@ class DoctoresController {
         }
     }
     
+    private function obtenerEspecialidadesPorSucursal() {
+        error_log("🔍 === DEBUGGING obtenerEspecialidadesPorSucursal ===");
+        
+        try {
+            $id_sucursal = $_POST['id_sucursal'] ?? '';
+            $submenu_id = $_POST['submenu_id'] ?? '';
+            
+            error_log("🔍 ID Sucursal recibido: " . $id_sucursal);
+            error_log("🔍 Submenu ID recibido: " . $submenu_id);
+            
+            if (empty($id_sucursal)) {
+                error_log("❌ ID de sucursal vacío");
+                $this->responderJSON([
+                    'success' => false,
+                    'error' => 'ID de sucursal requerido'
+                ]);
+                return;
+            }
+            
+            // Verificar que el modelo existe
+            if (!$this->especialidadesModel) {
+                error_log("❌ Modelo de especialidades no inicializado");
+                $this->responderJSON([
+                    'success' => false,
+                    'error' => 'Error de inicialización del modelo'
+                ]);
+                return;
+            }
+            
+            error_log("✅ Llamando al modelo...");
+            $especialidades = $this->especialidadesModel->obtenerEspecialidadesPorSucursal($id_sucursal);
+            
+            error_log("✅ Especialidades obtenidas: " . count($especialidades));
+            error_log("📊 Datos: " . print_r($especialidades, true));
+            
+            $this->responderJSON([
+                'success' => true,
+                'data' => $especialidades,
+                'total' => count($especialidades),
+                'sucursal_id' => $id_sucursal,
+                'debug' => [
+                    'submenu_id' => $submenu_id,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            error_log("❌ Error en obtenerEspecialidadesPorSucursal: " . $e->getMessage());
+            error_log("❌ Stack trace: " . $e->getTraceAsString());
+            
+            $this->responderJSON([
+                'success' => false,
+                'error' => 'Error al obtener especialidades: ' . $e->getMessage(),
+                'debug' => [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
+            ]);
+        }
+    }
     /**
  * Actualizar doctor con horarios
  */
@@ -236,8 +299,8 @@ private function obtenerHorarios() {
     // Verificar permisos
     $this->verificarPermisos('crear');
     
-    // Validar datos requeridos
-    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'correo', 'id_especialidad'];
+    // ✅ AGREGAR id_sucursal a los campos requeridos
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'correo', 'id_especialidad', 'id_sucursal'];
     $camposFaltantes = [];
     
     foreach ($camposRequeridos as $campo) {
@@ -308,8 +371,9 @@ private function obtenerHorarios() {
             'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
         ];
         
-        // Obtener sucursales seleccionadas
-        $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+        // ✅ CAMBIO PRINCIPAL: Obtener UNA sola sucursal
+        $idSucursal = (int)$_POST['id_sucursal'];
+        $sucursales = [$idSucursal]; // Convertir a array para compatibilidad con el modelo
         
         // 🕒 OBTENER HORARIOS
         $horariosJson = isset($_POST['horarios']) ? $_POST['horarios'] : '[]';
@@ -318,15 +382,17 @@ private function obtenerHorarios() {
         if ($horarios === null) {
             $horarios = [];
         }
+        
         // DEBUG
         error_log("📦 Horarios recibidos: " . $horariosJson);
         error_log("📋 Horarios procesados: " . print_r($horarios, true));
+        error_log("🏥 Sucursal seleccionada: " . $idSucursal);
         
-        // Validar que tenga al menos una sucursal
-        if (empty($sucursales)) {
+        // ✅ VALIDACIÓN CORREGIDA: Validar que tenga sucursal
+        if (empty($idSucursal) || $idSucursal <= 0) {
             $this->responderJSON([
                 'success' => false,
-                'message' => 'Debe seleccionar al menos una sucursal'
+                'message' => 'Debe seleccionar una sucursal válida'
             ]);
             return;
         }
@@ -345,10 +411,8 @@ private function obtenerHorarios() {
                     $passwordGenerada
                 );
                 
-                $mensaje = 'Doctor creado exitosamente';
-                if (!empty($sucursales)) {
-                    $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
-                }
+                // ✅ MENSAJE CORREGIDO para una sola sucursal
+                $mensaje = 'Doctor creado exitosamente y asignado a la sucursal seleccionada';
                 if (!empty($horarios)) {
                     $mensaje .= ' con ' . count($horarios) . ' horario(s) configurado(s)';
                 }
@@ -360,10 +424,7 @@ private function obtenerHorarios() {
                 }
                 
                 // Si falla el correo, aún es éxito pero informar
-                $mensaje = 'Doctor creado exitosamente';
-                if (!empty($sucursales)) {
-                    $mensaje .= ' y asignado a ' . count($sucursales) . ' sucursal(es)';
-                }
+                $mensaje = 'Doctor creado exitosamente y asignado a la sucursal seleccionada';
                 if (!empty($horarios)) {
                     $mensaje .= ' con ' . count($horarios) . ' horario(s) configurado(s)';
                 }
@@ -375,7 +436,7 @@ private function obtenerHorarios() {
                 'message' => $mensaje,
                 'data' => [
                     'id_doctor' => $id_doctor,
-                    'total_sucursales' => count($sucursales),
+                    'id_sucursal' => $idSucursal,
                     'total_horarios' => count($horarios),
                     'username' => $datosUsuario['username'],
                     'password_temporal' => $passwordGenerada
@@ -698,6 +759,8 @@ private function editar() {
             ]);
         }
     }
+
+    
     
     
     private function obtenerDoctoresPaginados() {
