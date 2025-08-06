@@ -206,7 +206,7 @@ function guardarHorario() {
     });
 }
 
-// ===== MOSTRAR HORARIOS (CREAR) =====
+// ===== MODIFICAR EN mostrarHorariosSucursal =====
 function mostrarHorariosSucursal(idSucursal) {
     const container = $('#horariosContainer');
     
@@ -244,7 +244,6 @@ function mostrarHorariosSucursal(idSucursal) {
         horariosPorDia[dia].push({...horario, index});
     });
     
-    // Generar HTML por días
     let html = '<div class="row g-2">';
     
     for (let dia = 1; dia <= 7; dia++) {
@@ -278,10 +277,14 @@ function mostrarHorariosSucursal(idSucursal) {
                             </small>
                         </div>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editarHorario('${idSucursal}', ${horario.index})" title="Editar">
+                            <button type="button" class="btn btn-outline-primary" 
+                                    onclick="editarHorario('${idSucursal}', ${horario.index}); return false;" 
+                                    title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger" onclick="eliminarHorario('${idSucursal}', ${horario.index})" title="Eliminar">
+                            <button type="button" class="btn btn-outline-danger" 
+                                    onclick="eliminarHorario('${idSucursal}', ${horario.index}); return false;" 
+                                    title="Eliminar">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -301,7 +304,7 @@ function mostrarHorariosSucursal(idSucursal) {
     container.html(html);
 }
 
-// ===== MOSTRAR HORARIOS (EDITAR) =====
+// ===== IGUAL PARA mostrarHorariosSucursalEditar =====
 function mostrarHorariosSucursalEditar(idSucursal) {
     const container = $('#editarHorariosContainer');
     
@@ -371,10 +374,14 @@ function mostrarHorariosSucursalEditar(idSucursal) {
                             </small>
                         </div>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="editarHorarioEdicion('${idSucursal}', ${horario.index})" title="Editar">
+                            <button type="button" class="btn btn-outline-primary" 
+                                    onclick="editarHorarioEdicion('${idSucursal}', ${horario.index}); return false;" 
+                                    title="Editar">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger" onclick="eliminarHorarioEdicion('${idSucursal}', ${horario.index})" title="Eliminar">
+                            <button type="button" class="btn btn-outline-danger" 
+                                    onclick="eliminarHorarioEdicion('${idSucursal}', ${horario.index}); return false;" 
+                                    title="Eliminar">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -394,8 +401,13 @@ function mostrarHorariosSucursalEditar(idSucursal) {
     container.html(html);
 }
 
-// ===== EDITAR HORARIO =====
+// ===== CORREGIR FUNCIONES DE EDITAR Y ELIMINAR HORARIO =====
+
 function editarHorario(idSucursal, index) {
+    // ✅ PREVENIR PROPAGACIÓN DEL EVENTO
+    event.preventDefault();
+    event.stopPropagation();
+    
     const horario = horariosDoctor[idSucursal][index];
     if (!horario) return;
     
@@ -412,10 +424,20 @@ function editarHorario(idSucursal, index) {
     $('#modalHorario').data('modo-edicion', false);
     $('#tituloModalHorario').text('Editar Horario de Atención');
     
+    // ✅ PREVENIR QUE SE CIERRE EL MODAL PADRE
+    $('#modalHorario').off('hidden.bs.modal.preventParent');
+    $('#modalHorario').on('hidden.bs.modal.preventParent', function(e) {
+        e.stopPropagation();
+    });
+    
     $('#modalHorario').modal('show');
 }
 
 function editarHorarioEdicion(idSucursal, index) {
+    // ✅ PREVENIR PROPAGACIÓN DEL EVENTO
+    event.preventDefault();
+    event.stopPropagation();
+    
     const horario = horariosDoctor[idSucursal][index];
     if (!horario) return;
     
@@ -432,11 +454,20 @@ function editarHorarioEdicion(idSucursal, index) {
     $('#modalHorario').data('modo-edicion', true);
     $('#tituloModalHorario').text('Editar Horario de Atención (Edición)');
     
+    // ✅ PREVENIR QUE SE CIERRE EL MODAL PADRE
+    $('#modalHorario').off('hidden.bs.modal.preventParent');
+    $('#modalHorario').on('hidden.bs.modal.preventParent', function(e) {
+        e.stopPropagation();
+    });
+    
     $('#modalHorario').modal('show');
 }
 
-// ===== ELIMINAR HORARIO =====
 function eliminarHorario(idSucursal, index) {
+    // ✅ PREVENIR PROPAGACIÓN DEL EVENTO
+    event.preventDefault();
+    event.stopPropagation();
+    
     Swal.fire({
         title: '¿Eliminar horario?',
         text: 'Esta acción no se puede deshacer',
@@ -460,6 +491,10 @@ function eliminarHorario(idSucursal, index) {
 }
 
 function eliminarHorarioEdicion(idSucursal, index) {
+    // ✅ PREVENIR PROPAGACIÓN DEL EVENTO
+    event.preventDefault();
+    event.stopPropagation();
+    
     Swal.fire({
         title: '¿Eliminar horario?',
         text: 'Esta acción no se puede deshacer',
@@ -481,7 +516,6 @@ function eliminarHorarioEdicion(idSucursal, index) {
         }
     });
 }
-
 // ===== VALIDACIONES =====
 function horariosSeSuperponen(horario1, horario2) {
     if (horario1.dia_semana !== horario2.dia_semana) return false;

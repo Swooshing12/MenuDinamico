@@ -457,8 +457,8 @@ private function obtenerHorarios() {
         ]);
     }
 }
-    /**
- * ✅ EDITAR DOCTOR - MÉTODO COMPLETO
+   /**
+ * ✅ EDITAR DOCTOR - MÉTODO CORREGIDO PARA SUCURSAL ÚNICA
  */
 private function editar() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -483,8 +483,8 @@ private function editar() {
     
     $id_doctor = (int)$_POST['id_doctor'];
     
-    // Validar campos requeridos
-    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad'];
+    // ✅ AGREGAR id_sucursal a los campos requeridos
+    $camposRequeridos = ['cedula', 'username', 'nombres', 'apellidos', 'sexo', 'nacionalidad', 'correo', 'id_especialidad', 'id_sucursal'];
     $camposFaltantes = [];
     
     foreach ($camposRequeridos as $campo) {
@@ -547,57 +547,57 @@ private function editar() {
             'titulo_profesional' => !empty($_POST['titulo_profesional']) ? trim($_POST['titulo_profesional']) : null
         ];
         
-        // Obtener sucursales seleccionadas
-        $sucursales = isset($_POST['sucursales']) ? $_POST['sucursales'] : [];
+        // ✅ CAMBIO PRINCIPAL: Obtener UNA sola sucursal
+        $idSucursal = (int)$_POST['id_sucursal'];
+        $sucursales = [$idSucursal]; // Convertir a array para compatibilidad con el modelo
         
-        // Procesar horarios si se enviaron
+        // ✅ PROCESAR HORARIOS - FORMATO JSON (igual que en crear)
         $horarios = [];
-        if (isset($_POST['horarios']) && is_array($_POST['horarios'])) {
-            foreach ($_POST['horarios'] as $horario) {
-                if (isset($horario['id_sucursal'], $horario['dia_semana'], $horario['hora_inicio'], $horario['hora_fin'])) {
-                    $horarios[] = [
-                        'id_sucursal' => (int)$horario['id_sucursal'],
-                        'dia_semana' => (int)$horario['dia_semana'],
-                        'hora_inicio' => $horario['hora_inicio'],
-                        'hora_fin' => $horario['hora_fin'],
-                        'duracion_cita' => isset($horario['duracion_cita']) ? (int)$horario['duracion_cita'] : 30
-                    ];
-                }
+        if (isset($_POST['horarios'])) {
+            $horariosJson = $_POST['horarios'];
+            $horariosDecodificados = json_decode($horariosJson, true);
+            
+            if ($horariosDecodificados !== null && is_array($horariosDecodificados)) {
+                $horarios = $horariosDecodificados;
             }
+        }
+        
+        // ✅ VALIDACIÓN CORREGIDA: Validar que tenga sucursal
+        if (empty($idSucursal) || $idSucursal <= 0) {
+            $this->responderJSON([
+                'success' => false,
+                'message' => 'Debe seleccionar una sucursal válida'
+            ]);
+            return;
         }
         
         if ($this->debug) {
             error_log("🔄 Actualizando doctor ID: $id_doctor");
             error_log("Datos usuario: " . json_encode($datosUsuario));
             error_log("Datos doctor: " . json_encode($datosDoctor));
-            error_log("Sucursales: " . json_encode($sucursales));
-            error_log("Horarios: " . json_encode($horarios));
+            error_log("🏥 Sucursal seleccionada: " . $idSucursal);
+            error_log("🕒 Horarios recibidos: " . ($horariosJson ?? 'ninguno'));
+            error_log("📋 Horarios procesados: " . json_encode($horarios));
         }
         
-        // Actualizar doctor
-        $resultado = $this->doctoresModel->actualizar($id_doctor, $datosUsuario, $datosDoctor, $sucursales);
+        // ✅ ACTUALIZAR DOCTOR CON HORARIOS
+        $resultado = $this->doctoresModel->actualizarConHorarios($id_doctor, $datosUsuario, $datosDoctor, $sucursales, $horarios);
         
         if ($resultado) {
-            // Actualizar horarios si se proporcionaron
+            // ✅ MENSAJE CORREGIDO para una sola sucursal
+            $mensaje = 'Doctor actualizado exitosamente y asignado a la sucursal seleccionada';
             if (!empty($horarios)) {
-                try {
-                    $this->doctoresModel->actualizarHorarios($id_doctor, $horarios);
-                } catch (Exception $e) {
-                    error_log("Warning: Error actualizando horarios: " . $e->getMessage());
-                }
-            }
-            
-            $mensaje = 'Doctor actualizado exitosamente';
-            if (!empty($sucursales)) {
-                $mensaje .= ' con ' . count($sucursales) . ' sucursal(es) asignada(s)';
-            }
-            if (!empty($horarios)) {
-                $mensaje .= ' y ' . count($horarios) . ' horario(s) configurado(s)';
+                $mensaje .= ' con ' . count($horarios) . ' horario(s) configurado(s)';
             }
             
             $this->responderJSON([
                 'success' => true,
-                'message' => $mensaje
+                'message' => $mensaje,
+                'data' => [
+                    'id_doctor' => $id_doctor,
+                    'id_sucursal' => $idSucursal,
+                    'total_horarios' => count($horarios)
+                ]
             ]);
         } else {
             $this->responderJSON([

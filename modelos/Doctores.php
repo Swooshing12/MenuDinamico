@@ -231,81 +231,122 @@ public function actualizarHorarios($id_doctor, $horarios) {
     }
     
     /**
-     * Actualizar doctor (múltiples tablas)
-     */
-    public function actualizar($id_doctor, $datosUsuario, $datosDoctor, $sucursales = []) {
-        try {
-            $this->conn->beginTransaction();
-            
-            // 1. Obtener id_usuario del doctor
-            $queryIdUsuario = "SELECT id_usuario FROM doctores WHERE id_doctor = :id_doctor";
-            $stmt = $this->conn->prepare($queryIdUsuario);
-            $stmt->execute([':id_doctor' => $id_doctor]);
-            $id_usuario = $stmt->fetchColumn();
-            
-            if (!$id_usuario) {
-                throw new Exception("Doctor no encontrado");
-            }
-            
-            // 2. Actualizar usuario
-            $queryUsuario = "UPDATE usuarios SET 
-                           cedula = :cedula,
-                           username = :username,
-                           nombres = :nombres,
-                           apellidos = :apellidos,
-                           sexo = :sexo,
-                           nacionalidad = :nacionalidad,
-                           correo = :correo,
-                           id_estado = :id_estado
-                           WHERE id_usuario = :id_usuario";
-            
-            $stmtUsuario = $this->conn->prepare($queryUsuario);
-            $stmtUsuario->execute([
-                ':cedula' => $datosUsuario['cedula'],
-                ':username' => $datosUsuario['username'],
-                ':nombres' => $datosUsuario['nombres'],
-                ':apellidos' => $datosUsuario['apellidos'],
-                ':sexo' => $datosUsuario['sexo'],
-                ':nacionalidad' => $datosUsuario['nacionalidad'],
-                ':correo' => $datosUsuario['correo'],
-                ':id_estado' => $datosUsuario['id_estado'],
-                ':id_usuario' => $id_usuario
-            ]);
-            
-            // 3. Actualizar doctor
-            $queryDoctor = "UPDATE doctores SET 
-                          id_especialidad = :id_especialidad,
-                          titulo_profesional = :titulo_profesional
-                          WHERE id_doctor = :id_doctor";
-            
-            $stmtDoctor = $this->conn->prepare($queryDoctor);
-            $stmtDoctor->execute([
-                ':id_especialidad' => $datosDoctor['id_especialidad'],
-                ':titulo_profesional' => $datosDoctor['titulo_profesional'],
-                ':id_doctor' => $id_doctor
-            ]);
-            
-            // 4. Actualizar sucursales
-            // Eliminar asignaciones actuales
-            $this->eliminarTodasSucursales($id_doctor);
-            
-            // Asignar nuevas sucursales
-            if (!empty($sucursales)) {
-                foreach ($sucursales as $id_sucursal) {
-                    $this->asignarASucursal($id_doctor, $id_sucursal);
-                }
-            }
-            
-            $this->conn->commit();
-            return true;
-            
-        } catch (PDOException $e) {
-            $this->conn->rollback();
-            error_log("Error actualizando doctor: " . $e->getMessage());
-            throw new Exception("Error al actualizar el doctor: " . $e->getMessage());
+ * Actualizar doctor con horarios - VERSIÓN CORREGIDA
+ */
+public function actualizarConHorarios($id_doctor, $datosUsuario, $datosDoctor, $sucursales = [], $horarios = []) {
+    try {
+        $this->conn->beginTransaction();
+        
+        // ✅ VALIDACIÓN ADICIONAL
+        if (empty($sucursales)) {
+            throw new Exception("No se proporcionaron sucursales para asignar");
         }
+        
+        // 1. Obtener id_usuario del doctor
+        $queryIdUsuario = "SELECT id_usuario FROM doctores WHERE id_doctor = :id_doctor";
+        $stmt = $this->conn->prepare($queryIdUsuario);
+        $stmt->execute([':id_doctor' => $id_doctor]);
+        $id_usuario = $stmt->fetchColumn();
+        
+        if (!$id_usuario) {
+            throw new Exception("Doctor no encontrado");
+        }
+        
+        // 2. Actualizar usuario
+        $queryUsuario = "UPDATE usuarios SET 
+                       cedula = :cedula,
+                       username = :username,
+                       nombres = :nombres,
+                       apellidos = :apellidos,
+                       sexo = :sexo,
+                       nacionalidad = :nacionalidad,
+                       correo = :correo,
+                       id_estado = :id_estado
+                       WHERE id_usuario = :id_usuario";
+        
+        $stmtUsuario = $this->conn->prepare($queryUsuario);
+        $stmtUsuario->execute([
+            ':cedula' => $datosUsuario['cedula'],
+            ':username' => $datosUsuario['username'],
+            ':nombres' => $datosUsuario['nombres'],
+            ':apellidos' => $datosUsuario['apellidos'],
+            ':sexo' => $datosUsuario['sexo'],
+            ':nacionalidad' => $datosUsuario['nacionalidad'],
+            ':correo' => $datosUsuario['correo'],
+            ':id_estado' => $datosUsuario['id_estado'],
+            ':id_usuario' => $id_usuario
+        ]);
+        
+        // 3. Actualizar doctor
+        $queryDoctor = "UPDATE doctores SET 
+                      id_especialidad = :id_especialidad,
+                      titulo_profesional = :titulo_profesional
+                      WHERE id_doctor = :id_doctor";
+        
+        $stmtDoctor = $this->conn->prepare($queryDoctor);
+        $stmtDoctor->execute([
+            ':id_especialidad' => $datosDoctor['id_especialidad'],
+            ':titulo_profesional' => $datosDoctor['titulo_profesional'],
+            ':id_doctor' => $id_doctor
+        ]);
+        
+        // 4. ✅ ACTUALIZAR SUCURSALES (ahora solo será una)
+        // Eliminar asignaciones actuales
+        $this->eliminarTodasSucursales($id_doctor);
+        
+        // Asignar nueva sucursal
+        foreach ($sucursales as $id_sucursal) {
+            $id_sucursal = (int)$id_sucursal;
+            if ($id_sucursal > 0) {
+                $this->asignarASucursal($id_doctor, $id_sucursal);
+                error_log("✅ Doctor {$id_doctor} reasignado a sucursal {$id_sucursal}");
+            }
+        }
+        
+        // 5. ✅ ACTUALIZAR HORARIOS
+        if (!empty($horarios)) {
+            // Eliminar horarios existentes
+            $this->eliminarTodosLosHorarios($id_doctor);
+            
+            // Insertar nuevos horarios
+            $this->insertarHorarios($id_doctor, $horarios);
+            error_log("✅ Actualizados " . count($horarios) . " horarios para doctor {$id_doctor}");
+        }
+        
+        $this->conn->commit();
+        error_log("✅ Doctor actualizado exitosamente: ID {$id_doctor}");
+        return true;
+        
+    } catch (PDOException $e) {
+        $this->conn->rollback();
+        error_log("❌ Error PDO actualizando doctor: " . $e->getMessage());
+        throw new Exception("Error al actualizar el doctor: " . $e->getMessage());
+    } catch (Exception $e) {
+        $this->conn->rollback();
+        error_log("❌ Error actualizando doctor: " . $e->getMessage());
+        throw $e;
     }
-    
+}
+
+/**
+ * ✅ MÉTODO AUXILIAR: Eliminar todos los horarios de un doctor
+ */
+private function eliminarTodosLosHorarios($id_doctor) {
+    try {
+        $query = "DELETE FROM doctor_horarios WHERE id_doctor = :id_doctor";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([':id_doctor' => $id_doctor]);
+        
+        error_log("✅ Horarios anteriores eliminados para doctor {$id_doctor}");
+        return true;
+        
+    } catch (PDOException $e) {
+        error_log("❌ Error eliminando horarios: " . $e->getMessage());
+        throw new Exception("Error al eliminar horarios existentes");
+    }
+}
+
+
     /**
      * Cambiar estado del doctor (usuario)
      */
