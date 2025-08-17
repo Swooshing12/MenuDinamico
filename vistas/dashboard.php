@@ -1,5 +1,5 @@
 <?php
-require_once "../helpers/permisos.php"; // Protección de sesión
+require_once  "../helpers/permisos.php"; // Protección de sesión
 ?>
 
 <!DOCTYPE html>

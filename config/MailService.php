@@ -818,6 +818,138 @@ private function generarTokenConfirmacion($id_cita) {
     
     return $token;
 }
+
+
+
+// ===== MÉTODO ESPECÍFICO PARA RECUPERACIÓN DE CONTRASEÑA =====
+    
+    /**
+     * Enviar clave temporal para recuperación de contraseña (OLVIDÉ MI CONTRASEÑA)
+     */
+    public function enviarClaveRecuperacion($correo, $nombreCompleto, $claveTemporalRecuperacion) {
+        try {
+            $asunto = "🔑 Recuperación de Contraseña - MediSys";
+            
+            $contenidoHTML = $this->generarPlantillaRecuperacionPassword($nombreCompleto, $claveTemporalRecuperacion);
+            
+            $enviado = $this->enviarEmail($correo, $nombreCompleto, $asunto, $contenidoHTML);
+            
+            if ($enviado) {
+                error_log("✅ Clave de recuperación enviada a: $correo");
+                return true;
+            } else {
+                error_log("❌ Error enviando clave de recuperación a: $correo");
+                return false;
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ Error en enviarClaveRecuperacion: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Plantilla específica para recuperación de contraseña
+     */
+    private function generarPlantillaRecuperacionPassword($nombreCompleto, $claveTemporalRecuperacion) {
+        $html = '<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperación de Contraseña - MediSys</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border-radius: 8px; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .clave-container { text-align: center; margin: 30px 0; }
+        .clave { display: inline-block; background: #fff3cd; border: 3px solid #ffc107; color: #856404; font-size: 28px; font-weight: bold; padding: 20px 25px; border-radius: 8px; letter-spacing: 3px; font-family: monospace; }
+        .warning { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .steps { background: #d1ecf1; border-left: 4px solid #bee5eb; padding: 15px; margin: 20px 0; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔑 ¿Olvidaste tu Contraseña?</h1>
+            <p>MediSys - Sistema Hospitalario</p>
+        </div>
+        
+        <p><strong>Hola ' . htmlspecialchars($nombreCompleto) . ',</strong></p>
+        
+        <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en MediSys.</p>
+        
+        <div class="steps">
+            <p><strong>📋 Pasos para recuperar tu acceso:</strong></p>
+            <ol>
+                <li><strong>Copia la clave temporal</strong> que aparece abajo</li>
+                <li><strong>Ve al sistema MediSys</strong> e inicia sesión con tu correo</li>
+                <li><strong>Usa esta clave temporal</strong> como contraseña</li>
+                <li><strong>¡IMPORTANTE!</strong> Cambia inmediatamente tu contraseña a una permanente</li>
+            </ol>
+        </div>
+        
+        <div class="clave-container">
+            <p><strong>Tu clave temporal de acceso es:</strong></p>
+            <div class="clave">' . $claveTemporalRecuperacion . '</div>
+        </div>
+        
+        <div class="warning">
+            <p><strong>⚠️ IMPORTANTE:</strong></p>
+            <ul>
+                <li><strong>Esta es una clave temporal</strong> - solo para acceder UNA VEZ</li>
+                <li><strong>Debes cambiarla inmediatamente</strong> después de iniciar sesión</li>
+                <li><strong>Por seguridad,</strong> no compartas esta clave con nadie</li>
+                <li><strong>Si no solicitaste este cambio,</strong> contacta al administrador</li>
+            </ul>
+        </div>
+        
+        <p><strong>¿Qué hacer después?</strong></p>
+        <p>1. Inicia sesión con esta clave temporal<br>
+        2. Ve a "Cambiar Contraseña" en tu perfil<br>
+        3. Establece una nueva contraseña segura<br>
+        4. ¡Listo! Ya puedes usar tu nueva contraseña</p>
+        
+        <p>Si tienes problemas para acceder, contacta al administrador del sistema.</p>
+        
+        <div class="footer">
+            <p><strong>MediSys - Sistema Hospitalario</strong></p>
+            <p>© ' . date('Y') . ' Todos los derechos reservados</p>
+            <p style="margin-top: 15px;">
+                Este es un correo automático de seguridad.<br>
+                Por favor, no respondas directamente a este mensaje.
+            </p>
+        </div>
+    </div>
+</body>
+</html>';
+        
+        return $html;
+    }
+    
+    /**
+     * Generar clave temporal específica para recuperación (diferente formato)
+     */
+    public static function generarClaveRecuperacion($longitud = 10) {
+        // Usar un formato diferente: XXXX-XXXX
+        $caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $parte1 = '';
+        $parte2 = '';
+        
+        // Primera parte (4 caracteres)
+        for ($i = 0; $i < 4; $i++) {
+            $parte1 .= $caracteres[random_int(0, strlen($caracteres) - 1)];
+        }
+        
+        // Segunda parte (4 caracteres)
+        for ($i = 0; $i < 4; $i++) {
+            $parte2 .= $caracteres[random_int(0, strlen($caracteres) - 1)];
+        }
+        
+        return $parte1 . '-' . $parte2; // Formato: A1B2-C3D4
+    }
     // ===== MÉTODO AUXILIAR PARA ENVÍO GENÉRICO =====
     
     /**

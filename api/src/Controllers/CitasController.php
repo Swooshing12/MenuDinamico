@@ -1,0 +1,1503 @@
+<?php
+namespace App\Controllers;
+
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use App\Utils\ResponseUtil;
+use App\Validators\DateValidator;
+use Illuminate\Database\Capsule\Manager as DB;
+use Exception;
+use Carbon\Carbon;
+
+class CitasController
+{
+    // PUNTO 5: API para consultar citas por especialidad - MEJORADA
+    public function getCitasByEspecialidad(Request $request, Response $response, array $args): Response
+    {
+        $idEspecialidad = $args['id_especialidad'];
+        
+        // Validación básica
+        if (!is_numeric($idEspecialidad) || $idEspecialidad <= 0) {
+            return ResponseUtil::badRequest('El ID de especialidad debe ser un número válido mayor a 0');
+        }
+        
+        try {
+            // Verificar que la especialidad existe
+            $especialidad = DB::table('especialidades')
+                ->where('id_especialidad', $idEspecialidad)
+                ->first();
+                
+            if (!$especialidad) {
+                return ResponseUtil::notFound('No se encontró la especialidad con ID: ' . $idEspecialidad);
+            }
+            
+            // Obtener médicos de esta especialidad
+            $medicosEspecialidad = DB::table('doctores')
+                ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+                ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+                ->where('doctores.id_especialidad', $idEspecialidad)
+                ->select(
+                    'doctores.id_doctor',
+                    'usuarios.nombres',
+                    'usuarios.apellidos',
+                    'doctores.titulo_profesional'
+                )
+                ->get();
+            
+            // Obtener citas agrupadas por médico
+            $citasPorMedico = [];
+            $totalCitas = 0;
+            $estadisticasGlobales = [
+                'pendientes' => 0,
+                'completadas' => 0,
+                'canceladas' => 0,
+                'confirmadas' => 0,
+                'presenciales' => 0,
+                'virtuales' => 0
+            ];
+            
+            foreach ($medicosEspecialidad as $medico) {
+                $citas = $this->getCitasQuery()
+                    ->where('especialidades.id_especialidad', $idEspecialidad)
+                    ->where('doctores.id_doctor', $medico->id_doctor)
+                    ->orderBy('citas.fecha_hora', 'desc')
+                    ->get();
+                
+                $estadisticasMedico = [
+                    'total_citas' => count($citas),
+                    'pendientes' => collect($citas)->where('estado', 'Pendiente')->count(),
+                    'completadas' => collect($citas)->where('estado', 'Completada')->count(),
+                    'canceladas' => collect($citas)->where('estado', 'Cancelada')->count(),
+                    'confirmadas' => collect($citas)->where('estado', 'Confirmada')->count(),
+                    'presenciales' => collect($citas)->where('tipo_cita', 'presencial')->count(),
+                    'virtuales' => collect($citas)->where('tipo_cita', 'virtual')->count()
+                ];
+                
+                $citasPorMedico[] = [
+                    'medico' => [
+                        'id_doctor' => $medico->id_doctor,
+                        'nombres' => $medico->nombres,
+                        'apellidos' => $medico->apellidos,
+                        'nombre_completo' => $medico->nombres . ' ' . $medico->apellidos,
+                        'titulo_profesional' => $medico->titulo_profesional
+                    ],
+                    'citas' => $citas,
+                    'estadisticas' => $estadisticasMedico
+                ];
+                
+                // Acumular estadísticas globales
+                $totalCitas += count($citas);
+                $estadisticasGlobales['pendientes'] += $estadisticasMedico['pendientes'];
+                $estadisticasGlobales['completadas'] += $estadisticasMedico['completadas'];
+                $estadisticasGlobales['canceladas'] += $estadisticasMedico['canceladas'];
+                $estadisticasGlobales['confirmadas'] += $estadisticasMedico['confirmadas'];
+                $estadisticasGlobales['presenciales'] += $estadisticasMedico['presenciales'];
+                $estadisticasGlobales['virtuales'] += $estadisticasMedico['virtuales'];
+            }
+            
+            $responseData = [
+                'especialidad' => [
+                    'id_especialidad' => $especialidad->id_especialidad,
+                    'nombre_especialidad' => $especialidad->nombre_especialidad,
+                    'descripcion' => $especialidad->descripcion,
+                    'total_medicos' => count($medicosEspecialidad)
+                ],
+                'resumen_estadisticas' => [
+                    'total_citas' => $totalCitas,
+                    'total_medicos_con_citas' => count(array_filter($citasPorMedico, function($m) { return $m['estadisticas']['total_citas'] > 0; })),
+                    'distribucion_estados' => $estadisticasGlobales,
+                    'promedio_citas_por_medico' => count($medicosEspecialidad) > 0 ? round($totalCitas / count($medicosEspecialidad), 2) : 0
+                ],
+                'citas_por_medico' => $citasPorMedico
+            ];
+            
+            return ResponseUtil::success($responseData, 'Análisis completo de citas para la especialidad: ' . $especialidad->nombre_especialidad);
+            
+        } catch (Exception $e) {
+            return ResponseUtil::error('Error al analizar citas por especialidad: ' . $e->getMessage());
+        }
+    }
+    
+    // PUNTO 5 y 8: API para consultar citas por médico - MEJORADA
+    public function getCitasByMedico(Request $request, Response $response, array $args): Response
+    {
+        $idMedico = $args['id_medico'];
+        
+        // Validación básica
+        if (!is_numeric($idMedico) || $idMedico <= 0) {
+            return ResponseUtil::badRequest('El ID del médico debe ser un número válido mayor a 0');
+        }
+        
+        try {
+            // Información completa del médico
+            $medico = DB::table('doctores')
+                ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+                ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+                ->select(
+                    'doctores.id_doctor',
+                    'usuarios.nombres',
+                    'usuarios.apellidos',
+                    'usuarios.correo',
+                    'doctores.titulo_profesional',
+                    'especialidades.id_especialidad',
+                    'especialidades.nombre_especialidad',
+                    'especialidades.descripcion as especialidad_descripcion'
+                )
+                ->where('doctores.id_doctor', $idMedico)
+                ->first();
+                
+            if (!$medico) {
+                return ResponseUtil::notFound('No se encontró el médico con ID: ' . $idMedico);
+            }
+            
+            // Punto 8: Solo citas asignadas a este médico específico
+            $todasLasCitas = $this->getCitasQuery()
+                ->where('doctores.id_doctor', $idMedico)
+                ->orderBy('citas.fecha_hora', 'desc')
+                ->get();
+            
+            // Organizar citas por estado
+            $citasPorEstado = [
+                'pendientes' => collect($todasLasCitas)->where('estado', 'Pendiente')->values(),
+                'confirmadas' => collect($todasLasCitas)->where('estado', 'Confirmada')->values(),
+                'completadas' => collect($todasLasCitas)->where('estado', 'Completada')->values(),
+                'canceladas' => collect($todasLasCitas)->where('estado', 'Cancelada')->values()
+            ];
+            
+            // Organizar citas por tipo
+            $citasPorTipo = [
+                'presenciales' => collect($todasLasCitas)->where('tipo_cita', 'presencial')->values(),
+                'virtuales' => collect($todasLasCitas)->where('tipo_cita', 'virtual')->values()
+            ];
+            
+            // Citas próximas (siguientes 30 días)
+            $fechaLimite = Carbon::now()->addDays(30);
+            $citasProximas = collect($todasLasCitas)
+                ->filter(function($cita) use ($fechaLimite) {
+                    return Carbon::parse($cita->fecha_hora)->between(Carbon::now(), $fechaLimite) 
+                           && in_array($cita->estado, ['Pendiente', 'Confirmada']);
+                })
+                ->sortBy('fecha_hora')
+                ->values();
+            
+            // Análisis temporal
+            $citasPorMes = collect($todasLasCitas)
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('Y-m');
+                })
+                ->map(function($citas) {
+                    return count($citas);
+                });
+            
+            // Sucursales donde atiende
+            $sucursalesAtencion = collect($todasLasCitas)
+                ->groupBy('id_sucursal')
+                ->map(function($citas) {
+                    $primera = $citas->first();
+                    return [
+                        'id_sucursal' => $primera->id_sucursal,
+                        'nombre_sucursal' => $primera->nombre_sucursal,
+                        'direccion' => $primera->sucursal_direccion,
+                        'total_citas' => count($citas)
+                    ];
+                })
+                ->values();
+            
+            $responseData = [
+                'medico' => [
+                    'id_doctor' => $medico->id_doctor,
+                    'nombres' => $medico->nombres,
+                    'apellidos' => $medico->apellidos,
+                    'nombre_completo' => $medico->nombres . ' ' . $medico->apellidos,
+                    'correo' => $medico->correo,
+                    'titulo_profesional' => $medico->titulo_profesional,
+                    'especialidad' => [
+                        'id_especialidad' => $medico->id_especialidad,
+                        'nombre' => $medico->nombre_especialidad,
+                        'descripcion' => $medico->especialidad_descripcion
+                    ]
+                ],
+                'resumen_estadisticas' => [
+                    'total_citas' => count($todasLasCitas),
+                    'citas_pendientes' => count($citasPorEstado['pendientes']),
+                    'citas_confirmadas' => count($citasPorEstado['confirmadas']),
+                    'citas_completadas' => count($citasPorEstado['completadas']),
+                    'citas_canceladas' => count($citasPorEstado['canceladas']),
+                    'citas_presenciales' => count($citasPorTipo['presenciales']),
+                    'citas_virtuales' => count($citasPorTipo['virtuales']),
+                    'proximas_citas' => count($citasProximas),
+                    'sucursales_atencion' => count($sucursalesAtencion)
+                ],
+                'citas_proximas' => $citasProximas,
+                'citas_por_estado' => $citasPorEstado,
+                'citas_por_tipo' => $citasPorTipo,
+                'analisis_temporal' => $citasPorMes,
+                'sucursales_atencion' => $sucursalesAtencion,
+                'todas_las_citas' => $todasLasCitas
+            ];
+            
+            return ResponseUtil::success($responseData, 'Análisis completo de citas para Dr. ' . $medico->nombres . ' ' . $medico->apellidos);
+            
+        } catch (Exception $e) {
+            return ResponseUtil::error('Error al analizar citas del médico: ' . $e->getMessage());
+        }
+    }
+    
+    // PUNTO 5: API para consultar citas por especialidad Y médico - MEJORADA
+    public function getCitasByEspecialidadYMedico(Request $request, Response $response, array $args): Response
+    {
+        $idEspecialidad = $args['id_especialidad'];
+        $idMedico = $args['id_medico'];
+        
+        // Validaciones básicas
+        if (!is_numeric($idEspecialidad) || $idEspecialidad <= 0) {
+            return ResponseUtil::badRequest('El ID de especialidad debe ser un número válido mayor a 0');
+        }
+        
+        if (!is_numeric($idMedico) || $idMedico <= 0) {
+            return ResponseUtil::badRequest('El ID del médico debe ser un número válido mayor a 0');
+        }
+        
+        try {
+            // Verificar relación médico-especialidad
+            $medicoEspecialidad = DB::table('doctores')
+                ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+                ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+                ->select(
+                    'doctores.id_doctor',
+                    'usuarios.nombres',
+                    'usuarios.apellidos',
+                    'doctores.titulo_profesional',
+                    'especialidades.id_especialidad',
+                    'especialidades.nombre_especialidad',
+                    'especialidades.descripcion as especialidad_descripcion'
+                )
+                ->where('doctores.id_doctor', $idMedico)
+                ->where('doctores.id_especialidad', $idEspecialidad)
+                ->first();
+                
+            if (!$medicoEspecialidad) {
+                return ResponseUtil::notFound('No se encontró un médico con ID ' . $idMedico . ' en la especialidad con ID ' . $idEspecialidad);
+            }
+            
+            // Obtener citas específicas de este médico en esta especialidad
+            $citas = $this->getCitasQuery()
+                ->where('especialidades.id_especialidad', $idEspecialidad)
+                ->where('doctores.id_doctor', $idMedico)
+                ->orderBy('citas.fecha_hora', 'desc')
+                ->get();
+            
+            // Análisis detallado
+            $analisisPorMes = collect($citas)
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('Y-m');
+                })
+                ->map(function($citasMes, $mes) {
+                    return [
+                        'mes' => $mes,
+                        'total' => count($citasMes),
+                        'pendientes' => collect($citasMes)->where('estado', 'Pendiente')->count(),
+                        'completadas' => collect($citasMes)->where('estado', 'Completada')->count(),
+                        'canceladas' => collect($citasMes)->where('estado', 'Cancelada')->count()
+                    ];
+                })
+                ->values();
+            
+            // Pacientes únicos atendidos
+            $pacientesUnicos = collect($citas)
+                ->groupBy('paciente_cedula')
+                ->map(function($citasPaciente) {
+                    $primera = $citasPaciente->first();
+                    return [
+                        'cedula' => $primera->paciente_cedula,
+                        'nombres' => $primera->paciente_nombres,
+                        'apellidos' => $primera->paciente_apellidos,
+                        'total_citas' => count($citasPaciente),
+                        'ultima_cita' => collect($citasPaciente)->max('fecha_hora')
+                    ];
+                })
+                ->values();
+            
+            $responseData = [
+                'especialidad' => [
+                    'id_especialidad' => $medicoEspecialidad->id_especialidad,
+                    'nombre_especialidad' => $medicoEspecialidad->nombre_especialidad,
+                    'descripcion' => $medicoEspecialidad->especialidad_descripcion
+                ],
+                'medico' => [
+                    'id_doctor' => $medicoEspecialidad->id_doctor,
+                    'nombres' => $medicoEspecialidad->nombres,
+                    'apellidos' => $medicoEspecialidad->apellidos,
+                    'nombre_completo' => $medicoEspecialidad->nombres . ' ' . $medicoEspecialidad->apellidos,
+                    'titulo_profesional' => $medicoEspecialidad->titulo_profesional
+                ],
+                'resumen_estadisticas' => [
+                    'total_citas' => count($citas),
+                    'pacientes_unicos' => count($pacientesUnicos),
+                    'promedio_citas_por_paciente' => count($pacientesUnicos) > 0 ? round(count($citas) / count($pacientesUnicos), 2) : 0,
+                    'distribucion_estados' => [
+                        'pendientes' => collect($citas)->where('estado', 'Pendiente')->count(),
+                        'confirmadas' => collect($citas)->where('estado', 'Confirmada')->count(),
+                        'completadas' => collect($citas)->where('estado', 'Completada')->count(),
+                        'canceladas' => collect($citas)->where('estado', 'Cancelada')->count()
+                    ],
+                    'distribucion_tipos' => [
+                        'presenciales' => collect($citas)->where('tipo_cita', 'presencial')->count(),
+                        'virtuales' => collect($citas)->where('tipo_cita', 'virtual')->count()
+                    ]
+                ],
+                'analisis_temporal' => $analisisPorMes,
+                'pacientes_atendidos' => $pacientesUnicos,
+                'citas' => $citas
+            ];
+            
+            return ResponseUtil::success($responseData, 'Análisis específico: ' . $medicoEspecialidad->nombre_especialidad . ' - Dr. ' . $medicoEspecialidad->nombres . ' ' . $medicoEspecialidad->apellidos);
+            
+        } catch (Exception $e) {
+            return ResponseUtil::error('Error al analizar citas específicas: ' . $e->getMessage());
+        }
+    }
+    
+    // PUNTO 7: API para consultar citas por rango de fechas - MEJORADA
+    public function getCitasByRangoFechas(Request $request, Response $response): Response
+    {
+        $data = $request->getParsedBody();
+        
+        // Validaciones básicas
+        if (empty($data['fecha_inicio']) || empty($data['fecha_fin'])) {
+            return ResponseUtil::badRequest('Los campos fecha_inicio y fecha_fin son requeridos', [
+                'fecha_inicio' => empty($data['fecha_inicio']) ? 'La fecha de inicio es requerida' : null,
+                'fecha_fin' => empty($data['fecha_fin']) ? 'La fecha de fin es requerida' : null
+            ]);
+        }
+        
+        // Validar formato de fechas
+        $erroresFechaInicio = DateValidator::validate($data['fecha_inicio']);
+        $erroresFechaFin = DateValidator::validate($data['fecha_fin']);
+        
+        if (!empty($erroresFechaInicio) || !empty($erroresFechaFin)) {
+            return ResponseUtil::badRequest('Formato de fechas inválido', [
+                'fecha_inicio' => $erroresFechaInicio,
+                'fecha_fin' => $erroresFechaFin
+            ]);
+        }
+        
+        try {
+            // Convertir fechas
+            $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
+            $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
+            
+            // Validaciones de rango
+            if ($fechaInicio->gt($fechaFin)) {
+                return ResponseUtil::badRequest('La fecha de inicio no puede ser mayor que la fecha de fin');
+            }
+            
+            if ($fechaInicio->diffInDays($fechaFin) > 365) {
+                return ResponseUtil::badRequest('El rango de fechas no puede ser mayor a 365 días');
+            }
+            
+            // Query base con filtros
+            $query = $this->getCitasQuery()->whereBetween('citas.fecha_hora', [$fechaInicio, $fechaFin]);
+            
+            // Aplicar filtros opcionales
+            if (!empty($data['id_medico'])) {
+                if (!is_numeric($data['id_medico'])) {
+                    return ResponseUtil::badRequest('El ID del médico debe ser un número válido');
+                }
+                $query->where('doctores.id_doctor', $data['id_medico']);
+            }
+            
+            if (!empty($data['id_especialidad'])) {
+                if (!is_numeric($data['id_especialidad'])) {
+                    return ResponseUtil::badRequest('El ID de especialidad debe ser un número válido');
+                }
+                $query->where('especialidades.id_especialidad', $data['id_especialidad']);
+            }
+            
+            if (!empty($data['estado'])) {
+                $query->where('citas.estado', $data['estado']);
+            }
+            
+            $citas = $query->orderBy('citas.fecha_hora', 'asc')->get();
+            
+            // Análisis avanzado del rango
+            $analisisPorDia = collect($citas)
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('Y-m-d');
+                })
+                ->map(function($citasDia, $dia) {
+                    return [
+                        'fecha' => $dia,
+                        'total_citas' => count($citasDia),
+                        'completadas' => collect($citasDia)->where('estado', 'Completada')->count(),
+                        'pendientes' => collect($citasDia)->where('estado', 'Pendiente')->count(),
+                        'canceladas' => collect($citasDia)->where('estado', 'Cancelada')->count()
+                    ];
+                })
+                ->values();
+            
+            $analisisPorMedico = collect($citas)
+                ->groupBy('id_doctor')
+                ->map(function($citasMedico) {
+                    $primera = $citasMedico->first();
+                    return [
+                        'id_doctor' => $primera->id_doctor,
+                        'medico_nombre' => $primera->medico_nombres . ' ' . $primera->medico_apellidos,
+                        'especialidad' => $primera->nombre_especialidad,
+                        'total_citas' => count($citasMedico),
+                        'distribucion_estados' => [
+                            'completadas' => collect($citasMedico)->where('estado', 'Completada')->count(),
+                            'pendientes' => collect($citasMedico)->where('estado', 'Pendiente')->count(),
+                            'canceladas' => collect($citasMedico)->where('estado', 'Cancelada')->count()
+                        ]
+                    ];
+                })
+                ->values();
+            
+            $estadisticasAvanzadas = [
+                'total_citas' => count($citas),
+                'fecha_inicio' => $fechaInicio->format('Y-m-d H:i:s'),
+                'fecha_fin' => $fechaFin->format('Y-m-d H:i:s'),
+                'dias_consultados' => $fechaInicio->diffInDays($fechaFin) + 1,
+                'promedio_citas_por_dia' => count($citas) > 0 ? round(count($citas) / ($fechaInicio->diffInDays($fechaFin) + 1), 2) : 0,
+                'distribucion_estados' => [
+                    'pendientes' => collect($citas)->where('estado', 'Pendiente')->count(),
+                    'confirmadas' => collect($citas)->where('estado', 'Confirmada')->count(),
+                    'completadas' => collect($citas)->where('estado', 'Completada')->count(),
+                    'canceladas' => collect($citas)->where('estado', 'Cancelada')->count()
+                ],
+                'distribucion_tipos' => [
+                    'presenciales' => collect($citas)->where('tipo_cita', 'presencial')->count(),
+                    'virtuales' => collect($citas)->where('tipo_cita', 'virtual')->count()
+                ],
+                'especialidades_involucradas' => collect($citas)->pluck('nombre_especialidad')->unique()->count(),
+                'medicos_involucrados' => collect($citas)->pluck('id_doctor')->unique()->count(),
+                'sucursales_involucradas' => collect($citas)->pluck('id_sucursal')->unique()->count()
+            ];
+            
+            $responseData = [
+                'parametros_busqueda' => [
+                    'fecha_inicio' => $data['fecha_inicio'],
+                    'fecha_fin' => $data['fecha_fin'],
+                    'id_medico' => $data['id_medico'] ?? null,
+                    'id_especialidad' => $data['id_especialidad'] ?? null,
+                    'estado' => $data['estado'] ?? null
+                ],
+                'estadisticas_generales' => $estadisticasAvanzadas,
+                'analisis_temporal' => $analisisPorDia,
+                'analisis_por_medico' => $analisisPorMedico,
+                'citas' => $citas
+            ];
+            
+            return ResponseUtil::success($responseData, 'Análisis completo de citas en el rango de fechas especificado');
+            
+        } catch (Exception $e) {
+            return ResponseUtil::error('Error al analizar citas por rango de fechas: ' . $e->getMessage());
+        }
+    }
+
+
+
+    // NUEVO ENDPOINT: Consultar citas por especialidad (ID) y médico (cédula)
+public function getCitasByEspecialidadYMedicoCedula(Request $request, Response $response): Response
+{
+    $data = $request->getParsedBody();
+    
+    // Validaciones de campos requeridos
+    if (empty($data['id_especialidad'])) {
+        return ResponseUtil::badRequest('El campo id_especialidad es requerido');
+    }
+    
+    if (empty($data['cedula_medico'])) {
+        return ResponseUtil::badRequest('El campo cedula_medico es requerido');
+    }
+    
+    // Validar ID de especialidad
+    if (!is_numeric($data['id_especialidad']) || $data['id_especialidad'] <= 0) {
+        return ResponseUtil::badRequest('El ID de especialidad debe ser un número válido mayor a 0');
+    }
+    
+    // Validar cédula del médico
+    $erroresCedula = \App\Validators\CedulaValidator::validate($data['cedula_medico']);
+    if (!empty($erroresCedula)) {
+        return ResponseUtil::badRequest('La cédula del médico no es válida', $erroresCedula);
+    }
+    
+    try {
+        // PASO 1: Verificar que la especialidad existe
+        $especialidad = DB::table('especialidades')
+            ->where('id_especialidad', $data['id_especialidad'])
+            ->first();
+            
+        if (!$especialidad) {
+            return ResponseUtil::notFound('No se encontró la especialidad con ID: ' . $data['id_especialidad']);
+        }
+        
+        // PASO 2: Buscar el médico por cédula y verificar que pertenece a la especialidad
+        $medico = DB::table('doctores')
+            ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->select(
+                'doctores.id_doctor',
+                'usuarios.id_usuario',
+                'usuarios.cedula',
+                'usuarios.username',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'usuarios.sexo',
+                'usuarios.nacionalidad',
+                'doctores.titulo_profesional',
+                'especialidades.id_especialidad',
+                'especialidades.nombre_especialidad'
+            )
+            ->where('usuarios.cedula', $data['cedula_medico'])
+            ->where('doctores.id_especialidad', $data['id_especialidad'])
+            ->first();
+            
+        if (!$medico) {
+            return ResponseUtil::notFound(
+                'No se encontró un médico con cédula ' . $data['cedula_medico'] . 
+                ' que pertenezca a la especialidad ' . $especialidad->nombre_especialidad
+            );
+        }
+        
+        // PASO 3: Obtener todas las citas del médico en esa especialidad
+        $todasLasCitas = $this->getCitasQuery()
+            ->where('especialidades.id_especialidad', $data['id_especialidad'])
+            ->where('doctores.id_doctor', $medico->id_doctor)
+            ->orderBy('citas.fecha_hora', 'desc')
+            ->get();
+        
+        // PASO 4: Aplicar filtros opcionales si se proporcionan
+        $citasFiltradas = collect($todasLasCitas);
+        
+        // Filtro por estado
+        if (!empty($data['estado'])) {
+            $estadosValidos = ['Pendiente', 'Confirmada', 'Completada', 'Cancelada'];
+            if (!in_array($data['estado'], $estadosValidos)) {
+                return ResponseUtil::badRequest('Estado inválido. Valores permitidos: ' . implode(', ', $estadosValidos));
+            }
+            $citasFiltradas = $citasFiltradas->where('estado', $data['estado']);
+        }
+        
+        // Filtro por tipo de cita
+        if (!empty($data['tipo_cita'])) {
+            $tiposValidos = ['presencial', 'virtual'];
+            if (!in_array($data['tipo_cita'], $tiposValidos)) {
+                return ResponseUtil::badRequest('Tipo de cita inválido. Valores permitidos: ' . implode(', ', $tiposValidos));
+            }
+            $citasFiltradas = $citasFiltradas->where('tipo_cita', $data['tipo_cita']);
+        }
+        
+        // Filtro por rango de fechas
+        if (!empty($data['fecha_desde']) && !empty($data['fecha_hasta'])) {
+            $erroresFechaDesde = \App\Validators\DateValidator::validate($data['fecha_desde']);
+            $erroresFechaHasta = \App\Validators\DateValidator::validate($data['fecha_hasta']);
+            
+            if (!empty($erroresFechaDesde) || !empty($erroresFechaHasta)) {
+                return ResponseUtil::badRequest('Formato de fechas inválido', [
+                    'fecha_desde' => $erroresFechaDesde,
+                    'fecha_hasta' => $erroresFechaHasta
+                ]);
+            }
+            
+            $fechaDesde = Carbon::parse($data['fecha_desde'])->startOfDay();
+            $fechaHasta = Carbon::parse($data['fecha_hasta'])->endOfDay();
+            
+            if ($fechaDesde->gt($fechaHasta)) {
+                return ResponseUtil::badRequest('La fecha desde no puede ser mayor que fecha hasta');
+            }
+            
+            $citasFiltradas = $citasFiltradas->filter(function($cita) use ($fechaDesde, $fechaHasta) {
+                $fechaCita = Carbon::parse($cita->fecha_hora);
+                return $fechaCita->between($fechaDesde, $fechaHasta);
+            });
+        }
+        
+        // Filtro por sucursal
+        if (!empty($data['id_sucursal'])) {
+            if (!is_numeric($data['id_sucursal'])) {
+                return ResponseUtil::badRequest('El ID de sucursal debe ser numérico');
+            }
+            $citasFiltradas = $citasFiltradas->where('id_sucursal', $data['id_sucursal']);
+        }
+        
+        // Filtro por paciente específico
+        if (!empty($data['cedula_paciente'])) {
+            $erroresCedulaPaciente = \App\Validators\CedulaValidator::validate($data['cedula_paciente']);
+            if (!empty($erroresCedulaPaciente)) {
+                return ResponseUtil::badRequest('Cédula del paciente inválida', $erroresCedulaPaciente);
+            }
+            $citasFiltradas = $citasFiltradas->where('paciente_cedula', $data['cedula_paciente']);
+        }
+        
+        // Convertir de vuelta a array
+        $citasFiltradas = $citasFiltradas->values()->all();
+        
+        // PASO 5: Organizar y segmentar la información eficientemente
+        
+        // 5.1 INFORMACIÓN GENERAL
+        $informacionGeneral = [
+            'especialidad' => [
+                'id_especialidad' => $especialidad->id_especialidad,
+                'nombre_especialidad' => $especialidad->nombre_especialidad,
+                'descripcion' => $especialidad->descripcion
+            ],
+            'medico' => [
+                'id_doctor' => $medico->id_doctor,
+                'cedula' => $medico->cedula,
+                'username' => $medico->username,
+                'nombres' => $medico->nombres,
+                'apellidos' => $medico->apellidos,
+                'nombre_completo' => $medico->nombres . ' ' . $medico->apellidos,
+                'correo' => $medico->correo,
+                'sexo' => $medico->sexo,
+                'nacionalidad' => $medico->nacionalidad,
+                'titulo_profesional' => $medico->titulo_profesional,
+                'especialidad_asignada' => $medico->nombre_especialidad
+            ],
+            'parametros_consulta' => array_filter([
+                'id_especialidad' => $data['id_especialidad'],
+                'cedula_medico' => $data['cedula_medico'],
+                'estado' => $data['estado'] ?? null,
+                'tipo_cita' => $data['tipo_cita'] ?? null,
+                'fecha_desde' => $data['fecha_desde'] ?? null,
+                'fecha_hasta' => $data['fecha_hasta'] ?? null,
+                'id_sucursal' => $data['id_sucursal'] ?? null,
+                'cedula_paciente' => $data['cedula_paciente'] ?? null
+            ])
+        ];
+        
+        // 5.2 ESTADÍSTICAS COMPLETAS
+        $estadisticasCompletas = [
+            'totales' => [
+                'total_citas_encontradas' => count($citasFiltradas),
+                'total_citas_medico_especialidad' => count($todasLasCitas),
+                'filtros_aplicados' => count(array_filter($data)) - 2 // -2 porque id_especialidad y cedula_medico son obligatorios
+            ],
+            'distribucion_por_estado' => [
+                'pendientes' => collect($citasFiltradas)->where('estado', 'Pendiente')->count(),
+                'confirmadas' => collect($citasFiltradas)->where('estado', 'Confirmada')->count(),
+                'completadas' => collect($citasFiltradas)->where('estado', 'Completada')->count(),
+                'canceladas' => collect($citasFiltradas)->where('estado', 'Cancelada')->count()
+            ],
+            'distribucion_por_tipo' => [
+                'presenciales' => collect($citasFiltradas)->where('tipo_cita', 'presencial')->count(),
+                'virtuales' => collect($citasFiltradas)->where('tipo_cita', 'virtual')->count()
+            ],
+            'pacientes_atendidos' => [
+                'total_pacientes_unicos' => collect($citasFiltradas)->pluck('paciente_cedula')->unique()->count(),
+                'promedio_citas_por_paciente' => collect($citasFiltradas)->pluck('paciente_cedula')->unique()->count() > 0 
+                    ? round(count($citasFiltradas) / collect($citasFiltradas)->pluck('paciente_cedula')->unique()->count(), 2) 
+                    : 0
+            ]
+        ];
+        
+        // 5.3 ANÁLISIS TEMPORAL
+        $analisisTemporal = [
+            'por_mes' => collect($citasFiltradas)
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('Y-m');
+                })
+                ->map(function($citasMes, $mes) {
+                    return [
+                        'mes' => $mes,
+                        'mes_nombre' => Carbon::parse($mes . '-01')->locale('es')->isoFormat('MMMM YYYY'),
+                        'total_citas' => count($citasMes),
+                        'completadas' => collect($citasMes)->where('estado', 'Completada')->count(),
+                        'pendientes' => collect($citasMes)->where('estado', 'Pendiente')->count(),
+                        'canceladas' => collect($citasMes)->where('estado', 'Cancelada')->count()
+                    ];
+                })
+                ->values(),
+            'proximas_citas' => collect($citasFiltradas)
+                ->filter(function($cita) {
+                    $fechaCita = Carbon::parse($cita->fecha_hora);
+                    return $fechaCita->isFuture() && in_array($cita->estado, ['Pendiente', 'Confirmada']);
+                })
+                ->sortBy('fecha_hora')
+                ->take(10)
+                ->values()
+        ];
+        
+        // 5.4 ANÁLISIS POR SUCURSAL
+        $analisisPorSucursal = collect($citasFiltradas)
+            ->groupBy('id_sucursal')
+            ->map(function($citasSucursal) {
+                $primera = $citasSucursal->first();
+                return [
+                    'sucursal' => [
+                        'id_sucursal' => $primera->id_sucursal,
+                        'nombre_sucursal' => $primera->nombre_sucursal,
+                        'direccion' => $primera->sucursal_direccion,
+                        'telefono' => $primera->sucursal_telefono,
+                        'email' => $primera->sucursal_email
+                    ],
+                    'estadisticas' => [
+                        'total_citas' => count($citasSucursal),
+                        'completadas' => collect($citasSucursal)->where('estado', 'Completada')->count(),
+                        'pendientes' => collect($citasSucursal)->where('estado', 'Pendiente')->count(),
+                        'presenciales' => collect($citasSucursal)->where('tipo_cita', 'presencial')->count(),
+                        'virtuales' => collect($citasSucursal)->where('tipo_cita', 'virtual')->count()
+                    ]
+                ];
+            })
+            ->values();
+        
+        // 5.5 TOP PACIENTES (más citas)
+        $topPacientes = collect($citasFiltradas)
+            ->groupBy('paciente_cedula')
+            ->map(function($citasPaciente) {
+                $primera = $citasPaciente->first();
+                return [
+                    'paciente' => [
+                        'cedula' => $primera->paciente_cedula,
+                        'nombres' => $primera->paciente_nombres,
+                        'apellidos' => $primera->paciente_apellidos,
+                        'nombre_completo' => $primera->paciente_nombres . ' ' . $primera->paciente_apellidos,
+                        'telefono' => $primera->paciente_telefono,
+                        'tipo_sangre' => $primera->tipo_sangre
+                    ],
+                    'resumen_citas' => [
+                        'total_citas' => count($citasPaciente),
+                        'completadas' => collect($citasPaciente)->where('estado', 'Completada')->count(),
+                        'pendientes' => collect($citasPaciente)->where('estado', 'Pendiente')->count(),
+                        'canceladas' => collect($citasPaciente)->where('estado', 'Cancelada')->count(),
+                        'primera_cita' => collect($citasPaciente)->min('fecha_hora'),
+                        'ultima_cita' => collect($citasPaciente)->max('fecha_hora')
+                    ]
+                ];
+            })
+            ->sortByDesc('resumen_citas.total_citas')
+            ->take(10)
+            ->values();
+        
+        // 5.6 CITAS DETALLADAS ORGANIZADAS
+        $citasOrganizadas = collect($citasFiltradas)->map(function($cita) {
+            return [
+                'cita' => [
+                    'id_cita' => $cita->id_cita,
+                    'fecha_hora' => $cita->fecha_hora,
+                    'fecha_formateada' => Carbon::parse($cita->fecha_hora)->locale('es')->isoFormat('dddd, D [de] MMMM [de] YYYY [a las] HH:mm'),
+                    'motivo' => $cita->motivo,
+                    'estado' => $cita->estado,
+                    'tipo_cita' => $cita->tipo_cita,
+                    'notas' => $cita->notas,
+                    'enlace_virtual' => $cita->enlace_virtual,
+                    'sala_virtual' => $cita->sala_virtual,
+                    'fecha_creacion' => $cita->cita_creada
+                ],
+                'paciente' => [
+                    'cedula' => $cita->paciente_cedula,
+                    'nombres' => $cita->paciente_nombres,
+                    'apellidos' => $cita->paciente_apellidos,
+                    'nombre_completo' => $cita->paciente_nombres . ' ' . $cita->paciente_apellidos,
+                    'sexo' => $cita->paciente_sexo,
+                    'telefono' => $cita->paciente_telefono,
+                    'tipo_sangre' => $cita->tipo_sangre
+                ],
+                'sucursal' => [
+                    'id_sucursal' => $cita->id_sucursal,
+                    'nombre' => $cita->nombre_sucursal,
+                    'direccion' => $cita->sucursal_direccion,
+                    'telefono' => $cita->sucursal_telefono
+                ],
+                'tipo_cita_detalle' => [
+                    'nombre' => $cita->nombre_tipo_cita,
+                    'descripcion' => $cita->descripcion_tipo_cita
+                ]
+            ];
+        })->values();
+        
+        // RESPUESTA FINAL ORGANIZADA
+        $responseData = [
+            'informacion_general' => $informacionGeneral,
+            'estadisticas_completas' => $estadisticasCompletas,
+            'analisis_temporal' => $analisisTemporal,
+            'analisis_por_sucursal' => $analisisPorSucursal,
+            'top_pacientes' => $topPacientes,
+            'citas_detalladas' => $citasOrganizadas
+        ];
+        
+        $mensaje = sprintf(
+            'Consulta exitosa: %d citas encontradas para %s en %s',
+            count($citasFiltradas),
+            $medico->nombres . ' ' . $medico->apellidos,
+            $especialidad->nombre_especialidad
+        );
+        
+        return ResponseUtil::success($responseData, $mensaje);
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error al consultar citas por especialidad y médico: ' . $e->getMessage());
+    }
+}
+    
+// ENDPOINT MEJORADO: Rango de fechas + cédula médico (CON INFORMACIÓN MÉDICA COMPLETA)
+public function getCitasByRangoFechasYMedicoCedula(Request $request, Response $response): Response
+{
+    $data = $request->getParsedBody();
+    
+    // Validaciones de campos requeridos
+    if (empty($data['fecha_inicio']) || empty($data['fecha_fin'])) {
+        return ResponseUtil::badRequest('Los campos fecha_inicio y fecha_fin son requeridos', [
+            'fecha_inicio' => empty($data['fecha_inicio']) ? 'La fecha de inicio es requerida' : null,
+            'fecha_fin' => empty($data['fecha_fin']) ? 'La fecha de fin es requerida' : null
+        ]);
+    }
+    
+    if (empty($data['cedula_medico'])) {
+        return ResponseUtil::badRequest('El campo cedula_medico es requerido');
+    }
+    
+    // Validar formato de fechas
+    $erroresFechaInicio = \App\Validators\DateValidator::validate($data['fecha_inicio']);
+    $erroresFechaFin = \App\Validators\DateValidator::validate($data['fecha_fin']);
+    
+    if (!empty($erroresFechaInicio) || !empty($erroresFechaFin)) {
+        return ResponseUtil::badRequest('Formato de fechas inválido', [
+            'fecha_inicio' => $erroresFechaInicio,
+            'fecha_fin' => $erroresFechaFin
+        ]);
+    }
+    
+    // Validar cédula del médico
+    $erroresCedula = \App\Validators\CedulaValidator::validate($data['cedula_medico']);
+    if (!empty($erroresCedula)) {
+        return ResponseUtil::badRequest('La cédula del médico no es válida', $erroresCedula);
+    }
+    
+    try {
+        // PASO 1: Verificar fechas
+        $fechaInicio = Carbon::parse($data['fecha_inicio'])->startOfDay();
+        $fechaFin = Carbon::parse($data['fecha_fin'])->endOfDay();
+        
+        if ($fechaInicio->gt($fechaFin)) {
+            return ResponseUtil::badRequest('La fecha de inicio no puede ser mayor que la fecha de fin');
+        }
+        
+        if ($fechaInicio->diffInDays($fechaFin) > 365) {
+            return ResponseUtil::badRequest('El rango de fechas no puede ser mayor a 365 días');
+        }
+        
+        // PASO 2: Obtener información completa del médico
+        $medico = DB::table('doctores')
+            ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->select(
+                'doctores.id_doctor',
+                'usuarios.id_usuario',
+                'usuarios.cedula',
+                'usuarios.username',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'usuarios.sexo',
+                'usuarios.nacionalidad',
+                'doctores.titulo_profesional',
+                'especialidades.id_especialidad',
+                'especialidades.nombre_especialidad',
+                'especialidades.descripcion as especialidad_descripcion'
+            )
+            ->where('usuarios.cedula', $data['cedula_medico'])
+            ->first();
+            
+        if (!$medico) {
+            return ResponseUtil::notFound('No se encontró un médico con la cédula: ' . $data['cedula_medico']);
+        }
+        
+        // PASO 3: Obtener citas con información médica extendida
+        $citasCompletas = $this->getCitasConInformacionMedica($medico->id_doctor, $fechaInicio, $fechaFin);
+        
+        // PASO 4: Aplicar filtros opcionales
+$citasFiltradas = collect($citasCompletas);
+
+if (!empty($data['estado'])) {
+    $estadosValidos = ['Pendiente', 'Confirmada', 'Completada', 'Cancelada'];
+    if (!in_array($data['estado'], $estadosValidos)) {
+        return ResponseUtil::badRequest('Estado inválido. Valores permitidos: ' . implode(', ', $estadosValidos));
+    }
+    $citasFiltradas = $citasFiltradas->where('estado', $data['estado']);
+}
+
+if (!empty($data['tipo_cita'])) {
+    $tiposValidos = ['presencial', 'virtual'];
+    if (!in_array($data['tipo_cita'], $tiposValidos)) {
+        return ResponseUtil::badRequest('Tipo de cita inválido. Valores permitidos: ' . implode(', ', $tiposValidos));
+    }
+    $citasFiltradas = $citasFiltradas->where('tipo_cita', $data['tipo_cita']);
+}
+
+if (!empty($data['id_sucursal'])) {
+    if (!is_numeric($data['id_sucursal'])) {
+        return ResponseUtil::badRequest('El ID de sucursal debe ser numérico');
+    }
+    $citasFiltradas = $citasFiltradas->where('id_sucursal', $data['id_sucursal']);
+}
+
+if (!empty($data['cedula_paciente'])) {
+    $erroresCedulaPaciente = \App\Validators\CedulaValidator::validate($data['cedula_paciente']);
+    if (!empty($erroresCedulaPaciente)) {
+        return ResponseUtil::badRequest('Cédula del paciente inválida', $erroresCedulaPaciente);
+    }
+    $citasFiltradas = $citasFiltradas->where('paciente_cedula', $data['cedula_paciente']);
+}
+
+// MANTENER COMO COLLECTION para los métodos auxiliares
+// $citasFiltradas ya es una collection aquí
+
+// PASO 5: ORGANIZAR INFORMACIÓN DE MANERA EFICIENTE Y CLARA
+
+// 5.1 INFORMACIÓN DEL MÉDICO Y CONTEXTO
+$informacionMedico = $this->organizarInformacionMedico($medico, $fechaInicio, $fechaFin, $data);
+
+// 5.2 RESUMEN EJECUTIVO
+$resumenEjecutivo = $this->generarResumenEjecutivo($citasFiltradas, $fechaInicio, $fechaFin);
+
+// 5.3 ANÁLISIS DETALLADO
+$analisisDetallado = $this->generarAnalisisDetallado($citasFiltradas);
+
+// 5.4 CITAS ORGANIZADAS POR ESTADO CON INFORMACIÓN MÉDICA
+$citasOrganizadas = $this->organizarCitasPorEstado($citasFiltradas);
+
+// RESPUESTA FINAL SUPER ORGANIZADA
+$responseData = [
+    'informacion_medico' => $informacionMedico,
+    'resumen_ejecutivo' => $resumenEjecutivo,
+    'analisis_detallado' => $analisisDetallado,
+    'citas_organizadas' => $citasOrganizadas
+];
+
+$mensaje = sprintf(
+    'Consulta exitosa: %d citas encontradas para Dr. %s entre %s y %s',
+    $citasFiltradas->count(), // Usar ->count() en lugar de count()
+    $medico->nombres . ' ' . $medico->apellidos,
+    $fechaInicio->locale('es')->isoFormat('D [de] MMMM'),
+    $fechaFin->locale('es')->isoFormat('D [de] MMMM [de] YYYY')
+);
+        return ResponseUtil::success($responseData, $mensaje);
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error al consultar citas: ' . $e->getMessage());
+    }
+}
+
+// MÉTODO AUXILIAR: Obtener citas con información médica completa
+private function getCitasConInformacionMedica($idDoctor, $fechaInicio, $fechaFin)
+{
+    // Query principal con LEFT JOINs para obtener TODA la información médica
+    $citas = DB::table('citas')
+        ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+        ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+        ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+        ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+        ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+        ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+        ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
+        ->leftJoin('consultas_medicas', 'citas.id_cita', '=', 'consultas_medicas.id_cita')
+        ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
+        ->select(
+            // Datos básicos de la cita
+            'citas.id_cita',
+            'citas.fecha_hora',
+            'citas.motivo',
+            'citas.tipo_cita',
+            'citas.estado',
+            'citas.notas',
+            'citas.enlace_virtual',
+            'citas.sala_virtual',
+            'citas.fecha_creacion as cita_creada',
+            
+            // Datos del paciente
+            'u_paciente.cedula as paciente_cedula',
+            'u_paciente.nombres as paciente_nombres',
+            'u_paciente.apellidos as paciente_apellidos',
+            'u_paciente.sexo as paciente_sexo',
+            'pacientes.telefono as paciente_telefono',
+            'pacientes.tipo_sangre',
+            'pacientes.fecha_nacimiento',
+            'pacientes.alergias',
+            'pacientes.antecedentes_medicos',
+            
+            // Datos de sucursal
+            'sucursales.id_sucursal',
+            'sucursales.nombre_sucursal',
+            'sucursales.direccion as sucursal_direccion',
+            'sucursales.telefono as sucursal_telefono',
+            'sucursales.email as sucursal_email',
+            'sucursales.horario_atencion',
+            
+            // Tipo de cita
+            'tipos_cita.nombre_tipo as nombre_tipo_cita',
+            'tipos_cita.descripcion as descripcion_tipo_cita',
+            
+            // INFORMACIÓN MÉDICA (consultas_medicas)
+            'consultas_medicas.id_consulta',
+            'consultas_medicas.fecha_hora as fecha_consulta',
+            'consultas_medicas.motivo_consulta',
+            'consultas_medicas.sintomatologia',
+            'consultas_medicas.diagnostico',
+            'consultas_medicas.tratamiento',
+            'consultas_medicas.observaciones as observaciones_medicas',
+            'consultas_medicas.fecha_seguimiento',
+            
+            // INFORMACIÓN DE TRIAJE
+            'triage.id_triage',
+            'triage.nivel_urgencia',
+            'triage.estado_triaje',
+            'triage.temperatura',
+            'triage.presion_arterial',
+            'triage.frecuencia_cardiaca',
+            'triage.frecuencia_respiratoria',
+            'triage.saturacion_oxigeno',
+            'triage.peso',
+            'triage.talla',
+            'triage.imc',
+            'triage.observaciones as observaciones_triaje'
+        )
+        ->where('doctores.id_doctor', $idDoctor)
+        ->whereBetween('citas.fecha_hora', [$fechaInicio, $fechaFin])
+        ->orderBy('citas.fecha_hora', 'asc')
+        ->get();
+    
+    return $citas;
+}
+
+// MÉTODO AUXILIAR: Organizar información del médico
+private function organizarInformacionMedico($medico, $fechaInicio, $fechaFin, $parametros)
+{
+    // Obtener sucursales donde atiende
+    $sucursalesMedico = DB::table('doctores_sucursales')
+        ->join('sucursales', 'doctores_sucursales.id_sucursal', '=', 'sucursales.id_sucursal')
+        ->where('doctores_sucursales.id_doctor', $medico->id_doctor)
+        ->select(
+            'sucursales.id_sucursal',
+            'sucursales.nombre_sucursal',
+            'sucursales.direccion',
+            'sucursales.telefono',
+            'sucursales.email',
+            'sucursales.horario_atencion'
+        )
+        ->get();
+    
+    return [
+        'datos_medico' => [
+            'identificacion' => [
+                'id_doctor' => $medico->id_doctor,
+                'cedula' => $medico->cedula,
+                'username' => $medico->username
+            ],
+            'informacion_personal' => [
+                'nombres' => $medico->nombres,
+                'apellidos' => $medico->apellidos,
+                'nombre_completo' => $medico->nombres . ' ' . $medico->apellidos,
+                'sexo' => $medico->sexo,
+                'nacionalidad' => $medico->nacionalidad,
+                'correo' => $medico->correo
+            ],
+            'informacion_profesional' => [
+                'titulo_profesional' => $medico->titulo_profesional,
+                'especialidad' => [
+                    'id_especialidad' => $medico->id_especialidad,
+                    'nombre' => $medico->nombre_especialidad,
+                    'descripcion' => $medico->especialidad_descripcion
+                ]
+            ]
+        ],
+        'sucursales_atencion' => $sucursalesMedico,
+        'parametros_consulta' => [
+            'rango_temporal' => [
+                'fecha_inicio' => $parametros['fecha_inicio'],
+                'fecha_fin' => $parametros['fecha_fin'],
+                'fecha_inicio_procesada' => $fechaInicio->format('Y-m-d H:i:s'),
+                'fecha_fin_procesada' => $fechaFin->format('Y-m-d H:i:s'),
+                'total_dias' => $fechaInicio->diffInDays($fechaFin) + 1,
+                'descripcion_periodo' => $fechaInicio->locale('es')->isoFormat('D [de] MMMM [de] YYYY') . 
+                                       ' hasta ' . 
+                                       $fechaFin->locale('es')->isoFormat('D [de] MMMM [de] YYYY')
+            ],
+            'filtros_aplicados' => array_filter([
+                'estado' => $parametros['estado'] ?? null,
+                'tipo_cita' => $parametros['tipo_cita'] ?? null,
+                'id_sucursal' => $parametros['id_sucursal'] ?? null,
+                'cedula_paciente' => $parametros['cedula_paciente'] ?? null
+            ])
+        ]
+    ];
+}
+
+// MÉTODO AUXILIAR: Generar resumen ejecutivo - FINAL CORREGIDO
+private function generarResumenEjecutivo($citasFiltradas, $fechaInicio, $fechaFin)
+{
+    $totalCitas = $citasFiltradas->count();
+    $citasCompletadas = $citasFiltradas->where('estado', 'Completada');
+    $citasConConsulta = $citasFiltradas->filter(function($cita) {
+        return !is_null($cita->id_consulta);
+    });
+    
+    return [
+        'metricas_principales' => [
+            'total_citas_periodo' => $totalCitas,
+            'citas_completadas' => $citasCompletadas->count(),
+            'citas_con_informacion_medica' => $citasConConsulta->count(),
+            'promedio_citas_por_dia' => $totalCitas > 0 ? 
+                round($totalCitas / ($fechaInicio->diffInDays($fechaFin) + 1), 2) : 0,
+            'tasa_completitud' => $totalCitas > 0 ? 
+                round(($citasCompletadas->count() / $totalCitas) * 100, 2) : 0,
+            'tasa_informacion_medica' => $totalCitas > 0 ? 
+                round(($citasConConsulta->count() / $totalCitas) * 100, 2) : 0
+        ],
+        'distribucion_estados' => [
+            'pendientes' => $citasFiltradas->where('estado', 'Pendiente')->count(),
+            'confirmadas' => $citasFiltradas->where('estado', 'Confirmada')->count(),
+            'completadas' => $citasFiltradas->where('estado', 'Completada')->count(),
+            'canceladas' => $citasFiltradas->where('estado', 'Cancelada')->count()
+        ],
+        'distribucion_tipos' => [
+            'presenciales' => $citasFiltradas->where('tipo_cita', 'presencial')->count(),
+            'virtuales' => $citasFiltradas->where('tipo_cita', 'virtual')->count()
+        ],
+        'informacion_pacientes' => [
+            'total_pacientes_unicos' => $citasFiltradas->pluck('paciente_cedula')->unique()->count(),
+            'promedio_citas_por_paciente' => $citasFiltradas->pluck('paciente_cedula')->unique()->count() > 0 ?
+                round($totalCitas / $citasFiltradas->pluck('paciente_cedula')->unique()->count(), 2) : 0
+        ]
+    ];
+}
+
+// MÉTODO AUXILIAR: Generar análisis detallado - FINAL CORREGIDO
+private function generarAnalisisDetallado($citasFiltradas)
+{
+    $totalCitasConConsulta = $citasFiltradas->whereNotNull('id_consulta')->count();
+    
+    return [
+        'analisis_temporal' => [
+            'distribucion_por_mes' => $citasFiltradas
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('Y-m');
+                })
+                ->map(function($citasMes, $mes) {
+                    return [
+                        'mes' => $mes,
+                        'mes_nombre' => Carbon::parse($mes . '-01')->locale('es')->isoFormat('MMMM YYYY'),
+                        'total_citas' => $citasMes->count(),
+                        'completadas' => $citasMes->where('estado', 'Completada')->count(),
+                        'con_consulta_medica' => $citasMes->whereNotNull('id_consulta')->count()
+                    ];
+                })
+                ->values(),
+            'distribucion_por_dia_semana' => $citasFiltradas
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->dayOfWeek;
+                })
+                ->map(function($citasDia, $dia) {
+                    $nombreDia = Carbon::now()->dayOfWeek($dia)->locale('es')->isoFormat('dddd');
+                    return [
+                        'dia_numero' => $dia,
+                        'dia_nombre' => $nombreDia,
+                        'total_citas' => $citasDia->count(),
+                        'promedio_por_dia' => round($citasDia->count() / 4, 1)
+                    ];
+                })
+                ->values(),
+            'horarios_mas_frecuentes' => $citasFiltradas
+                ->groupBy(function($cita) {
+                    return Carbon::parse($cita->fecha_hora)->format('H');
+                })
+                ->map(function($citasHora, $hora) use ($citasFiltradas) {
+                    return [
+                        'hora' => $hora . ':00',
+                        'total_citas' => $citasHora->count(),
+                        'porcentaje' => $citasFiltradas->count() > 0 ? 
+                            round(($citasHora->count() / $citasFiltradas->count()) * 100, 2) : 0
+                    ];
+                })
+                ->sortByDesc('total_citas')
+                ->take(5)
+                ->values()
+        ],
+        'analisis_medico' => [
+            'diagnosticos_frecuentes' => $totalCitasConConsulta > 0 ? 
+                $citasFiltradas
+                    ->whereNotNull('diagnostico')
+                    ->where('diagnostico', '!=', '')
+                    ->groupBy('diagnostico')
+                    ->map(function($citasDiagnostico, $diagnostico) use ($totalCitasConConsulta) {
+                        return [
+                            'diagnostico' => $diagnostico,
+                            'frecuencia' => $citasDiagnostico->count(),
+                            'porcentaje' => round(($citasDiagnostico->count() / $totalCitasConConsulta) * 100, 2)
+                        ];
+                    })
+                    ->sortByDesc('frecuencia')
+                    ->take(10)
+                    ->values() : [],
+            'tratamientos_aplicados' => $citasFiltradas
+                ->whereNotNull('tratamiento')
+                ->where('tratamiento', '!=', '')
+                ->pluck('tratamiento')
+                ->unique()
+                ->take(10)
+                ->values(),
+            'motivos_consulta_frecuentes' => $citasFiltradas
+                ->whereNotNull('motivo_consulta')
+                ->where('motivo_consulta', '!=', '')
+                ->groupBy('motivo_consulta')
+                ->map(function($citasMotivo, $motivo) {
+                    return [
+                        'motivo' => $motivo,
+                        'frecuencia' => $citasMotivo->count()
+                    ];
+                })
+                ->sortByDesc('frecuencia')
+                ->take(5)
+                ->values(),
+            'estadisticas_triaje' => [
+                'total_con_triaje' => $citasFiltradas->whereNotNull('id_triage')->count(),
+                'niveles_urgencia' => $citasFiltradas
+                    ->whereNotNull('nivel_urgencia')
+                    ->groupBy('nivel_urgencia')
+                    ->map(function($citasNivel, $nivel) {
+                        $nombreNivel = match($nivel) {
+                            1 => 'No urgente',
+                            2 => 'Menos urgente',
+                            3 => 'Urgente',
+                            4 => 'Muy urgente',
+                            5 => 'Crítico',
+                            default => 'No especificado'
+                        };
+                        return [
+                            'nivel' => $nivel,
+                            'nombre' => $nombreNivel,
+                            'cantidad' => $citasNivel->count()
+                        ];
+                    })
+                    ->values()
+            ]
+        ],
+        'analisis_sucursales' => $citasFiltradas
+            ->groupBy('id_sucursal')
+            ->map(function($citasSucursal) {
+                $primera = $citasSucursal->first();
+                return [
+                    'sucursal' => [
+                        'id_sucursal' => $primera->id_sucursal,
+                        'nombre' => $primera->nombre_sucursal,
+                        'direccion' => $primera->sucursal_direccion
+                    ],
+                    'estadisticas' => [
+                        'total_citas' => $citasSucursal->count(),
+                        'completadas' => $citasSucursal->where('estado', 'Completada')->count(),
+                        'con_consulta_medica' => $citasSucursal->whereNotNull('id_consulta')->count(),
+                        'presenciales' => $citasSucursal->where('tipo_cita', 'presencial')->count(),
+                        'virtuales' => $citasSucursal->where('tipo_cita', 'virtual')->count()
+                    ]
+                ];
+            })
+            ->sortByDesc('estadisticas.total_citas')
+            ->values(),
+        'top_pacientes_periodo' => $citasFiltradas
+            ->groupBy('paciente_cedula')
+            ->map(function($citasPaciente) {
+                $primera = $citasPaciente->first();
+                return [
+                    'paciente' => [
+                        'cedula' => $primera->paciente_cedula,
+                        'nombre_completo' => $primera->paciente_nombres . ' ' . $primera->paciente_apellidos,
+                        'tipo_sangre' => $primera->tipo_sangre
+                    ],
+                    'estadisticas' => [
+                        'total_citas' => $citasPaciente->count(),
+                        'completadas' => $citasPaciente->where('estado', 'Completada')->count(),
+                        'primera_cita' => $citasPaciente->min('fecha_hora'),
+                        'ultima_cita' => $citasPaciente->max('fecha_hora')
+                    ]
+                ];
+            })
+            ->sortByDesc('estadisticas.total_citas')
+            ->take(10)
+            ->values()
+    ];
+}
+
+// MÉTODO AUXILIAR: Organizar citas por estado - FINAL CORREGIDO
+private function organizarCitasPorEstado($citasFiltradas)
+{
+    $citasPorEstado = $citasFiltradas->groupBy('estado');
+    
+    $resultado = [];
+    
+    foreach ($citasPorEstado as $estado => $citasEstado) {
+        $resultado[$estado] = [
+            'resumen' => [
+                'total_citas' => $citasEstado->count(),
+                'con_informacion_medica' => $citasEstado->whereNotNull('id_consulta')->count(),
+                'con_triaje' => $citasEstado->whereNotNull('id_triage')->count(),
+                'porcentaje_del_total' => $citasFiltradas->count() > 0 ? 
+                    round(($citasEstado->count() / $citasFiltradas->count()) * 100, 2) : 0
+            ],
+            'citas' => $citasEstado->map(function($cita) {
+                return $this->formatearCitaCompleta($cita);
+            })->sortBy('informacion_cita.fecha_hora')->values()->all()
+        ];
+    }
+    
+    // Ordenar por cantidad de citas (estado con más citas primero)
+    uasort($resultado, function($a, $b) {
+        return $b['resumen']['total_citas'] <=> $a['resumen']['total_citas'];
+    });
+    
+    return $resultado;
+}
+
+// MÉTODO AUXILIAR: Formatear cita con toda la información médica
+private function formatearCitaCompleta($cita)
+{
+    $fechaCita = Carbon::parse($cita->fecha_hora);
+    
+    $citaFormateada = [
+        'informacion_cita' => [
+            'id_cita' => $cita->id_cita,
+            'fecha_hora' => $cita->fecha_hora,
+            'fecha_formateada' => $fechaCita->locale('es')->isoFormat('dddd, D [de] MMMM [de] YYYY'),
+            'hora_formateada' => $fechaCita->format('H:i'),
+            'motivo_inicial' => $cita->motivo,
+            'estado' => $cita->estado,
+            'tipo_cita' => $cita->tipo_cita,
+            'notas_generales' => $cita->notas,
+            'enlace_virtual' => $cita->enlace_virtual,
+            'fecha_creacion' => $cita->cita_creada,
+            'tiempo_transcurrido' => $fechaCita->diffForHumans()
+        ],
+        'informacion_paciente' => [
+            'identificacion' => [
+                'cedula' => $cita->paciente_cedula,
+                'nombres' => $cita->paciente_nombres,
+                'apellidos' => $cita->paciente_apellidos,
+                'nombre_completo' => $cita->paciente_nombres . ' ' . $cita->paciente_apellidos
+            ],
+            'datos_contacto' => [
+                'telefono' => $cita->paciente_telefono
+            ],
+            'informacion_medica_basica' => [
+                'sexo' => $cita->paciente_sexo,
+                'fecha_nacimiento' => $cita->fecha_nacimiento,
+                'edad' => $cita->fecha_nacimiento ? Carbon::parse($cita->fecha_nacimiento)->age : null,
+                'tipo_sangre' => $cita->tipo_sangre,
+                'alergias' => $cita->alergias,
+                'antecedentes_medicos' => $cita->antecedentes_medicos
+            ]
+        ],
+        'informacion_sucursal' => [
+            'id_sucursal' => $cita->id_sucursal,
+            'nombre' => $cita->nombre_sucursal,
+            'direccion' => $cita->sucursal_direccion,
+            'telefono' => $cita->sucursal_telefono,
+            'email' => $cita->sucursal_email,
+            'horario_atencion' => $cita->horario_atencion
+        ]
+    ];
+    
+    // Agregar información de triaje si existe
+    if ($cita->id_triage) {
+        $citaFormateada['triaje'] = [
+            'id_triage' => $cita->id_triage,
+            'nivel_urgencia' => $cita->nivel_urgencia,
+            'estado_triaje' => $cita->estado_triaje,
+            'signos_vitales' => [
+                'temperatura' => $cita->temperatura ? $cita->temperatura . ' °C' : null,
+                'presion_arterial' => $cita->presion_arterial,
+                'frecuencia_cardiaca' => $cita->frecuencia_cardiaca ? $cita->frecuencia_cardiaca . ' bpm' : null,
+                'frecuencia_respiratoria' => $cita->frecuencia_respiratoria ? $cita->frecuencia_respiratoria . ' rpm' : null,
+                'saturacion_oxigeno' => $cita->saturacion_oxigeno ? $cita->saturacion_oxigeno . '%' : null
+            ],
+            'medidas_corporales' => [
+                'peso' => $cita->peso ? $cita->peso . ' kg' : null,
+                'talla' => $cita->talla ? $cita->talla . ' cm' : null,
+                'imc' => $cita->imc
+            ],
+            'observaciones_triaje' => $cita->observaciones_triaje
+        ];
+    }
+    
+    // Agregar información médica completa si existe (para citas completadas)
+    if ($cita->id_consulta) {
+        $citaFormateada['consulta_medica'] = [
+            'id_consulta' => $cita->id_consulta,
+            'fecha_consulta' => $cita->fecha_consulta,
+            'evaluacion_medica' => [
+                'motivo_consulta' => $cita->motivo_consulta,
+                'sintomatologia' => $cita->sintomatologia,
+                'diagnostico' => $cita->diagnostico,
+                'tratamiento' => $cita->tratamiento,
+                'observaciones_medicas' => $cita->observaciones_medicas
+            ],
+            'seguimiento' => [
+                'fecha_seguimiento' => $cita->fecha_seguimiento,
+                'seguimiento_requerido' => !is_null($cita->fecha_seguimiento)
+            ]
+        ];
+    }
+    
+    return $citaFormateada;
+}
+    // Método auxiliar para la query base - MEJORADO
+    private function getCitasQuery()
+    {
+        return DB::table('citas')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+            ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
+            ->select(
+                // Datos básicos de la cita
+                'citas.id_cita',
+                'citas.fecha_hora',
+                'citas.motivo',
+                'citas.tipo_cita',
+                'citas.estado',
+                'citas.notas',
+                'citas.enlace_virtual',
+                'citas.sala_virtual',
+                'citas.fecha_creacion as cita_creada',
+                
+                // PACIENTE
+                'u_paciente.cedula as paciente_cedula',
+                'u_paciente.nombres as paciente_nombres',
+                'u_paciente.apellidos as paciente_apellidos',
+                'u_paciente.sexo as paciente_sexo',
+                'pacientes.telefono as paciente_telefono',
+                'pacientes.tipo_sangre',
+                
+                // MÉDICO ASIGNADO
+                'citas.id_doctor',
+                'u_doctor.nombres as medico_nombres',
+                'u_doctor.apellidos as medico_apellidos',
+                'doctores.titulo_profesional as medico_titulo',
+                
+                // ESPECIALIDAD
+                'especialidades.id_especialidad',
+                'especialidades.nombre_especialidad',
+                'especialidades.descripcion as especialidad_descripcion',
+                
+                // SUCURSAL
+                'sucursales.id_sucursal',
+                'sucursales.nombre_sucursal',
+                'sucursales.direccion as sucursal_direccion',
+                'sucursales.telefono as sucursal_telefono',
+                'sucursales.email as sucursal_email',
+                
+                // TIPO DE CITA
+                'tipos_cita.nombre_tipo as nombre_tipo_cita',
+                'tipos_cita.descripcion as descripcion_tipo_cita'
+            );
+    }
+
+
+    
+}
+?>
