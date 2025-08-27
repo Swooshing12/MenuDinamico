@@ -306,7 +306,7 @@ class HistorialController
                     
                     // ✅ DATOS DE TRIAGE (CAMPOS REALES)
                     'triage.id_triage',
-                    'triage.nivel_urgencia',
+                    DB::raw('COALESCE(triage.nivel_urgencia, "") as nivel_urgencia'),
                     'triage.temperatura',
                     'triage.presion_arterial',
                     'triage.frecuencia_cardiaca',
@@ -551,7 +551,7 @@ class HistorialController
                     
                     // Triage completo
                     'triage.id_triage',
-                    'triage.nivel_urgencia',
+                    DB::raw('COALESCE(triage.nivel_urgencia, "") as nivel_urgencia'),
                     'triage.temperatura',
                     'triage.presion_arterial',
                     'triage.frecuencia_cardiaca',

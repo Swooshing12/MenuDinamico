@@ -13,8 +13,22 @@ use Exception;
 class AuthController
 {
     // PUNTO 1 y 3: Login mejorado con sistema de 3 intentos (SIN CAMPOS NUEVOS)
+// PUNTO 1 y 3: Login mejorado con sistema de 3 intentos (SIN CAMPOS NUEVOS)
 public function login(Request $request, Response $response): Response
 {
+    // 🔥 FORZAR INICIO DE SESIÓN SIEMPRE - ESTE ES EL CAMBIO CRÍTICO
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // 🔥 ASEGURAR QUE LA SESIÓN TENGA UN ID VÁLIDO
+    if (empty(session_id())) {
+        session_start();
+        error_log("🔄 Session force started: " . session_id());
+    } else {
+        error_log("🔄 Session already active: " . session_id());
+    }
+
     $data = $request->getParsedBody();
     
     // Validaciones básicas
@@ -35,10 +49,9 @@ public function login(Request $request, Response $response): Response
         // Obtener IP del cliente para logs de seguridad
         $clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         
-        // 🔒 INICIAR SESIÓN PARA TRACKING DE INTENTOS
-        if (session_status() == PHP_SESSION_NONE) {
-            session_start();
-        }
+        // 🔥 LOG DE DEBUG PARA VERIFICAR SESIÓN
+        error_log("🔍 Session ID: " . session_id());
+        error_log("🔍 Current attempts in session: " . json_encode($_SESSION['intentos'] ?? 'NONE'));
         
         // Buscar usuario por correo
         $usuario = DB::table('usuarios')
@@ -79,7 +92,6 @@ public function login(Request $request, Response $response): Response
             return ResponseUtil::unauthorized('Cuenta bloqueada por múltiples intentos fallidos. Contacte al administrador');
         }
         
-        
         if ($usuario->id_estado == 4) {
             error_log("Login blocked - Account disabled: {$data['correo']} from IP: $clientIp");
             return ResponseUtil::unauthorized('Cuenta deshabilitada. Contacte al administrador');
@@ -104,22 +116,22 @@ public function login(Request $request, Response $response): Response
             error_log("Login failed - Wrong password: {$data['correo']} (attempt $intentosActuales/3) from IP: $clientIp");
             return ResponseUtil::unauthorized('Credenciales incorrectas');
         }
-                        // Si la contraseña es correcta, verificar el estado
-                if ($usuario->id_estado == 3) {
-                    // Usuario con clave temporal - debe cambiar contraseña
-                    return ResponseUtil::success([
-                        'usuario' => [
-                            'id_usuario' => $usuario->id_usuario,
-                            'correo' => $usuario->correo,
-                            'nombres' => $usuario->nombres,
-                            'apellidos' => $usuario->apellidos,
-                            'requiere_cambio_password' => true,
-                            'estado' => 'pendiente'
-                        ]
-                    ], 'Debe cambiar su contraseña temporal');
-                }
-
         
+        // Si la contraseña es correcta, verificar el estado
+        if ($usuario->id_estado == 3) {
+            // Usuario con clave temporal - debe cambiar contraseña
+            return ResponseUtil::success([
+                'usuario' => [
+                    'id_usuario' => $usuario->id_usuario,
+                    'correo' => $usuario->correo,
+                    'nombres' => $usuario->nombres,
+                    'apellidos' => $usuario->apellidos,
+                    'requiere_cambio_password' => true,
+                    'estado' => 'pendiente'
+                ]
+            ], 'Debe cambiar su contraseña temporal');
+        }
+
         // 🔒 LOGIN EXITOSO - Limpiar intentos fallidos
         $this->limpiarIntentosFallidos($data['correo']);
         
@@ -158,11 +170,22 @@ public function login(Request $request, Response $response): Response
 }
 
 // 🔒 INCREMENTAR INTENTOS FALLIDOS (USANDO SESIONES)
+// 🔒 INCREMENTAR INTENTOS FALLIDOS (USANDO SESIONES)
 private function incrementarIntentosFallidos($correo, $clientIp)
 {
+    // 🔥 ASEGURAR QUE LA SESIÓN ESTÉ ACTIVA
+    if (session_status() == PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // 🔥 LOG DE DEBUG
+    error_log("🔍 Before increment - Session ID: " . session_id());
+    error_log("🔍 Before increment - Current session data: " . json_encode($_SESSION));
+    
     // Inicializar array de intentos si no existe
     if (!isset($_SESSION['intentos'])) {
         $_SESSION['intentos'] = [];
+        error_log("🔄 Initialized attempts array");
     }
     
     // Incrementar contador para este correo
@@ -174,11 +197,14 @@ private function incrementarIntentosFallidos($correo, $clientIp)
     
     $intentos = $_SESSION['intentos'][$correo];
     
+    // 🔥 LOG DETALLADO
+    error_log("🔍 After increment - Attempts for $correo: $intentos");
+    error_log("🔍 After increment - Full session data: " . json_encode($_SESSION));
+    
     error_log("Failed login attempt $intentos/3 for: $correo from IP: $clientIp");
     
     return $intentos;
 }
-
 // 🔒 BLOQUEAR USUARIO (CAMBIAR ESTADO A 2)
 private function bloquearUsuario($idUsuario, $correo, $clientIp)
 {

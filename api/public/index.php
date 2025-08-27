@@ -6,6 +6,8 @@ use Tuupola\Middleware\CorsMiddleware;
 use App\Controllers\AuthController;
 use App\Controllers\HistorialController;
 use App\Controllers\CitasController;
+use App\Controllers\DoctoresApiController;
+use App\Utils\ResponseUtil;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
@@ -43,7 +45,7 @@ $app->add(new CorsMiddleware([
     "origin" => ["*"],
     "methods" => ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "headers.allow" => ["Content-Type", "Authorization", "X-Requested-With"],
-    "credentials" => false,
+    "credentials" => true,
 ]));
 $app->addRoutingMiddleware();
 $app->addErrorMiddleware(true, true, true);
@@ -98,6 +100,8 @@ $app->post('/citas/rango-fechas-medico-cedula', [CitasController::class, 'getCit
     // Búsqueda de pacientes
 $app->get('/pacientes/buscar/{cedula}', HistorialController::class . ':buscarPacientePorCedula');
 
+$app->get('/pacientes/buscar2/{cedula}', [CitasController::class, 'buscarPacienteRapido']);
+
 // Historial clínico
 $app->get('/historial/{cedula}', HistorialController::class . ':getHistorialByCedula');
 $app->get('/historial/{cedula}/filtros', HistorialController::class . ':getHistorialCompleto');
@@ -114,6 +118,65 @@ $app->get('/sucursales', HistorialController::class . ':getSucursales');
 $app->get('/citas/consulta-general', HistorialController::class . ':getConsultaGeneralCitas');
 // Mis citas para médicos
 $app->get('/citas/mis-citas', HistorialController::class . ':getMisCitasMedico');
+
+
+$app->get('/doctores/estadisticas', [DoctoresApiController::class, 'obtenerEstadisticas']);
+
+
+// ===== MÉDICOS - CRUD BÁSICO =====
+$app->get('/doctores', [DoctoresApiController::class, 'listarDoctores']);
+$app->post('/doctores', [DoctoresApiController::class, 'crearDoctor']);
+$app->get('/doctores/{id}', [DoctoresApiController::class, 'obtenerDoctor']);
+$app->put('/doctores/{id}', [DoctoresApiController::class, 'actualizarDoctor']);
+$app->delete('/doctores/{id}', [DoctoresApiController::class, 'eliminarDoctor']);
+
+// ===== MÉDICOS - GESTIÓN DE ESTADO =====
+$app->post('/doctores/{id}/estado', [DoctoresApiController::class, 'cambiarEstadoDoctor']);
+
+// ===== HORARIOS DE MÉDICOS =====
+$app->get('/doctores/{id}/horarios', [DoctoresApiController::class, 'obtenerHorarios']);
+$app->post('/doctores/{id}/horarios', [DoctoresApiController::class, 'guardarHorarios']);
+$app->put('/doctores/{id}/horarios', [DoctoresApiController::class, 'guardarHorarios']);
+$app->get('/doctores/{id}/disponibilidad', [DoctoresApiController::class, 'obtenerDisponibilidad']);
+
+// ===== EXCEPCIONES DE MÉDICOS (Vacaciones, días especiales, etc.) =====
+$app->get('/doctores/{id}/excepciones', [DoctoresApiController::class, 'obtenerExcepciones']);
+$app->post('/doctores/{id}/excepciones', [DoctoresApiController::class, 'guardarExcepcion']);
+$app->delete('/excepciones/{id}', [DoctoresApiController::class, 'eliminarExcepcion']);
+
+// ===== RUTAS ALTERNATIVAS CON QUERY PARAMETERS (Para compatibilidad) =====
+$app->get('/doctores-api', [DoctoresApiController::class, 'manejarSolicitud']);
+$app->post('/doctores-api', [DoctoresApiController::class, 'manejarSolicitud']);
+$app->put('/doctores-api', [DoctoresApiController::class, 'manejarSolicitud']);
+$app->delete('/doctores-api', [DoctoresApiController::class, 'manejarSolicitud']);
+$app->get('/doctores/cedula/{cedula}', [DoctoresApiController::class, 'buscarPorCedula']);
+// ===== HORARIOS DE MÉDICOS =====
+
+
+
+
+// Crear paciente
+$app->post('/pacientes/crear', [CitasController::class, 'crearPaciente']);
+
+// Tipos de cita
+$app->get('/tipos-cita', [CitasController::class, 'getTiposCita']);
+
+// Especialidades por sucursal
+$app->get('/especialidades/sucursal/{id_sucursal}', [CitasController::class, 'getEspecialidadesPorSucursal']);
+
+// Doctores por especialidad y sucursal
+$app->get('/doctores/especialidad/{id_especialidad}/sucursal/{id_sucursal}', [CitasController::class, 'getDoctoresPorEspecialidadYSucursal']);
+
+// Horarios disponibles
+$app->get('/horarios/disponibles', [CitasController::class, 'getHorariosDisponibles']);
+
+// Crear cita
+$app->post('/citas/crear', [CitasController::class, 'crearCita']);
+
+// En api/public/index.php agregar estas líneas:
+$app->post('/doctores/horarios', [CitasController::class, 'guardarHorarios2']);
+$app->delete('/horarios', [CitasController::class, 'eliminarHorario']);
+$app->put('/horarios', [CitasController::class, 'editarHorario']);
 
 $app->run();
 ?>

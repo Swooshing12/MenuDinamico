@@ -8,6 +8,9 @@ use App\Validators\DateValidator;
 use Illuminate\Database\Capsule\Manager as DB;
 use Exception;
 use Carbon\Carbon;
+use DateTime;
+use DateTimeZone;
+
 
 class CitasController
 {
@@ -1496,6 +1499,540 @@ private function formatearCitaCompleta($cita)
                 'tipos_cita.descripcion as descripcion_tipo_cita'
             );
     }
+
+
+    /**
+ * ✅ CREAR NUEVO PACIENTE
+ */
+public function crearPaciente(Request $request, Response $response): Response
+{
+    try {
+        $data = $request->getParsedBody();
+        
+        // Validar campos requeridos
+        $camposRequeridos = ['cedula', 'nombres', 'apellidos', 'correo', 'telefono', 'fecha_nacimiento', 'sexo'];
+        $camposFaltantes = [];
+        
+        foreach ($camposRequeridos as $campo) {
+            if (empty($data[$campo])) {
+                $camposFaltantes[] = $campo;
+            }
+        }
+        
+        if (!empty($camposFaltantes)) {
+            return ResponseUtil::badRequest('Campos requeridos faltantes: ' . implode(', ', $camposFaltantes));
+        }
+        
+        // Validar formato de cédula
+        if (!preg_match('/^[0-9]{10}$/', $data['cedula'])) {
+            return ResponseUtil::badRequest('La cédula debe tener exactamente 10 dígitos');
+        }
+        
+        // Validar que no existe ya un paciente con esa cédula
+        $pacienteExistente = DB::table('usuarios')->where('cedula', $data['cedula'])->first();
+        if ($pacienteExistente) {
+            return ResponseUtil::conflict('Ya existe un usuario con esa cédula');
+        }
+        
+        // Generar username único
+        $baseUsername = strtolower(trim($data['nombres'])) . '.' . strtolower(trim($data['apellidos']));
+        $baseUsername = preg_replace('/[^a-z0-9.]/', '', $baseUsername);
+        $username = substr($baseUsername, 0, 20);
+        
+        // Verificar si el username existe y modificarlo si es necesario
+        $contador = 1;
+        $usernameOriginal = $username;
+        while (DB::table('usuarios')->where('username', $username)->exists()) {
+            $username = $usernameOriginal . $contador;
+            $contador++;
+        }
+        
+        DB::beginTransaction();
+        
+        // 1. Crear usuario
+        $usuarioId = DB::table('usuarios')->insertGetId([
+            'username' => $username,
+            'password' => password_hash($data['cedula'], PASSWORD_DEFAULT), // Password temporal = cédula
+            'nombres' => trim($data['nombres']),
+            'apellidos' => trim($data['apellidos']),
+            'correo' => trim($data['correo']),
+            'cedula' => $data['cedula'],
+            'sexo' => $data['sexo'],
+            'nacionalidad' => $data['nacionalidad'] ?? 'Ecuatoriana',
+            'id_rol' => 71, // Rol Paciente
+            'id_estado' => 1, // Activo
+        ]);
+        
+        // 2. Crear registro en pacientes
+        $pacienteId = DB::table('pacientes')->insertGetId([
+            'id_usuario' => $usuarioId,
+            'fecha_nacimiento' => $data['fecha_nacimiento'],
+            'tipo_sangre' => $data['tipo_sangre'] ?? null,
+            'alergias' => $data['alergias'] ?? null,
+            'antecedentes_medicos' => $data['antecedentes_medicos'] ?? null,
+            'contacto_emergencia' => $data['contacto_emergencia'] ?? null,
+            'telefono_emergencia' => $data['telefono_emergencia'] ?? null,
+            'telefono' => trim($data['telefono']),
+            'numero_seguro' => $data['numero_seguro'] ?? null
+        ]);
+        
+        DB::commit();
+        
+        // Obtener datos completos del paciente creado
+        $pacienteCompleto = DB::table('pacientes')
+            ->join('usuarios', 'pacientes.id_usuario', '=', 'usuarios.id_usuario')
+            ->select(
+                'pacientes.id_paciente',
+                'usuarios.id_usuario',
+                'usuarios.cedula',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'usuarios.sexo',
+                'usuarios.nacionalidad',
+                'pacientes.telefono',
+                'pacientes.fecha_nacimiento',
+                'pacientes.tipo_sangre',
+                'pacientes.alergias',
+                'pacientes.contacto_emergencia',
+                'pacientes.telefono_emergencia'
+            )
+            ->where('pacientes.id_paciente', $pacienteId)
+            ->first();
+        
+        return ResponseUtil::success([
+            'paciente' => $pacienteCompleto,
+            'password_temporal' => $data['cedula']
+        ], 'Paciente creado exitosamente');
+        
+    } catch (Exception $e) {
+        DB::rollBack();
+        return ResponseUtil::error('Error creando paciente: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ✅ OBTENER TIPOS DE CITA
+ */
+public function getTiposCita(Request $request, Response $response): Response
+{
+    try {
+        $tiposCita = DB::table('tipos_cita')
+            ->where('activo', 1)
+            ->orderBy('id_tipo_cita')
+            ->get();
+        
+        return ResponseUtil::success($tiposCita->toArray(), 'Tipos de cita obtenidos exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo tipos de cita: ' . $e->getMessage());
+    }
+}
+
+
+/**
+ * ✅ Buscar paciente por cédula (búsqueda rápida)
+ */
+public function buscarPacienteRapido(Request $request, Response $response, array $args): Response
+{
+    $cedula = $args['cedula'];
+
+    try {
+        $paciente = DB::table('pacientes')
+            ->join('usuarios', 'pacientes.id_usuario', '=', 'usuarios.id_usuario')
+            ->select(
+                'pacientes.id_paciente',
+                'usuarios.cedula',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'usuarios.sexo',
+                'pacientes.tipo_sangre',
+                'pacientes.alergias',
+                'pacientes.antecedentes_medicos',
+                'pacientes.contacto_emergencia',
+                'pacientes.telefono_emergencia',
+                'pacientes.numero_seguro'
+            )
+            ->where('usuarios.cedula', $cedula)
+            ->first();
+
+        if (!$paciente) {
+            return ResponseUtil::notFound('No se encontró ningún paciente con la cédula: ' . $cedula);
+        }
+
+        return ResponseUtil::success($paciente, 'Paciente encontrado exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error buscando paciente: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ✅ OBTENER ESPECIALIDADES POR SUCURSAL
+ */
+public function getEspecialidadesPorSucursal(Request $request, Response $response, array $args): Response
+{
+    try {
+        $idSucursal = $args['id_sucursal'];
+        
+        $especialidades = DB::table('especialidades')
+            ->join('especialidades_sucursales', 'especialidades.id_especialidad', '=', 'especialidades_sucursales.id_especialidad')
+            ->where('especialidades_sucursales.id_sucursal', $idSucursal)
+            ->select(
+                'especialidades.id_especialidad',
+                'especialidades.nombre_especialidad',
+                'especialidades.descripcion'
+            )
+            ->orderBy('especialidades.nombre_especialidad')
+            ->get();
+        
+        return ResponseUtil::success($especialidades->toArray(), 'Especialidades por sucursal obtenidas exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo especialidades por sucursal: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ✅ OBTENER DOCTORES POR ESPECIALIDAD Y SUCURSAL
+ */
+public function getDoctoresPorEspecialidadYSucursal(Request $request, Response $response, array $args): Response
+{
+    try {
+        $idEspecialidad = $args['id_especialidad'];
+        $idSucursal = $args['id_sucursal'];
+        
+        $doctores = DB::table('doctores')
+            ->join('usuarios', 'doctores.id_usuario', '=', 'usuarios.id_usuario')
+            ->join('doctores_sucursales', 'doctores.id_doctor', '=', 'doctores_sucursales.id_doctor')
+            ->where('doctores.id_especialidad', $idEspecialidad)
+            ->where('doctores_sucursales.id_sucursal', $idSucursal)
+            ->where('usuarios.id_estado', 1) // Solo activos
+            ->select(
+                'doctores.id_doctor',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'doctores.titulo_profesional'
+            )
+            ->orderBy('usuarios.nombres')
+            ->get();
+        
+        return ResponseUtil::success($doctores->toArray(), 'Doctores por especialidad y sucursal obtenidos exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo doctores: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ✅ OBTENER HORARIOS DISPONIBLES DE UN DOCTOR
+ */
+public function getHorariosDisponibles(Request $request, Response $response): Response
+{
+    try {
+        $params = $request->getQueryParams();
+        
+        $idDoctor = $params['id_doctor'] ?? null;
+        $idSucursal = $params['id_sucursal'] ?? null;
+        $semana = $params['semana'] ?? date('Y-m-d'); // Formato: 2025-01-20 (lunes de la semana)
+        
+        if (!$idDoctor) {
+            return ResponseUtil::badRequest('ID del doctor es requerido');
+        }
+        
+        if (!$idSucursal) {
+            return ResponseUtil::badRequest('ID de sucursal es requerido');
+        }
+        
+        // Calcular fechas de la semana
+        $fechaInicio = new DateTime($semana);
+        $fechaInicio->modify('monday this week');
+        $fechaFin = clone $fechaInicio;
+        $fechaFin->modify('+6 days');
+        
+        // 1. Obtener horarios del doctor
+        $horarios = DB::table('doctor_horarios')
+            ->where('id_doctor', $idDoctor)
+            ->where('id_sucursal', $idSucursal)
+            ->where('activo', 1)
+            ->orderBy('dia_semana')
+            ->orderBy('hora_inicio')
+            ->get()
+            ->toArray();
+        
+        // 2. Obtener citas ocupadas en el rango de fechas
+        $citasOcupadas = DB::table('citas')
+            ->where('id_doctor', $idDoctor)
+            ->where('id_sucursal', $idSucursal)
+            ->whereBetween('fecha_hora', [
+                $fechaInicio->format('Y-m-d 00:00:00'),
+                $fechaFin->format('Y-m-d 23:59:59')
+            ])
+            ->whereNotIn('estado', ['Cancelada'])
+            ->select(
+                DB::raw('DATE(fecha_hora) as fecha'),
+                DB::raw('TIME(fecha_hora) as hora'),
+                'motivo',
+                'estado'
+            )
+            ->get()
+            ->toArray();
+        
+        // 3. Obtener excepciones (días no laborables, vacaciones, etc.)
+        $excepciones = DB::table('doctor_excepciones')
+            ->where('id_doctor', $idDoctor)
+            ->whereBetween('fecha', [
+                $fechaInicio->format('Y-m-d'),
+                $fechaFin->format('Y-m-d')
+            ])
+            ->where('activo', 1)
+            ->get()
+            ->toArray();
+        
+        return ResponseUtil::success([
+            'horarios' => $horarios,
+            'citas_ocupadas' => $citasOcupadas,
+            'excepciones' => $excepciones,
+            'semana_inicio' => $fechaInicio->format('Y-m-d'),
+            'semana_fin' => $fechaFin->format('Y-m-d')
+        ], 'Horarios disponibles obtenidos exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo horarios disponibles: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Guardar horarios de un médico
+ */
+public function guardarHorarios2()
+{
+    try {
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+        
+        if (!$data) {
+            $data = $_POST;
+        }
+        
+        $idDoctor = (int)($data['id_doctor'] ?? 0);
+        $horarios = $data['horarios'] ?? [];
+        
+        if (!$idDoctor || empty($horarios)) {
+            return ResponseUtil::badRequest('ID de médico y horarios son requeridos');
+        }
+        
+        // Insertar cada horario
+        foreach ($horarios as $horario) {
+            DB::table('doctor_horarios')->insert([
+                'id_doctor' => $idDoctor,
+                'id_sucursal' => $horario['id_sucursal'],
+                'dia_semana' => $horario['dia_semana'],
+                'hora_inicio' => $horario['hora_inicio'],
+                'hora_fin' => $horario['hora_fin'],
+                'duracion_cita' => $horario['duracion_cita'],
+                'activo' => 1,
+                'fecha_creacion' => date('Y-m-d H:i:s')
+            ]);
+        }
+        
+        return ResponseUtil::success(null, 'Horarios guardados exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error guardando horarios: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Eliminar horario
+ */
+public function eliminarHorario()
+{
+    try {
+        $idHorario = $_GET['id'] ?? null;
+        
+        if (!$idHorario) {
+            return ResponseUtil::badRequest('ID de horario requerido');
+        }
+        
+        DB::table('doctor_horarios')
+            ->where('id_horario', $idHorario)
+            ->delete();
+        
+        return ResponseUtil::success(null, 'Horario eliminado exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error eliminando horario: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Editar horario existente
+ */
+public function editarHorario()
+{
+    try {
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+        
+        if (!$data) {
+            $data = $_POST;
+        }
+        
+        $idHorario = (int)($data['id_horario'] ?? 0);
+        
+        if (!$idHorario) {
+            return ResponseUtil::badRequest('ID de horario requerido');
+        }
+        
+        // Verificar que el horario existe
+        $horarioExiste = DB::table('doctor_horarios')
+            ->where('id_horario', $idHorario)
+            ->first();
+            
+        if (!$horarioExiste) {
+            return ResponseUtil::notFound('Horario no encontrado');
+        }
+        
+        // Actualizar solo los campos enviados
+        $camposUpdate = [];
+        if (isset($data['id_sucursal'])) $camposUpdate['id_sucursal'] = $data['id_sucursal'];
+        if (isset($data['dia_semana'])) $camposUpdate['dia_semana'] = $data['dia_semana'];
+        if (isset($data['hora_inicio'])) $camposUpdate['hora_inicio'] = $data['hora_inicio'];
+        if (isset($data['hora_fin'])) $camposUpdate['hora_fin'] = $data['hora_fin'];
+        if (isset($data['duracion_cita'])) $camposUpdate['duracion_cita'] = $data['duracion_cita'];
+        
+        if (empty($camposUpdate)) {
+            return ResponseUtil::badRequest('No hay datos para actualizar');
+        }
+        
+        DB::table('doctor_horarios')
+            ->where('id_horario', $idHorario)
+            ->update($camposUpdate);
+        
+        return ResponseUtil::success(null, 'Horario actualizado exitosamente');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error editando horario: ' . $e->getMessage());
+    }
+}
+
+/**
+ * ✅ CREAR NUEVA CITA
+ */
+public function crearCita(Request $request, Response $response): Response
+{
+    try {
+        $data = $request->getParsedBody();
+        
+        // Validar campos requeridos
+        $camposRequeridos = ['id_paciente', 'id_doctor', 'id_sucursal', 'fecha_hora', 'motivo'];
+        $camposFaltantes = [];
+        
+        foreach ($camposRequeridos as $campo) {
+            if (empty($data[$campo])) {
+                $camposFaltantes[] = $campo;
+            }
+        }
+        
+        if (!empty($camposFaltantes)) {
+            return ResponseUtil::badRequest('Campos requeridos faltantes: ' . implode(', ', $camposFaltantes));
+        }
+        
+        // Validar formato de fecha
+        if (!DateTime::createFromFormat('Y-m-d H:i:s', $data['fecha_hora'])) {
+            return ResponseUtil::badRequest('Formato de fecha_hora inválido. Use: YYYY-MM-DD HH:MM:SS');
+        }
+        
+        // Validar que la fecha sea futura
+        $fechaCita = new DateTime($data['fecha_hora']);
+        $ahora = new DateTime();
+        if ($fechaCita <= $ahora) {
+            return ResponseUtil::badRequest('La fecha y hora de la cita debe ser futura');
+        }
+        
+        // Verificar que no haya conflicto de horario
+        $citaExistente = DB::table('citas')
+            ->where('id_doctor', $data['id_doctor'])
+            ->where('fecha_hora', $data['fecha_hora'])
+            ->whereNotIn('estado', ['Cancelada'])
+            ->first();
+        
+        if ($citaExistente) {
+            return ResponseUtil::conflict('Ya existe una cita programada para esa fecha y hora');
+        }
+        
+        DB::beginTransaction();
+        
+        // Crear la cita
+        $citaId = DB::table('citas')->insertGetId([
+            'id_paciente' => $data['id_paciente'],
+            'id_doctor' => $data['id_doctor'],
+            'id_sucursal' => $data['id_sucursal'],
+            'id_tipo_cita' => $data['id_tipo_cita'] ?? 1,
+            'fecha_hora' => $data['fecha_hora'],
+            'motivo' => trim($data['motivo']),
+            'tipo_cita' => $data['tipo_cita'] ?? 'presencial',
+            'estado' => 'Confirmada',
+            'notas' => $data['notas'] ?? null,
+            'fecha_creacion' => date('Y-m-d H:i:s')
+        ]);
+        
+        DB::commit();
+        
+        // Obtener datos completos de la cita creada
+        $citaCompleta = DB::table('citas')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+            ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
+            ->select(
+                'citas.*',
+                'u_paciente.nombres as paciente_nombres',
+                'u_paciente.apellidos as paciente_apellidos',
+                'u_paciente.cedula as paciente_cedula',
+                'u_paciente.correo as paciente_correo',   // 🔑 asegurarse que traes el correo
+                'u_doctor.nombres as doctor_nombres',
+                'u_doctor.apellidos as doctor_apellidos',
+                'doctores.titulo_profesional',
+                'especialidades.nombre_especialidad',
+                'sucursales.nombre_sucursal',
+                'tipos_cita.nombre_tipo as tipo_cita_nombre'
+            )
+            ->where('citas.id_cita', $citaId)
+            ->first();
+
+        // === 📧 Enviar correo de confirmación ===
+        if ($citaCompleta) {
+        require_once __DIR__ . '/../../../config/MailService.php';
+            $mailService = new \MailService();
+
+            $mailService->enviarConfirmacionCita(
+                (array)$citaCompleta,  // pasar la cita
+                [
+                    'nombres'   => $citaCompleta->paciente_nombres,
+                    'apellidos' => $citaCompleta->paciente_apellidos,
+                    'correo'    => $citaCompleta->paciente_correo
+                ]
+            );
+        }
+        
+        return ResponseUtil::success([
+            'cita' => $citaCompleta,
+            'id_cita' => $citaId
+        ], 'Cita creada exitosamente');
+        
+    } catch (Exception $e) {
+        DB::rollBack();
+        return ResponseUtil::error('Error creando cita: ' . $e->getMessage());
+    }
+}
+
 
 
     
