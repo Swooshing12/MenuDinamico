@@ -1611,6 +1611,111 @@ public function crearPaciente(Request $request, Response $response): Response
     }
 }
 
+public function crearPaciente2(Request $request, Response $response): Response
+{
+    $data = $request->getParsedBody();
+    
+    // ✅ VALIDAR CÉDULA COMO NÚMERO
+    if (empty($data['cedula']) || !is_numeric($data['cedula'])) {
+        return ResponseUtil::badRequest('La cédula debe ser un número válido');
+    }
+    
+    $cedula = (string)$data['cedula']; // ✅ Convertir a string para validación
+    
+    $erroresCedula = \App\Validators\CedulaValidator::validate($cedula);
+    if (!empty($erroresCedula)) {
+        return ResponseUtil::badRequest('La cédula proporcionada no es válida', $erroresCedula);
+    }
+    
+    // ✅ VERIFICAR QUE NO EXISTA EL PACIENTE (COMO STRING EN BD)
+    $existente = DB::table('usuarios')->where('cedula', $cedula)->first();
+    if ($existente) {
+        return ResponseUtil::badRequest('Ya existe un usuario con esta cédula');
+    }
+    
+    try {
+        DB::beginTransaction();
+        
+        // 1. Crear usuario
+        $usuarioId = DB::table('usuarios')->insertGetId([
+            'cedula' => $cedula, // ✅ GUARDAR COMO STRING EN BD
+            'nombres' => $data['nombres'],
+            'apellidos' => $data['apellidos'],
+            'correo' => $data['correo'] ?? null,
+            'sexo' => $data['sexo'],
+            'nacionalidad' => $data['nacionalidad'] ?? 'Ecuatoriana',
+            'username' => $cedula,
+            'password' => password_hash($cedula, PASSWORD_DEFAULT),
+            'id_rol' => 71, // Rol paciente
+            'id_estado' => 1, // Activo
+            'fecha_creacion' => date('Y-m-d H:i:s')
+        ]);
+        
+        // 2. Crear paciente
+        $pacienteId = DB::table('pacientes')->insertGetId([
+            'id_usuario' => $usuarioId,
+            'fecha_nacimiento' => $data['fecha_nacimiento'],
+            'tipo_sangre' => $data['tipo_sangre'] ?? null,
+            'alergias' => $data['alergias'] ?? null,
+            'antecedentes_medicos' => $data['antecedentes_medicos'] ?? null,
+            'contacto_emergencia' => $data['contacto_emergencia'] ?? null,
+            'telefono_emergencia' => $data['telefono_emergencia'] ?? null,
+            'numero_seguro' => $data['numero_seguro'] ?? null,
+            'telefono' => $data['telefono'] ?? null
+        ]);
+        
+        // 3. Crear historial clínico
+        DB::table('historiales_clinicos')->insert([
+            'id_paciente' => $pacienteId,
+            'fecha_creacion' => date('Y-m-d H:i:s'),
+            'ultima_actualizacion' => date('Y-m-d H:i:s')
+        ]);
+        
+        DB::commit();
+        
+        // 4. ✅ DEVOLVER DATOS CON CÉDULA COMO LONG
+        $pacienteCreado = [
+            'id_paciente' => $pacienteId,
+            'id_usuario' => $usuarioId,
+            'cedula' => (int)$cedula, // ✅ CONVERTIR A INT PARA LA RESPUESTA JSON
+            'nombres' => $data['nombres'],
+            'apellidos' => $data['apellidos'],
+            'nombre_completo' => $data['nombres'] . ' ' . $data['apellidos'],
+            'correo' => $data['correo'] ?? '',
+            'sexo' => $data['sexo'],
+            'nacionalidad' => $data['nacionalidad'] ?? 'Ecuatoriana',
+            'username' => $cedula,
+            'fecha_nacimiento' => $data['fecha_nacimiento'],
+            'edad' => $this->calcularEdad($data['fecha_nacimiento']),
+            'tipo_sangre' => $data['tipo_sangre'] ?? '',
+            'telefono' => $data['telefono'] ?? '',
+            'alergias' => $data['alergias'] ?? '',
+            'antecedentes_medicos' => $data['antecedentes_medicos'] ?? '',
+            'contacto_emergencia' => $data['contacto_emergencia'] ?? '',
+            'telefono_emergencia' => $data['telefono_emergencia'] ?? '',
+            'numero_seguro' => $data['numero_seguro'] ?? ''
+        ];
+        
+        return ResponseUtil::success(
+            $pacienteCreado,
+            'Paciente creado exitosamente: ' . $pacienteCreado['nombre_completo']
+        );
+        
+    } catch (Exception $e) {
+        DB::rollback();
+        return ResponseUtil::error('Error creando paciente: ' . $e->getMessage());
+    }
+}
+private function calcularEdad($fechaNacimiento): int
+{
+    try {
+        $nacimiento = new \DateTime($fechaNacimiento);
+        $hoy = new \DateTime();
+        return $hoy->diff($nacimiento)->y;
+    } catch (Exception $e) {
+        return 0;
+    }
+}
 /**
  * ✅ OBTENER TIPOS DE CITA
  */

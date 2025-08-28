@@ -178,5 +178,8 @@ $app->post('/doctores/horarios', [CitasController::class, 'guardarHorarios2']);
 $app->delete('/horarios', [CitasController::class, 'eliminarHorario']);
 $app->put('/horarios', [CitasController::class, 'editarHorario']);
 
+// ✅ AGREGAR ESTA LÍNEA DESPUÉS DE LOS ENDPOINTS EXISTENTES
+$app->post('/pacientes/crear2', [CitasController::class, 'crearPaciente2']);
+
 $app->run();
 ?>
