@@ -202,77 +202,114 @@ class DoctoresApiController {
     }
     
     /**
-     * Crear nuevo médico con horarios
-     */
-    public function crearDoctor() {
-        try {
-            $data = json_decode(file_get_contents('php://input'), true);
-            if (!$data) {
-                $data = $_POST;
-            }
-            
-            // Validar datos requeridos
-            $errores = $this->validarDatosDoctor($data);
-            if (!empty($errores)) {
-                return ResponseUtil::badRequest('Datos inválidos', $errores);
-            }
-            
-            DB::beginTransaction();
-            
-            // 1. Crear usuario
-            $usuarioData = [
-                'cedula' => $data['cedula'],
-                'username' => $data['username'],
-                'nombres' => $data['nombres'],
-                'apellidos' => $data['apellidos'],
-                'correo' => $data['correo'],
-                'password' => password_hash($data['password'], PASSWORD_BCRYPT),
-                'sexo' => $data['sexo'],
-                'nacionalidad' => $data['nacionalidad'],
-                'id_estado' => 1, // Activo
-                'id_rol' => 70, // Rol médico (según tu BD)
-                'fecha_creacion' => date('Y-m-d H:i:s')
-            ];
-            
-            $idUsuario = DB::table('usuarios')->insertGetId($usuarioData);
-            
-            // 2. Crear doctor
-            $doctorData = [
-                'id_usuario' => $idUsuario,
-                'id_especialidad' => $data['id_especialidad'],
-                'titulo_profesional' => $data['titulo_profesional'] ?? null
-            ];
-            
-            $idDoctor = DB::table('doctores')->insertGetId($doctorData);
-            
-            // 3. Asignar sucursales
-            if (!empty($data['sucursales'])) {
-                foreach ($data['sucursales'] as $idSucursal) {
-                    DB::table('doctores_sucursales')->insert([
-                        'id_doctor' => $idDoctor,
-                        'id_sucursal' => $idSucursal
-                    ]);
-                }
-            }
-            
-            // 4. Guardar horarios si se proporcionan
-            if (!empty($data['horarios'])) {
-                $this->guardarHorariosDoctor($idDoctor, $data['horarios']);
-            }
-            
-            DB::commit();
-            
-            // Obtener el doctor creado completo
-            $doctorCreado = $this->obtenerDoctorCompleto($idDoctor);
-            
-            return ResponseUtil::success($doctorCreado, 'Médico creado exitosamente');
-            
-        } catch (Exception $e) {
-            DB::rollBack();
-            error_log("Error creando médico: " . $e->getMessage());
-            return ResponseUtil::error('Error creando el médico: ' . $e->getMessage());
+ * Crear nuevo médico con horarios (JSON limpio)
+ */
+public function crearDoctor() {
+    // Evitar cualquier output antes de JSON
+    error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+    ini_set('display_errors', '0');
+    header('Content-Type: application/json; charset=utf-8');
+
+    try {
+        // Leer datos JSON
+        $data = json_decode(file_get_contents('php://input'), true);
+        if (!$data) {
+            $data = $_POST;
         }
+
+        // Validar datos requeridos
+        $errores = $this->validarDatosDoctor($data);
+        if (!empty($errores)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Datos inválidos',
+                'errors' => $errores
+            ]);
+            exit;
+        }
+
+        DB::beginTransaction();
+
+        // 🔑 Generar contraseña temporal
+        require_once __DIR__ . '/../../../config/MailService.php';
+        $passwordTemporal = \MailService::generarPasswordTemporal();
+
+        // 1. Crear usuario
+        $usuarioData = [
+            'cedula'        => $data['cedula'],
+            'username'      => $data['username'],
+            'nombres'       => $data['nombres'],
+            'apellidos'     => $data['apellidos'],
+            'correo'        => $data['correo'],
+            'password'      => password_hash($passwordTemporal, PASSWORD_BCRYPT),
+            'sexo'          => $data['sexo'],
+            'nacionalidad'  => $data['nacionalidad'],
+            'id_estado'     => 3,
+            'id_rol'        => 70,
+            'fecha_creacion'=> date('Y-m-d H:i:s')
+        ];
+
+        $idUsuario = DB::table('usuarios')->insertGetId($usuarioData);
+
+        // 2. Crear doctor
+        $doctorData = [
+            'id_usuario'        => $idUsuario,
+            'id_especialidad'   => $data['id_especialidad'],
+            'titulo_profesional'=> $data['titulo_profesional'] ?? null
+        ];
+
+        $idDoctor = DB::table('doctores')->insertGetId($doctorData);
+
+        // 3. Asignar sucursales
+        if (!empty($data['sucursales'])) {
+            foreach ($data['sucursales'] as $idSucursal) {
+                DB::table('doctores_sucursales')->insert([
+                    'id_doctor'  => $idDoctor,
+                    'id_sucursal'=> $idSucursal
+                ]);
+            }
+        }
+
+        // 4. Guardar horarios
+        if (!empty($data['horarios'])) {
+            $this->guardarHorariosDoctor($idDoctor, $data['horarios']);
+        }
+
+        DB::commit();
+
+        // Obtener doctor completo
+        $doctorCreado = $this->obtenerDoctorCompleto($idDoctor);
+
+        // Enviar correo de credenciales
+        if ($doctorCreado) {
+            $mailService = new \MailService();
+            $mailService->enviarPasswordTemporal(
+                $doctorCreado->correo,
+                $doctorCreado->nombres . ' ' . $doctorCreado->apellidos,
+                $doctorCreado->correo,
+                $passwordTemporal
+            );
+        }
+
+        // ✅ JSON limpio de respuesta
+        echo json_encode([
+            'success' => true,
+            'message' => 'Médico creado exitosamente y credenciales enviadas al correo',
+            'data' => $doctorCreado
+        ]);
+        exit;
+
+    } catch (Exception $e) {
+        DB::rollBack();
+        error_log("Error creando médico: " . $e->getMessage());
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Error creando el médico: ' . $e->getMessage()
+        ]);
+        exit;
     }
+}
     
     /**
      * Obtener médico específico con todos sus datos
