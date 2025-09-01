@@ -204,6 +204,9 @@ class DoctoresApiController {
     /**
  * Crear nuevo médico con horarios (JSON limpio)
  */
+/**
+ * Crear nuevo médico con horarios (JSON limpio con errores específicos)
+ */
 public function crearDoctor() {
     // Evitar cualquier output antes de JSON
     error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
@@ -217,13 +220,17 @@ public function crearDoctor() {
             $data = $_POST;
         }
 
-        // Validar datos requeridos
+        // Validar datos requeridos con mensajes específicos
         $errores = $this->validarDatosDoctor($data);
         if (!empty($errores)) {
+            // ✅ MENSAJE ESPECÍFICO SEGÚN EL ERROR
+            $mensajePrincipal = $this->generarMensajeError($errores);
+            
             echo json_encode([
                 'success' => false,
-                'message' => 'Datos inválidos',
-                'errors' => $errores
+                'message' => $mensajePrincipal,
+                'errors' => $errores,
+                'detalles' => $this->formatearErroresParaUsuario($errores)
             ]);
             exit;
         }
@@ -303,9 +310,13 @@ public function crearDoctor() {
         DB::rollBack();
         error_log("Error creando médico: " . $e->getMessage());
 
+        // ✅ MENSAJE DE ERROR ESPECÍFICO PARA EXCEPCIONES
+        $mensajeError = $this->interpretarErrorBD($e);
+
         echo json_encode([
             'success' => false,
-            'message' => 'Error creando el médico: ' . $e->getMessage()
+            'message' => $mensajeError,
+            'error_type' => 'database_error'
         ]);
         exit;
     }
@@ -553,47 +564,174 @@ public function guardarHorarios() {
         }
     }
     
-    // ===== MÉTODOS AUXILIARES =====
+    // ===== MÉTODOS AUXILIARES MEJORADOS =====
+
+private function validarDatosDoctor($data) {
+    $errores = [];
     
-    private function validarDatosDoctor($data) {
-        $errores = [];
-        
-        // Validar campos requeridos
-        $requeridos = ['cedula', 'nombres', 'apellidos', 'correo', 'id_especialidad', 'sexo'];
-        foreach ($requeridos as $campo) {
-            if (empty($data[$campo])) {
-                $errores[$campo] = "El campo {$campo} es requerido";
+    // ✅ VALIDAR CÉDULA CON MENSAJES ESPECÍFICOS
+    if (empty($data['cedula'])) {
+        $errores['cedula'] = 'La cédula es obligatoria';
+    } else {
+        // Validar formato de cédula
+        if (!preg_match('/^\d{10}$/', $data['cedula'])) {
+            $errores['cedula'] = 'La cédula debe tener exactamente 10 dígitos numéricos';
+        } else {
+            // Verificar si ya existe
+            $usuarioExistente = DB::table('usuarios')->where('cedula', $data['cedula'])->first();
+            if ($usuarioExistente) {
+                $errores['cedula'] = "La cédula {$data['cedula']} ya está registrada en el sistema";
             }
         }
-        
-        // Validar cédula ecuatoriana
-        if (!empty($data['cedula'])) {
-            if (!$this->validarCedulaEcuatoriana($data['cedula'])) {
-                $errores['cedula'] = 'Cédula ecuatoriana inválida';
-            }
-            
-            // Verificar que no exista
-            $existe = DB::table('usuarios')->where('cedula', $data['cedula'])->exists();
-            if ($existe) {
-                $errores['cedula'] = 'Ya existe un usuario con esta cédula';
-            }
-        }
-        
-        // Validar correo
-        if (!empty($data['correo'])) {
-            if (!filter_var($data['correo'], FILTER_VALIDATE_EMAIL)) {
-                $errores['correo'] = 'Formato de correo inválido';
-            }
-            
-            // Verificar que no exista
-            $existe = DB::table('usuarios')->where('correo', $data['correo'])->exists();
-            if ($existe) {
-                $errores['correo'] = 'Ya existe un usuario con este correo';
-            }
-        }
-        
-        return $errores;
     }
+    
+    // ✅ VALIDAR CORREO CON MENSAJES ESPECÍFICOS
+    if (empty($data['correo'])) {
+        $errores['correo'] = 'El correo electrónico es obligatorio';
+    } else {
+        if (!filter_var($data['correo'], FILTER_VALIDATE_EMAIL)) {
+            $errores['correo'] = 'El formato del correo electrónico no es válido';
+        } else {
+            // Verificar si ya existe
+            $correoExistente = DB::table('usuarios')->where('correo', $data['correo'])->first();
+            if ($correoExistente) {
+                $errores['correo'] = "El correo {$data['correo']} ya está registrado en el sistema";
+            }
+        }
+    }
+    
+    // ✅ VALIDAR NOMBRES
+    if (empty($data['nombres'])) {
+        $errores['nombres'] = 'Los nombres son obligatorios';
+    } elseif (strlen(trim($data['nombres'])) < 2) {
+        $errores['nombres'] = 'Los nombres deben tener al menos 2 caracteres';
+    }
+    
+    // ✅ VALIDAR APELLIDOS
+    if (empty($data['apellidos'])) {
+        $errores['apellidos'] = 'Los apellidos son obligatorios';
+    } elseif (strlen(trim($data['apellidos'])) < 2) {
+        $errores['apellidos'] = 'Los apellidos deben tener al menos 2 caracteres';
+    }
+    
+    // ✅ VALIDAR ESPECIALIDAD
+    if (empty($data['id_especialidad'])) {
+        $errores['especialidad'] = 'La especialidad médica es obligatoria';
+    } else {
+        $especialidadExiste = DB::table('especialidades')->where('id_especialidad', $data['id_especialidad'])->exists();
+        if (!$especialidadExiste) {
+            $errores['especialidad'] = 'La especialidad seleccionada no es válida';
+        }
+    }
+    
+    // ✅ VALIDAR SEXO
+    if (empty($data['sexo'])) {
+        $errores['sexo'] = 'El sexo es obligatorio';
+    } elseif (!in_array($data['sexo'], ['M', 'F'])) {
+        $errores['sexo'] = 'El sexo debe ser M (Masculino) o F (Femenino)';
+    }
+    
+    // ✅ VALIDAR SUCURSALES
+    if (empty($data['sucursales']) || !is_array($data['sucursales'])) {
+        $errores['sucursales'] = 'Debe seleccionar al menos una sucursal';
+    } else {
+        foreach ($data['sucursales'] as $idSucursal) {
+            $sucursalExiste = DB::table('sucursales')->where('id_sucursal', $idSucursal)->exists();
+            if (!$sucursalExiste) {
+                $errores['sucursales'] = "Una o más sucursales seleccionadas no son válidas";
+                break;
+            }
+        }
+    }
+    
+    // ✅ VALIDAR HORARIOS
+    if (empty($data['horarios']) || !is_array($data['horarios'])) {
+        $errores['horarios'] = 'Debe configurar al menos un horario de atención';
+    }
+    
+    return $errores;
+}
+
+/**
+ * Generar mensaje principal de error basado en los errores específicos
+ */
+private function generarMensajeError($errores) {
+    if (isset($errores['cedula'])) {
+        return $errores['cedula'];
+    }
+    
+    if (isset($errores['correo'])) {
+        return $errores['correo'];
+    }
+    
+    if (count($errores) == 1) {
+        return reset($errores); // Retorna el primer error
+    }
+    
+    return "Se encontraron " . count($errores) . " errores en los datos proporcionados";
+}
+
+/**
+ * Formatear errores para mostrar al usuario de forma amigable
+ */
+private function formatearErroresParaUsuario($errores) {
+    $mensajes = [];
+    
+    foreach ($errores as $campo => $mensaje) {
+        $nombreCampo = $this->traducirNombreCampo($campo);
+        $mensajes[] = "• {$nombreCampo}: {$mensaje}";
+    }
+    
+    return implode("\n", $mensajes);
+}
+
+/**
+ * Traducir nombres de campos técnicos a nombres amigables
+ */
+private function traducirNombreCampo($campo) {
+    $traducciones = [
+        'cedula' => 'Cédula',
+        'nombres' => 'Nombres',
+        'apellidos' => 'Apellidos',
+        'correo' => 'Correo electrónico',
+        'especialidad' => 'Especialidad',
+        'sexo' => 'Sexo',
+        'sucursales' => 'Sucursales',
+        'horarios' => 'Horarios'
+    ];
+    
+    return $traducciones[$campo] ?? ucfirst($campo);
+}
+
+/**
+ * Interpretar errores de base de datos y convertirlos en mensajes amigables
+ */
+private function interpretarErrorBD($exception) {
+    $mensaje = $exception->getMessage();
+    
+    // Error de cédula duplicada
+    if (strpos($mensaje, 'cedula') !== false && strpos($mensaje, 'Duplicate') !== false) {
+        return 'Esta cédula ya está registrada en el sistema';
+    }
+    
+    // Error de correo duplicado
+    if (strpos($mensaje, 'correo') !== false && strpos($mensaje, 'Duplicate') !== false) {
+        return 'Este correo electrónico ya está registrado en el sistema';
+    }
+    
+    // Error de clave foránea
+    if (strpos($mensaje, 'foreign key constraint') !== false) {
+        return 'Error de integridad: algunos datos relacionados no son válidos';
+    }
+    
+    // Error de conexión
+    if (strpos($mensaje, 'Connection') !== false) {
+        return 'Error de conexión con la base de datos. Intente nuevamente.';
+    }
+    
+    // Error genérico pero más amigable
+    return 'Error interno del servidor. Por favor contacte al administrador si el problema persiste.';
+}
     
     private function validarCedulaEcuatoriana($cedula) {
         if (strlen($cedula) != 10 || !ctype_digit($cedula)) {

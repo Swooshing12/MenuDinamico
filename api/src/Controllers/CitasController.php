@@ -1613,39 +1613,44 @@ public function crearPaciente(Request $request, Response $response): Response
 
 public function crearPaciente2(Request $request, Response $response): Response
 {
-    $data = $request->getParsedBody();
-    
-    // ✅ VALIDAR CÉDULA COMO NÚMERO
-    if (empty($data['cedula']) || !is_numeric($data['cedula'])) {
-        return ResponseUtil::badRequest('La cédula debe ser un número válido');
-    }
-    
-    $cedula = (string)$data['cedula']; // ✅ Convertir a string para validación
-    
-    $erroresCedula = \App\Validators\CedulaValidator::validate($cedula);
-    if (!empty($erroresCedula)) {
-        return ResponseUtil::badRequest('La cédula proporcionada no es válida', $erroresCedula);
-    }
-    
-    // ✅ VERIFICAR QUE NO EXISTA EL PACIENTE (COMO STRING EN BD)
-    $existente = DB::table('usuarios')->where('cedula', $cedula)->first();
-    if ($existente) {
-        return ResponseUtil::badRequest('Ya existe un usuario con esta cédula');
-    }
+    // Configurar headers para JSON limpio
+    error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+    ini_set('display_errors', '0');
+    header('Content-Type: application/json; charset=utf-8');
     
     try {
+        $data = $request->getParsedBody();
+        
+        // Validar datos con mensajes específicos
+        $errores = $this->validarDatosPaciente($data);
+        if (!empty($errores)) {
+            $mensajePrincipal = $this->generarMensajeErrorPaciente($errores);
+            
+            return ResponseUtil::badRequest($mensajePrincipal, [
+                'errors' => $errores,
+                'detalles' => $this->formatearErroresParaUsuario($errores)
+            ]);
+        }
+        
+        // Convertir cédula a string para BD
+        $cedula = (string)$data['cedula'];
+        
         DB::beginTransaction();
+        
+        // 🔑 Generar contraseña temporal
+        require_once __DIR__ . '/../../../config/MailService.php';
+        $passwordTemporal = \MailService::generarPasswordTemporal();
         
         // 1. Crear usuario
         $usuarioId = DB::table('usuarios')->insertGetId([
-            'cedula' => $cedula, // ✅ GUARDAR COMO STRING EN BD
+            'cedula' => $cedula,
             'nombres' => $data['nombres'],
             'apellidos' => $data['apellidos'],
             'correo' => $data['correo'] ?? null,
             'sexo' => $data['sexo'],
             'nacionalidad' => $data['nacionalidad'] ?? 'Ecuatoriana',
             'username' => $cedula,
-            'password' => password_hash($cedula, PASSWORD_DEFAULT),
+            'password' => password_hash($passwordTemporal, PASSWORD_DEFAULT),
             'id_rol' => 71, // Rol paciente
             'id_estado' => 1, // Activo
             'fecha_creacion' => date('Y-m-d H:i:s')
@@ -1673,11 +1678,11 @@ public function crearPaciente2(Request $request, Response $response): Response
         
         DB::commit();
         
-        // 4. ✅ DEVOLVER DATOS CON CÉDULA COMO LONG
+        // 4. Preparar datos del paciente creado
         $pacienteCreado = [
             'id_paciente' => $pacienteId,
             'id_usuario' => $usuarioId,
-            'cedula' => (int)$cedula, // ✅ CONVERTIR A INT PARA LA RESPUESTA JSON
+            'cedula' => (int)$cedula,
             'nombres' => $data['nombres'],
             'apellidos' => $data['apellidos'],
             'nombre_completo' => $data['nombres'] . ' ' . $data['apellidos'],
@@ -1696,15 +1701,219 @@ public function crearPaciente2(Request $request, Response $response): Response
             'numero_seguro' => $data['numero_seguro'] ?? ''
         ];
         
+        // 5. 📧 Enviar credenciales por correo si tiene email
+        $mensajeCredenciales = "";
+        if (!empty($data['correo'])) {
+            try {
+                $mailService = new \MailService();
+                $envioExitoso = $mailService->enviarPasswordTemporal(
+                    $data['correo'],
+                    $data['nombres'] . ' ' . $data['apellidos'],
+                    $data['correo'], // username
+                    $passwordTemporal
+                );
+                
+                if ($envioExitoso) {
+                    $mensajeCredenciales = " y credenciales enviadas al correo";
+                } else {
+                    $mensajeCredenciales = " (no se pudieron enviar las credenciales por correo)";
+                }
+            } catch (Exception $e) {
+                error_log("Error enviando correo a paciente: " . $e->getMessage());
+                $mensajeCredenciales = " (error enviando credenciales por correo)";
+            }
+        }
+        
         return ResponseUtil::success(
             $pacienteCreado,
-            'Paciente creado exitosamente: ' . $pacienteCreado['nombre_completo']
+            'Paciente ' . $pacienteCreado['nombre_completo'] . ' creado exitosamente' . $mensajeCredenciales
         );
         
     } catch (Exception $e) {
         DB::rollback();
-        return ResponseUtil::error('Error creando paciente: ' . $e->getMessage());
+        error_log("Error creando paciente: " . $e->getMessage());
+        
+        // Mensaje de error específico para excepciones
+        $mensajeError = $this->interpretarErrorBDPaciente($e);
+        
+        return ResponseUtil::error($mensajeError);
     }
+}
+
+// ===== MÉTODOS AUXILIARES PARA VALIDACIÓN DE PACIENTES =====
+
+private function validarDatosPaciente($data) {
+    $errores = [];
+    
+    // ✅ VALIDAR CÉDULA
+    if (empty($data['cedula'])) {
+        $errores['cedula'] = 'La cédula es obligatoria';
+    } else {
+        // Validar que sea numérico
+        if (!is_numeric($data['cedula'])) {
+            $errores['cedula'] = 'La cédula debe contener solo números';
+        } else {
+            $cedula = (string)$data['cedula'];
+            
+           
+                // Verificar si ya existe
+                $usuarioExistente = DB::table('usuarios')->where('cedula', $cedula)->first();
+                if ($usuarioExistente) {
+                    $errores['cedula'] = "La cédula {$cedula} ya está registrada en el sistema";
+                }
+            
+        }
+    }
+    
+    // ✅ VALIDAR NOMBRES
+    if (empty($data['nombres'])) {
+        $errores['nombres'] = 'Los nombres son obligatorios';
+    } elseif (strlen(trim($data['nombres'])) < 2) {
+        $errores['nombres'] = 'Los nombres deben tener al menos 2 caracteres';
+    } elseif (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/", $data['nombres'])) {
+        $errores['nombres'] = 'Los nombres solo pueden contener letras y espacios';
+    }
+    
+    // ✅ VALIDAR APELLIDOS
+    if (empty($data['apellidos'])) {
+        $errores['apellidos'] = 'Los apellidos son obligatorios';
+    } elseif (strlen(trim($data['apellidos'])) < 2) {
+        $errores['apellidos'] = 'Los apellidos deben tener al menos 2 caracteres';
+    } elseif (!preg_match("/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/", $data['apellidos'])) {
+        $errores['apellidos'] = 'Los apellidos solo pueden contener letras y espacios';
+    }
+    
+    // ✅ VALIDAR CORREO (opcional pero si está debe ser válido)
+    if (!empty($data['correo'])) {
+        if (!filter_var($data['correo'], FILTER_VALIDATE_EMAIL)) {
+            $errores['correo'] = 'El formato del correo electrónico no es válido';
+        } else {
+            // Verificar si ya existe
+            $correoExistente = DB::table('usuarios')->where('correo', $data['correo'])->first();
+            if ($correoExistente) {
+                $errores['correo'] = "El correo {$data['correo']} ya está registrado en el sistema";
+            }
+        }
+    }
+    
+    // ✅ VALIDAR SEXO
+    if (empty($data['sexo'])) {
+        $errores['sexo'] = 'El sexo es obligatorio';
+    } elseif (!in_array($data['sexo'], ['M', 'F'])) {
+        $errores['sexo'] = 'El sexo debe ser M (Masculino) o F (Femenino)';
+    }
+    
+    // ✅ VALIDAR FECHA DE NACIMIENTO
+    if (empty($data['fecha_nacimiento'])) {
+        $errores['fecha_nacimiento'] = 'La fecha de nacimiento es obligatoria';
+    } else {
+        $fechaNacimiento = DateTime::createFromFormat('Y-m-d', $data['fecha_nacimiento']);
+        if (!$fechaNacimiento) {
+            $errores['fecha_nacimiento'] = 'La fecha de nacimiento debe tener el formato YYYY-MM-DD';
+        } else {
+            $hoy = new DateTime();
+            $edad = $hoy->diff($fechaNacimiento)->y;
+            
+            if ($fechaNacimiento > $hoy) {
+                $errores['fecha_nacimiento'] = 'La fecha de nacimiento no puede ser futura';
+            } elseif ($edad > 120) {
+                $errores['fecha_nacimiento'] = 'La fecha de nacimiento no es realista (edad mayor a 120 años)';
+            }
+        }
+    }
+    
+    // ✅ VALIDAR TELÉFONO (opcional pero si está debe ser válido)
+    if (!empty($data['telefono'])) {
+        if (!preg_match("/^\d{10}$/", $data['telefono'])) {
+            $errores['telefono'] = 'El teléfono debe tener exactamente 10 dígitos';
+        }
+    }
+    
+    // ✅ VALIDAR TELÉFONO DE EMERGENCIA (opcional)
+    if (!empty($data['telefono_emergencia'])) {
+        if (!preg_match("/^\d{10}$/", $data['telefono_emergencia'])) {
+            $errores['telefono_emergencia'] = 'El teléfono de emergencia debe tener exactamente 10 dígitos';
+        }
+    }
+    
+    // ✅ VALIDAR TIPO DE SANGRE (opcional)
+    if (!empty($data['tipo_sangre'])) {
+        $tiposValidos = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        if (!in_array($data['tipo_sangre'], $tiposValidos)) {
+            $errores['tipo_sangre'] = 'El tipo de sangre no es válido. Debe ser: ' . implode(', ', $tiposValidos);
+        }
+    }
+    
+    return $errores;
+}
+
+private function generarMensajeErrorPaciente($errores) {
+    if (isset($errores['cedula'])) {
+        return $errores['cedula'];
+    }
+    
+    if (isset($errores['correo'])) {
+        return $errores['correo'];
+    }
+    
+    if (count($errores) == 1) {
+        return reset($errores);
+    }
+    
+    return "Se encontraron " . count($errores) . " errores en los datos del paciente";
+}
+
+private function formatearErroresParaUsuario($errores) {
+    $mensajes = [];
+    
+    foreach ($errores as $campo => $mensaje) {
+        $nombreCampo = $this->traducirNombreCampoPaciente($campo);
+        $mensajes[] = "• {$nombreCampo}: {$mensaje}";
+    }
+    
+    return implode("\n", $mensajes);
+}
+
+private function traducirNombreCampoPaciente($campo) {
+    $traducciones = [
+        'cedula' => 'Cédula',
+        'nombres' => 'Nombres',
+        'apellidos' => 'Apellidos',
+        'correo' => 'Correo electrónico',
+        'sexo' => 'Sexo',
+        'fecha_nacimiento' => 'Fecha de nacimiento',
+        'telefono' => 'Teléfono',
+        'telefono_emergencia' => 'Teléfono de emergencia',
+        'tipo_sangre' => 'Tipo de sangre'
+    ];
+    
+    return $traducciones[$campo] ?? ucfirst($campo);
+}
+
+private function interpretarErrorBDPaciente($exception) {
+    $mensaje = $exception->getMessage();
+    
+    // Error de cédula duplicada
+    if (strpos($mensaje, 'cedula') !== false && strpos($mensaje, 'Duplicate') !== false) {
+        return 'Esta cédula ya está registrada como paciente en el sistema';
+    }
+    
+    // Error de correo duplicado
+    if (strpos($mensaje, 'correo') !== false && strpos($mensaje, 'Duplicate') !== false) {
+        return 'Este correo electrónico ya está registrado en el sistema';
+    }
+    
+    // Error de clave foránea
+    if (strpos($mensaje, 'foreign key constraint') !== false) {
+        return 'Error de integridad: algunos datos del paciente no son válidos';
+    }
+    
+    // Error de conexión
+    if (strpos($mensaje, 'Connection') !== false) {
+        return 'Error de conexión con la base de datos. Intente nuevamente.';
+    }
+    
+    return 'Error interno del servidor creando el paciente. Contacte al administrador si persiste.';
 }
 private function calcularEdad($fechaNacimiento): int
 {
