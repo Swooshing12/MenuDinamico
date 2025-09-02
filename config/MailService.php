@@ -106,15 +106,25 @@ class MailService {
     // ===== MÉTODOS PARA NOTIFICACIONES DE CITAS =====
     
     /**
-     * Enviar confirmación de cita
-     */
-    public function enviarConfirmacionCita($cita, $paciente) {
+ * Enviar confirmación de cita - MEJORA MÍNIMA
+ */
+public function enviarConfirmacionCita($cita, $paciente) {
     try {
         error_log("🔍 DEBUG: Iniciando enviarConfirmacionCita");
         
         $fecha = new DateTime($cita['fecha_hora']);
         $fechaFormateada = $fecha->format('d/m/Y');
         $horaFormateada = $fecha->format('H:i');
+        
+        // ✅ EXTRAER PLATAFORMA VIRTUAL SI EXISTE
+        $plataformaVirtual = null;
+        $salaVirtualLimpia = $cita['sala_virtual'] ?? null;
+        
+        if (isset($cita['sala_virtual']) && strpos($cita['sala_virtual'], '|') !== false) {
+            $partes = explode('|', $cita['sala_virtual']);
+            $plataformaVirtual = $partes[0]; // zoom, meet, teams, etc.
+            $salaVirtualLimpia = $partes[1];
+        }
         
         $subject = "✅ Tu Cita Médica ha sido Confirmada - MediSys";
         
@@ -128,7 +138,8 @@ class MailService {
             'sucursal' => $cita['nombre_sucursal'] ?? 'No especificada',
             'tipo_cita' => $cita['id_tipo_cita'] == 2 ? 'Virtual' : 'Presencial',
             'enlace_virtual' => $cita['enlace_virtual'] ?? null,
-            'sala_virtual' => $cita['sala_virtual'] ?? null,
+            'sala_virtual' => $salaVirtualLimpia,
+            'plataforma_virtual' => $plataformaVirtual, // ✅ AGREGAR ESTO
             'id_cita' => $cita['id_cita']
         ]);
         
@@ -988,5 +999,7 @@ private function enviarEmail($destinatario, $nombreDestinatario, $asunto, $conte
         return false;
     }
 }
+
+
 }
 ?>

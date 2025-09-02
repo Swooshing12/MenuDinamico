@@ -181,5 +181,16 @@ $app->put('/horarios', [CitasController::class, 'editarHorario']);
 // ✅ AGREGAR ESTA LÍNEA DESPUÉS DE LOS ENDPOINTS EXISTENTES
 $app->post('/pacientes/crear2', [CitasController::class, 'crearPaciente2']);
 
+// En tu archivo de rutas (routes.php o similar)
+
+// En tu archivo de rutas (routes.php o similar)
+
+// Corregir estas rutas - deben apuntar al controlador correcto
+$app->get('/citas/paciente/{cedula}', [CitasController::class, 'obtenerCitasPacientePorFecha']);
+
+// Para triaje, crear un controlador específico o agregar al CitasController
+$app->post('/triaje/crear', [CitasController::class, 'crearTriaje']);
+$app->get('/triaje/cita/{id_cita}', [CitasController::class, 'obtenerTriajePorCita']);
+
 $app->run();
 ?>

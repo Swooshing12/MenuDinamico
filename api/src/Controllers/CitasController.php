@@ -2236,6 +2236,9 @@ public function editarHorario()
 /**
  * ✅ CREAR NUEVA CITA
  */
+/**
+ * ✅ CREAR NUEVA CITA - CORREGIDO PARA GUARDAR CORRECTAMENTE
+ */
 public function crearCita(Request $request, Response $response): Response
 {
     try {
@@ -2253,6 +2256,13 @@ public function crearCita(Request $request, Response $response): Response
         
         if (!empty($camposFaltantes)) {
             return ResponseUtil::badRequest('Campos requeridos faltantes: ' . implode(', ', $camposFaltantes));
+        }
+        
+        // Validar campos específicos para citas virtuales
+        if (!empty($data['id_tipo_cita']) && $data['id_tipo_cita'] == 2) {
+            if (empty($data['plataforma_virtual'])) {
+                return ResponseUtil::badRequest('La plataforma virtual es requerida para citas virtuales');
+            }
         }
         
         // Validar formato de fecha
@@ -2280,21 +2290,58 @@ public function crearCita(Request $request, Response $response): Response
         
         DB::beginTransaction();
         
-        // Crear la cita
-        $citaId = DB::table('citas')->insertGetId([
+        // ✅ PREPARAR DATOS BASE
+        $citaData = [
             'id_paciente' => $data['id_paciente'],
             'id_doctor' => $data['id_doctor'],
             'id_sucursal' => $data['id_sucursal'],
             'id_tipo_cita' => $data['id_tipo_cita'] ?? 1,
             'fecha_hora' => $data['fecha_hora'],
             'motivo' => trim($data['motivo']),
-            'tipo_cita' => $data['tipo_cita'] ?? 'presencial',
+            'tipo_cita' => ($data['id_tipo_cita'] ?? 1) == 2 ? 'virtual' : 'presencial',
             'estado' => 'Confirmada',
-            'notas' => $data['notas'] ?? null,
-            'fecha_creacion' => date('Y-m-d H:i:s')
-        ]);
+            'notas' => $data['notas'] ?? null
+        ];
+        
+        // ✅ GENERAR DATOS VIRTUALES - ASEGURAR QUE SE GUARDEN
+        $enlaceVirtual = null;
+        $salaVirtual = null;
+        
+        if ($citaData['id_tipo_cita'] == 2) {
+            $plataforma = $data['plataforma_virtual'] ?? 'zoom';
+            $enlaceVirtual = $this->generarEnlaceVirtual($plataforma);
+            
+            // USAR sala_virtual PARA GUARDAR PLATAFORMA + ID
+            $salaBase = $data['sala_virtual'] ?? ('Sala-' . uniqid());
+            $salaVirtual = $plataforma . '|' . $salaBase;
+            
+            error_log("🔍 DEBUG: Datos virtuales generados:");
+            error_log("  - Plataforma: " . $plataforma);
+            error_log("  - Enlace: " . $enlaceVirtual);
+            error_log("  - Sala: " . $salaVirtual);
+        }
+        
+        // ✅ AGREGAR EXPLÍCITAMENTE LOS CAMPOS VIRTUALES
+        $citaData['enlace_virtual'] = $enlaceVirtual;
+        $citaData['sala_virtual'] = $salaVirtual;
+        
+        error_log("🔍 DEBUG: Datos finales para insertar:");
+        error_log(json_encode($citaData, JSON_PRETTY_PRINT));
+        
+        // Crear la cita
+        $citaId = DB::table('citas')->insertGetId($citaData);
+        
+        error_log("🔍 DEBUG: Cita creada con ID: " . $citaId);
         
         DB::commit();
+        
+        // ✅ VERIFICAR QUE SE GUARDÓ CORRECTAMENTE
+        $citaVerificacion = DB::table('citas')
+            ->where('id_cita', $citaId)
+            ->first();
+            
+        error_log("🔍 DEBUG: Cita guardada - enlace_virtual: " . ($citaVerificacion->enlace_virtual ?? 'NULL'));
+        error_log("🔍 DEBUG: Cita guardada - sala_virtual: " . ($citaVerificacion->sala_virtual ?? 'NULL'));
         
         // Obtener datos completos de la cita creada
         $citaCompleta = DB::table('citas')
@@ -2310,7 +2357,7 @@ public function crearCita(Request $request, Response $response): Response
                 'u_paciente.nombres as paciente_nombres',
                 'u_paciente.apellidos as paciente_apellidos',
                 'u_paciente.cedula as paciente_cedula',
-                'u_paciente.correo as paciente_correo',   // 🔑 asegurarse que traes el correo
+                'u_paciente.correo as paciente_correo',
                 'u_doctor.nombres as doctor_nombres',
                 'u_doctor.apellidos as doctor_apellidos',
                 'doctores.titulo_profesional',
@@ -2321,32 +2368,361 @@ public function crearCita(Request $request, Response $response): Response
             ->where('citas.id_cita', $citaId)
             ->first();
 
-        // === 📧 Enviar correo de confirmación ===
-        if ($citaCompleta) {
-        require_once __DIR__ . '/../../../config/MailService.php';
-            $mailService = new \MailService();
+        // ✅ EXTRAER PLATAFORMA DEL CAMPO sala_virtual
+        $plataformaVirtual = null;
+        $salaVirtualLimpia = $citaCompleta->sala_virtual;
+        
+        if ($citaCompleta->tipo_cita == 'virtual' && $citaCompleta->sala_virtual) {
+            $partes = explode('|', $citaCompleta->sala_virtual);
+            if (count($partes) == 2) {
+                $plataformaVirtual = $partes[0];
+                $salaVirtualLimpia = $partes[1];
+            }
+        }
 
-            $mailService->enviarConfirmacionCita(
-                (array)$citaCompleta,  // pasar la cita
-                [
-                    'nombres'   => $citaCompleta->paciente_nombres,
-                    'apellidos' => $citaCompleta->paciente_apellidos,
-                    'correo'    => $citaCompleta->paciente_correo
-                ]
-            );
+        // ✅ ENVIAR CORREO CON INFO VIRTUAL
+        if ($citaCompleta && !empty($citaCompleta->paciente_correo)) {
+            try {
+                require_once __DIR__ . '/../../../config/MailService.php';
+                $mailService = new \MailService();
+
+                // Agregar info de plataforma al array de la cita para el correo
+                $citaParaCorreo = (array)$citaCompleta;
+                $citaParaCorreo['plataforma_virtual'] = $plataformaVirtual;
+
+                $resultadoCorreo = $mailService->enviarConfirmacionCita(
+                    $citaParaCorreo,
+                    [
+                        'nombres'   => $citaCompleta->paciente_nombres,
+                        'apellidos' => $citaCompleta->paciente_apellidos,
+                        'correo'    => $citaCompleta->paciente_correo
+                    ]
+                );
+                
+                error_log("🔍 DEBUG: Resultado envío correo: " . ($resultadoCorreo ? 'ÉXITO' : 'FALLO'));
+            } catch (Exception $e) {
+                error_log("❌ ERROR enviando correo: " . $e->getMessage());
+            }
         }
         
         return ResponseUtil::success([
             'cita' => $citaCompleta,
-            'id_cita' => $citaId
-        ], 'Cita creada exitosamente');
+            'id_cita' => $citaId,
+            'enlace_virtual' => $citaCompleta->enlace_virtual,
+            'plataforma_virtual' => $plataformaVirtual,
+            'sala_virtual' => $salaVirtualLimpia
+        ], 'Cita creada exitosamente' . ($citaCompleta->tipo_cita == 'virtual' ? ' con enlace virtual generado' : ''));
         
     } catch (Exception $e) {
         DB::rollBack();
+        error_log("❌ ERROR en crearCita: " . $e->getMessage());
         return ResponseUtil::error('Error creando cita: ' . $e->getMessage());
     }
 }
+// ✅ MANTENER MÉTODOS DE GENERACIÓN DE ENLACES
+private function generarEnlaceVirtual($plataforma) {
+    $enlaces = [
+        'zoom' => 'https://zoom.us/j/' . rand(100000000, 999999999),
+        'meet' => 'https://meet.google.com/' . $this->generarCodigoMeet(),
+        'teams' => 'https://teams.microsoft.com/l/meetup-join/' . $this->generarCodigoTeams(),
+        'whatsapp' => 'https://wa.me/' . rand(100000000000, 999999999999),
+        'jitsi' => 'https://meet.jit.si/' . uniqid()
+    ];
+    
+    return $enlaces[$plataforma] ?? $enlaces['zoom'];
+}
 
+private function generarCodigoMeet() {
+    $caracteres = 'abcdefghijklmnopqrstuvwxyz';
+    $codigo = '';
+    for ($i = 0; $i < 3; $i++) {
+        for ($j = 0; $j < 4; $j++) {
+            $codigo .= $caracteres[rand(0, strlen($caracteres) - 1)];
+        }
+        if ($i < 2) $codigo .= '-';
+    }
+    return $codigo;
+}
+
+private function generarCodigoTeams() {
+    return bin2hex(random_bytes(16));
+}
+
+
+// En tu CitasController.php - Agregar este método
+/**
+ * Obtener citas de un paciente por fecha específica
+ */
+// En CitasController.php - Agregar este método
+
+/**
+ * Obtener citas de un paciente por fecha específica
+ */
+/**
+ * Obtener citas de un paciente por fecha específica
+ */
+public function obtenerCitasPacientePorFecha(Request $request, Response $response, array $args): Response
+{
+    try {
+        $cedula = $args['cedula'] ?? null;
+        $fecha = $request->getQueryParams()['fecha'] ?? date('Y-m-d');
+        
+        if (empty($cedula)) {
+            return ResponseUtil::badRequest('Cédula del paciente es requerida');
+        }
+        
+        // Buscar paciente por cédula
+        $paciente = DB::table('usuarios')
+            ->join('pacientes', 'usuarios.id_usuario', '=', 'pacientes.id_usuario')
+            ->where('usuarios.cedula', $cedula)
+            ->select('pacientes.id_paciente', 'usuarios.nombres', 'usuarios.apellidos')
+            ->first();
+            
+        if (!$paciente) {
+            return ResponseUtil::notFound('Paciente no encontrado');
+        }
+        
+        // CORRIGIENDO NOMBRES DE CAMPOS SEGÚN TU BD
+        $citas = DB::table('citas')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+            ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
+            ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
+            ->where('citas.id_paciente', $paciente->id_paciente)
+            ->whereDate('citas.fecha_hora', '=', $fecha)
+            ->whereIn('citas.estado', ['Confirmada', 'Pendiente'])
+            ->whereNull('triage.id_triage') // Solo citas sin triaje
+            ->select(
+                'citas.*',
+                'u_paciente.nombres as paciente_nombres',
+                'u_paciente.apellidos as paciente_apellidos',
+                'u_paciente.cedula as paciente_cedula',
+                'u_doctor.nombres as doctor_nombres',
+                'u_doctor.apellidos as doctor_apellidos',
+                'doctores.titulo_profesional',
+                'especialidades.nombre_especialidad', // CAMPO CORRECTO
+                'sucursales.nombre_sucursal', // CAMPO CORRECTO
+                'tipos_cita.nombre_tipo as tipo_cita_nombre',
+                'triage.id_triage',
+                'triage.estado_triaje'
+            )
+            ->orderBy('citas.fecha_hora', 'asc')
+            ->get();
+        
+        return ResponseUtil::success($citas->toArray(), 'Citas encontradas para la fecha: ' . $fecha);
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo citas del paciente: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Crear triaje para una cita
+ */
+public function crearTriaje(Request $request, Response $response): Response
+{
+    try {
+        $data = $request->getParsedBody();
+        
+        // 🔥 VERIFICAR QUE VENGA EL ID_ENFERMERO EN EL REQUEST
+        if (empty($data['id_enfermero'])) {
+            return ResponseUtil::badRequest('ID de enfermero es requerido');
+        }
+
+        // 🔒 VERIFICAR QUE EL USUARIO EXISTE Y ES ENFERMERO (ID_ROL 73)
+        $usuario = DB::table('usuarios')
+            ->join('roles', 'usuarios.id_rol', '=', 'roles.id_rol')
+            ->where('usuarios.id_usuario', $data['id_enfermero'])
+            ->where('usuarios.id_estado', 1) // Usuario activo
+            ->select('usuarios.id_usuario', 'usuarios.id_rol', 'roles.nombre_rol', 'usuarios.nombres', 'usuarios.apellidos')
+            ->first();
+
+        if (!$usuario) {
+            return ResponseUtil::unauthorized('Usuario no encontrado o inactivo');
+        }
+
+        // 🔥 VERIFICAR QUE SEA ENFERMERO (ID_ROL 73) O ADMIN
+        if ($usuario->id_rol != 73 && strtolower($usuario->nombre_rol) !== 'Administrador') {
+            error_log("Access denied - User: {$usuario->nombres} {$usuario->apellidos} - Role: {$usuario->nombre_rol} (ID: {$usuario->id_rol})");
+            return ResponseUtil::forbidden('Solo enfermeros pueden registrar triaje');
+        }
+
+        // Validar campos requeridos
+        if (empty($data['id_cita']) || empty($data['nivel_urgencia'])) {
+            return ResponseUtil::badRequest('ID de cita y nivel de urgencia son requeridos');
+        }
+        
+        // Verificar que la cita existe y está confirmada
+        $cita = DB::table('citas')->where('id_cita', $data['id_cita'])->first();
+        if (!$cita) {
+            return ResponseUtil::notFound('Cita no encontrada');
+        }
+        
+        if (!in_array($cita->estado, ['Confirmada', 'Pendiente'])) {
+            return ResponseUtil::badRequest('Solo se puede hacer triaje a citas confirmadas o pendientes');
+        }
+        
+        // Verificar que no tenga triaje ya
+        $triajeExistente = DB::table('triage')->where('id_cita', $data['id_cita'])->first();
+        if ($triajeExistente) {
+            return ResponseUtil::conflict('Esta cita ya tiene triaje realizado');
+        }
+        
+        DB::beginTransaction();
+        
+        // Calcular IMC
+        $imc = null;
+        if (!empty($data['peso']) && !empty($data['talla'])) {
+            $peso = (float)$data['peso'];
+            $talla = (int)$data['talla'];
+            if ($peso > 0 && $talla > 0) {
+                $alturaMetros = $talla / 100;
+                $imc = round($peso / ($alturaMetros * $alturaMetros), 2);
+            }
+        }
+        
+        // Determinar estado del triaje según urgencia
+        $estadoTriaje = match((int)$data['nivel_urgencia']) {
+            5 => 'Critico',
+            4 => 'Critico', 
+            3 => 'Urgente',
+            2 => 'Pendiente_Atencion',
+            default => 'Completado'
+        };
+        
+        // 🔥 USAR LA FECHA_HORA DEL REQUEST O LA ACTUAL
+        $fechaHora = $data['fecha_hora'] ?? date('Y-m-d H:i:s');
+        
+        // Insertar triaje
+        $idTriaje = DB::table('triage')->insertGetId([
+            'id_cita' => $data['id_cita'],
+            'id_enfermero' => $data['id_enfermero'], // 🔥 USAR EL ID DEL REQUEST
+            'nivel_urgencia' => $data['nivel_urgencia'],
+            'estado_triaje' => $estadoTriaje,
+            'temperatura' => $data['temperatura'] ?? null,
+            'presion_arterial' => $data['presion_arterial'] ?? null,
+            'frecuencia_cardiaca' => $data['frecuencia_cardiaca'] ?? null,
+            'frecuencia_respiratoria' => $data['frecuencia_respiratoria'] ?? null,
+            'saturacion_oxigeno' => $data['saturacion_oxigeno'] ?? null,
+            'peso' => $data['peso'] ?? null,
+            'talla' => $data['talla'] ?? null,
+            'imc' => $imc,
+            'observaciones' => $data['observaciones'] ?? null,
+            'fecha_hora' => $fechaHora
+        ]);
+        
+        DB::commit();
+        
+        // Validar signos vitales y generar alertas
+        $alertas = $this->validarSignosVitales($data);
+        
+        // Categorizar IMC
+        $categoriaImc = null;
+        if ($imc) {
+            $categoriaImc = match(true) {
+                $imc < 18.5 => 'Bajo peso',
+                $imc < 25 => 'Peso normal',
+                $imc < 30 => 'Sobrepeso',
+                default => 'Obesidad'
+            };
+        }
+        
+        $responseData = [
+            'id_triaje' => $idTriaje,
+            'estado_triaje' => $estadoTriaje,
+            'imc' => $imc,
+            'categoria_imc' => $categoriaImc,
+            'alertas' => $alertas,
+            'tiene_alertas' => !empty($alertas)
+        ];
+        
+        $mensaje = 'Triaje registrado exitosamente';
+        if (!empty($alertas)) {
+            $mensaje .= ' - ATENCIÓN: Se detectaron signos vitales que requieren revisión';
+        }
+
+        // 🔥 LOG DE ÉXITO
+        error_log("Triaje creado exitosamente - ID: {$idTriaje} - Enfermero: {$usuario->nombres} {$usuario->apellidos} - Cita: {$data['id_cita']}");
+        
+        return ResponseUtil::success($responseData, $mensaje);
+        
+    } catch (Exception $e) {
+        DB::rollBack();
+        error_log("Error creando triaje: " . $e->getMessage());
+        return ResponseUtil::error('Error creando triaje: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Validar signos vitales
+ */
+private function validarSignosVitales(array $signos): array 
+{
+    $alertas = [];
+    
+    // Temperatura
+    if (isset($signos['temperatura']) && !empty($signos['temperatura'])) {
+        $temp = (float)$signos['temperatura'];
+        if ($temp < 35.0 || $temp > 42.0) {
+            $alertas[] = 'Temperatura fuera del rango normal (35-42°C)';
+        } elseif ($temp < 36.0 || $temp > 37.5) {
+            $alertas[] = 'Temperatura ligeramente alterada';
+        }
+    }
+    
+    // Frecuencia cardíaca
+    if (isset($signos['frecuencia_cardiaca']) && !empty($signos['frecuencia_cardiaca'])) {
+        $fc = (int)$signos['frecuencia_cardiaca'];
+        if ($fc < 50 || $fc > 120) {
+            $alertas[] = 'Frecuencia cardíaca fuera del rango normal (50-120 lpm)';
+        }
+    }
+    
+    // Saturación de oxígeno
+    if (isset($signos['saturacion_oxigeno']) && !empty($signos['saturacion_oxigeno'])) {
+        $sat = (int)$signos['saturacion_oxigeno'];
+        if ($sat < 95) {
+            $alertas[] = 'Saturación de oxígeno baja (<95%) - REQUIERE ATENCIÓN INMEDIATA';
+        }
+    }
+    
+    return $alertas;
+}
+
+// En EnfermeriaController.php
+/**
+ * Obtener triaje de una cita específica
+ */
+public function obtenerTriajePorCita(Request $request, Response $response): Response
+{
+    try {
+        $route = $request->getAttribute('route');
+        $idCita = $route->getArgument('id_cita');
+        
+        $triaje = DB::table('triage')
+            ->join('usuarios', 'triage.id_enfermero', '=', 'usuarios.id_usuario')
+            ->where('triage.id_cita', $idCita)
+            ->select(
+                'triage.*',
+                'usuarios.nombres as enfermero_nombres',
+                'usuarios.apellidos as enfermero_apellidos'
+            )
+            ->first();
+            
+        if (!$triaje) {
+            return ResponseUtil::notFound('No se encontró triaje para esta cita');
+        }
+        
+        return ResponseUtil::success($triaje, 'Triaje encontrado');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo triaje: ' . $e->getMessage());
+    }
+}
 
 
     
