@@ -183,14 +183,25 @@ $app->post('/pacientes/crear2', [CitasController::class, 'crearPaciente2']);
 
 // En tu archivo de rutas (routes.php o similar)
 
-// En tu archivo de rutas (routes.php o similar)
 
 // Corregir estas rutas - deben apuntar al controlador correcto
 $app->get('/citas/paciente/{cedula}', [CitasController::class, 'obtenerCitasPacientePorFecha']);
 
 // Para triaje, crear un controlador específico o agregar al CitasController
 $app->post('/triaje/crear', [CitasController::class, 'crearTriaje']);
+
 $app->get('/triaje/cita/{id_cita}', [CitasController::class, 'obtenerTriajePorCita']);
 
+$app->get('/consultas/doctor/{cedula}', [CitasController::class, 'obtenerCitasConsultaDoctor']);
+    
+    // Crear/actualizar consulta médica completa
+$app->post('/consultas/cita/{id_cita}', [CitasController::class, 'crearActualizarConsultaMedica']);
+
+$app->put('/citas/{id_cita}/estado', [CitasController::class, 'actualizarEstadoCita']);
+    
+    // Obtener detalle de consulta médica
+$app->get('/consultas/detalle/{id_cita}', [CitasController::class, 'obtenerDetalleConsulta']);
+    
+ 
 $app->run();
 ?>

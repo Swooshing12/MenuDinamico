@@ -2725,6 +2725,475 @@ public function obtenerTriajePorCita(Request $request, Response $response): Resp
 }
 
 
+
+
+/**
+ * Obtener citas confirmadas/en proceso del doctor para hacer consulta médica
+ */
+public function obtenerCitasConsultaDoctor(Request $request, Response $response, array $args): Response
+{
+    try {
+        $cedula_doctor = $args['cedula'] ?? null;
+        $fecha = $request->getQueryParams()['fecha'] ?? date('Y-m-d');
+        $estado = $request->getQueryParams()['estado'] ?? 'Confirmada';
+        
+        // Log para debugging
+        error_log("🔍 Iniciando obtenerCitasConsultaDoctor - Cédula: {$cedula_doctor}, Fecha: {$fecha}, Estado: {$estado}");
+        
+        if (empty($cedula_doctor)) {
+            return ResponseUtil::badRequest('Cédula del doctor es requerida');
+        }
+        
+        // Buscar doctor por cédula
+        $doctor = DB::table('usuarios')
+            ->join('doctores', 'usuarios.id_usuario', '=', 'doctores.id_usuario')
+            ->where('usuarios.cedula', $cedula_doctor)
+            ->select('doctores.id_doctor', 'usuarios.nombres', 'usuarios.apellidos')
+            ->first();
+            
+        if (!$doctor) {
+            error_log("❌ Doctor no encontrado con cédula: {$cedula_doctor}");
+            return ResponseUtil::notFound('Doctor no encontrado con cédula: ' . $cedula_doctor);
+        }
+        
+        error_log("✅ Doctor encontrado - ID: {$doctor->id_doctor}, Nombre: {$doctor->nombres} {$doctor->apellidos}");
+        
+        // Obtener citas del doctor con información completa
+        $citas = DB::table('citas')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+            ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
+            ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
+            ->leftJoin('consultas_medicas', 'citas.id_cita', '=', 'consultas_medicas.id_cita')
+            ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
+            ->where('citas.id_doctor', $doctor->id_doctor)
+            ->whereDate('citas.fecha_hora', '=', $fecha)
+            ->where('citas.estado', $estado)
+            ->select(
+                'citas.*',
+                'u_paciente.nombres as paciente_nombres',
+                'u_paciente.apellidos as paciente_apellidos',
+                'u_paciente.cedula as paciente_cedula',
+                'u_doctor.nombres as doctor_nombres',
+                'u_doctor.apellidos as doctor_apellidos',
+                'doctores.titulo_profesional',
+                'especialidades.nombre_especialidad',
+                'sucursales.nombre_sucursal',
+                'tipos_cita.nombre_tipo as tipo_cita_nombre',
+                // Datos del triaje si existe
+                'triage.presion_arterial',
+                'triage.frecuencia_cardiaca',
+                'triage.temperatura',
+                'triage.saturacion_oxigeno',
+                'triage.peso',
+                'triage.talla',
+                'triage.nivel_urgencia',
+                'triage.observaciones', // ✅ CORREGIDO - tenías 'observaciones'
+                'triage.estado_triaje',
+                'consultas_medicas.id_consulta',
+                'consultas_medicas.diagnostico',
+                'consultas_medicas.tratamiento',
+                'historiales_clinicos.id_historial'
+            )
+            ->orderBy('citas.fecha_hora', 'asc')
+            ->get();
+        
+        error_log("📊 Citas encontradas: " . $citas->count());
+        
+        // ✅ MAPEAR LOS DATOS CORRECTAMENTE
+        $citas_formateadas = $citas->map(function($cita) {
+            return [
+                // Datos de la cita
+                'id_cita' => (int)$cita->id_cita,
+                'fecha_hora' => $cita->fecha_hora,
+                'motivo' => $cita->motivo,
+                'estado' => $cita->estado,
+                'tipo_cita' => $cita->tipo_cita,
+                'notas' => $cita->notas,
+                
+                // Datos del paciente
+                'paciente' => [
+                    'nombres' => $cita->paciente_nombres,
+                    'apellidos' => $cita->paciente_apellidos,
+                    'cedula' => $cita->paciente_cedula,
+                    'nombre_completo' => trim($cita->paciente_nombres . ' ' . $cita->paciente_apellidos)
+                ],
+                
+                // Datos del doctor
+                'doctor' => [
+                    'nombres' => $cita->doctor_nombres,
+                    'apellidos' => $cita->doctor_apellidos,
+                    'titulo_profesional' => $cita->titulo_profesional,
+                    'especialidad' => $cita->nombre_especialidad
+                ],
+                
+                // Datos de la sucursal
+                'sucursal' => $cita->nombre_sucursal,
+                
+                // Datos del triaje (si existe) - ✅ CORREGIDO
+                'triaje' => $cita->presion_arterial ? [
+                    'presion_arterial' => $cita->presion_arterial,
+                    'frecuencia_cardiaca' => $cita->frecuencia_cardiaca,
+                    'temperatura' => $cita->temperatura,
+                    'saturacion_oxigeno' => $cita->saturacion_oxigeno,
+                    'peso' => $cita->peso,
+                    'talla' => $cita->talla,
+                    'nivel_urgencia' => $cita->nivel_urgencia,
+                    'observaciones' => $cita->observaciones, // ✅ CORREGIDO
+                    'estado' => $cita->estado_triaje
+                ] : null,
+                
+                // Estado de la consulta
+                'tiene_consulta' => !is_null($cita->id_consulta),
+                'tiene_historial' => !is_null($cita->id_historial),
+                'puede_consultar' => is_null($cita->id_consulta), // Solo si no tiene consulta
+                
+                // Preview de consulta existente
+                'consulta_preview' => $cita->id_consulta ? [
+                    'diagnostico' => $cita->diagnostico ? (strlen($cita->diagnostico) > 100 ? substr($cita->diagnostico, 0, 100) . '...' : $cita->diagnostico) : null,
+                    'tratamiento' => $cita->tratamiento ? (strlen($cita->tratamiento) > 100 ? substr($cita->tratamiento, 0, 100) . '...' : $cita->tratamiento) : null
+                ] : null
+            ];
+        });
+        
+        $mensaje = "Se encontraron " . $citas->count() . " citas para el doctor en fecha: $fecha";
+        error_log("✅ " . $mensaje);
+        
+        return ResponseUtil::success($citas_formateadas->toArray(), $mensaje);
+        
+    } catch (Exception $e) {
+        error_log("❌ Error en obtenerCitasConsultaDoctor: " . $e->getMessage());
+        error_log("❌ Stack trace: " . $e->getTraceAsString());
+        return ResponseUtil::error('Error obteniendo citas del doctor: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Crear o actualizar consulta médica (diagnóstico + tratamiento + receta)
+ */
+public function crearActualizarConsultaMedica(Request $request, Response $response, array $args): Response
+{
+    try {
+        $id_cita = $args['id_cita'] ?? null;
+        $data = $request->getParsedBody();
+        
+        if (empty($id_cita)) {
+            return ResponseUtil::badRequest('ID de cita es requerido');
+        }
+        
+        // Validar datos requeridos
+        $validator = $this->validarDatosConsulta($data);
+        if (!$validator['valido']) {
+            return ResponseUtil::badRequest($validator['errores']);
+        }
+        
+        // Verificar que la cita existe y está en estado correcto
+        $cita = DB::table('citas')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
+            ->where('citas.id_cita', $id_cita)
+            ->whereIn('citas.estado', ['Confirmada', 'En Proceso'])
+            ->select('citas.*', 'historiales_clinicos.id_historial')
+            ->first();
+            
+        if (!$cita) {
+            return ResponseUtil::notFound('Cita no encontrada o no está en estado válido para consulta');
+        }
+        
+        // Verificar si ya existe una consulta médica
+        $consultaExistente = DB::table('consultas_medicas')
+            ->where('id_cita', $id_cita)
+            ->first();
+        
+        DB::beginTransaction();
+        
+        try {
+            // Crear historial clínico si no existe
+            $id_historial = $cita->id_historial;
+            if (!$id_historial) {
+                $id_historial = DB::table('historiales_clinicos')->insertGetId([
+                    'id_paciente' => $cita->id_paciente,
+                    'fecha_creacion' => date('Y-m-d H:i:s'),
+                    'ultima_actualizacion' => date('Y-m-d H:i:s')
+                ]);
+            }
+            
+            // Preparar datos de la consulta
+            $datosConsulta = [
+                'id_cita' => $id_cita,
+                'id_historial' => $id_historial,
+                'motivo_consulta' => $data['motivo_consulta'],
+                'sintomatologia' => $data['sintomatologia'] ?? null,
+                'diagnostico' => $data['diagnostico'],
+                'tratamiento' => $data['tratamiento'] ?? null,
+                'observaciones' => $data['observaciones'] ?? null, // Aquí van las recetas
+                'fecha_seguimiento' => !empty($data['fecha_seguimiento']) ? $data['fecha_seguimiento'] : null,
+                'fecha_hora' => date('Y-m-d H:i:s'),
+            ];
+            
+            if ($consultaExistente) {
+                // Actualizar consulta existente
+                DB::table('consultas_medicas')
+                    ->where('id_consulta', $consultaExistente->id_consulta)
+                    ->update($datosConsulta);
+                    
+                $id_consulta = $consultaExistente->id_consulta;
+                $accion = 'actualizada';
+            } else {
+                // Crear nueva consulta
+                $id_consulta = DB::table('consultas_medicas')->insertGetId($datosConsulta);
+                $accion = 'creada';
+            }
+            
+            // Actualizar estado de la cita
+            DB::table('citas')
+                ->where('id_cita', $id_cita)
+                ->update([
+                    'estado' => 'Completada',
+                    'notas' => 'Consulta médica completada'
+                ]);
+                
+            // Actualizar historial clínico
+            DB::table('historiales_clinicos')
+                ->where('id_historial', $id_historial)
+                ->update(['ultima_actualizacion' => date('Y-m-d H:i:s')]);
+            
+            DB::commit();
+            
+            // Retornar datos completos de la consulta creada/actualizada
+            $consultaCompleta = $this->obtenerConsultaCompleta($id_consulta);
+            
+            return ResponseUtil::success($consultaCompleta, "Consulta médica $accion exitosamente");
+            
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error procesando consulta médica: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Validar datos de consulta médica
+ */
+private function validarDatosConsulta($data): array
+{
+    $errores = [];
+    
+    if (empty($data['motivo_consulta'])) {
+        $errores[] = 'Motivo de consulta es requerido';
+    }
+    
+    if (empty($data['diagnostico'])) {
+        $errores[] = 'Diagnóstico es requerido';
+    }
+    
+    if (!empty($data['fecha_seguimiento'])) {
+        if (!DateTime::createFromFormat('Y-m-d', $data['fecha_seguimiento'])) {
+            $errores[] = 'Fecha de seguimiento debe tener formato Y-m-d';
+        }
+    }
+    
+    return [
+        'valido' => empty($errores),
+        'errores' => implode(', ', $errores)
+    ];
+}
+
+/**
+ * Obtener consulta médica completa por ID
+ */
+private function obtenerConsultaCompleta($id_consulta)
+{
+    return DB::table('consultas_medicas')
+        ->join('citas', 'consultas_medicas.id_cita', '=', 'citas.id_cita')
+        ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+        ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+        ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+        ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+        ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+        ->where('consultas_medicas.id_consulta', $id_consulta)
+        ->select(
+            'consultas_medicas.*',
+            'citas.fecha_hora as fecha_cita',
+            'u_paciente.nombres as paciente_nombres',
+            'u_paciente.apellidos as paciente_apellidos',
+            'u_paciente.cedula as paciente_cedula',
+            'u_doctor.nombres as doctor_nombres',
+            'u_doctor.apellidos as doctor_apellidos',
+            'doctores.titulo_profesional',
+            'especialidades.nombre_especialidad'
+        )
+        ->first();
+}
+
+/**
+ * Obtener detalle completo de una consulta médica
+ */
+public function obtenerDetalleConsulta(Request $request, Response $response, array $args): Response
+{
+    try {
+        $id_cita = $args['id_cita'] ?? null;
+        
+        if (empty($id_cita)) {
+            return ResponseUtil::badRequest('ID de cita es requerido');
+        }
+        
+        $consulta = DB::table('consultas_medicas')
+            ->join('citas', 'consultas_medicas.id_cita', '=', 'citas.id_cita')
+            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
+            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
+            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
+            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
+            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
+            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
+            ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
+            ->where('consultas_medicas.id_cita', $id_cita)
+            ->select(
+                // Datos de la consulta
+                'consultas_medicas.*',
+                
+                // Datos de la cita
+                'citas.fecha_hora as fecha_cita',
+                'citas.motivo as motivo_cita',
+                'citas.estado as estado_cita',
+                'citas.tipo_cita',
+                
+                // Datos del paciente
+                'u_paciente.nombres as paciente_nombres',
+                'u_paciente.apellidos as paciente_apellidos',
+                'u_paciente.cedula as paciente_cedula',
+                'u_paciente.email as paciente_email',
+                
+                // Datos del doctor
+                'u_doctor.nombres as doctor_nombres',
+                'u_doctor.apellidos as doctor_apellidos',
+                'doctores.titulo_profesional',
+                'especialidades.nombre_especialidad',
+                
+                // Sucursal
+                'sucursales.nombre_sucursal',
+                
+                // Triaje si existe
+                'triage.presion_arterial',
+                'triage.frecuencia_cardiaca',
+                'triage.temperatura',
+                'triage.saturacion_oxigeno',
+                'triage.peso',
+                'triage.talla',
+                'triage.nivel_urgencia',
+                'triage.observaciones'
+            )
+            ->first();
+            
+        if (!$consulta) {
+            return ResponseUtil::notFound('Consulta médica no encontrada');
+        }
+        
+        // Formatear respuesta
+        $resultado = [
+            'consulta' => [
+                'id_consulta' => $consulta->id_consulta,
+                'fecha_hora' => $consulta->fecha_hora,
+                'motivo_consulta' => $consulta->motivo_consulta,
+                'sintomatologia' => $consulta->sintomatologia,
+                'diagnostico' => $consulta->diagnostico,
+                'tratamiento' => $consulta->tratamiento,
+                'observaciones' => $consulta->observaciones, // Receta médica
+                'fecha_seguimiento' => $consulta->fecha_seguimiento
+            ],
+            
+            'cita' => [
+                'id_cita' => $id_cita,
+                'fecha_hora' => $consulta->fecha_cita,
+                'motivo_original' => $consulta->motivo_cita,
+                'estado' => $consulta->estado_cita,
+                'tipo' => $consulta->tipo_cita
+            ],
+            
+            'paciente' => [
+                'nombres' => $consulta->paciente_nombres,
+                'apellidos' => $consulta->paciente_apellidos,
+                'cedula' => $consulta->paciente_cedula,
+                'email' => $consulta->paciente_email,
+                'nombre_completo' => trim($consulta->paciente_nombres . ' ' . $consulta->paciente_apellidos)
+            ],
+            
+            'doctor' => [
+                'nombres' => $consulta->doctor_nombres,
+                'apellidos' => $consulta->doctor_apellidos,
+                'titulo_profesional' => $consulta->titulo_profesional,
+                'especialidad' => $consulta->nombre_especialidad,
+                'nombre_completo' => trim($consulta->doctor_nombres . ' ' . $consulta->doctor_apellidos)
+            ],
+            
+            'sucursal' => $consulta->nombre_sucursal,
+            
+            'triaje' => $consulta->presion_arterial ? [
+                'signos_vitales' => [
+                    'presion_arterial' => $consulta->presion_arterial,
+                    'frecuencia_cardiaca' => $consulta->frecuencia_cardiaca,
+                    'temperatura' => $consulta->temperatura,
+                    'saturacion_oxigeno' => $consulta->saturacion_oxigeno,
+                    'peso' => $consulta->peso,
+                    'talla' => $consulta->talla
+                ],
+                'evaluacion' => [
+                    'nivel_urgencia' => $consulta->nivel_urgencia,
+                    'observaciones' => $consulta->observaciones
+                ]
+            ] : null
+        ];
+        
+        return ResponseUtil::success($resultado, 'Detalle de consulta médica obtenido');
+        
+    } catch (Exception $e) {
+        return ResponseUtil::error('Error obteniendo detalle de consulta: ' . $e->getMessage());
+    }
+}
+
+// En CitasController.php - AGREGAR ESTE MÉTODO
+public function actualizarEstadoCita(Request $request, Response $response, array $args): Response
+{
+    try {
+        $id_cita = $args['id_cita'] ?? null;
+        $data = $request->getParsedBody();
+        
+        if (empty($id_cita) || empty($data['estado'])) {
+            return ResponseUtil::badRequest('ID de cita y estado son requeridos');
+        }
+
+        // Log para debug
+        error_log("Actualizando estado de cita {$id_cita} a: {$data['estado']}");
+        
+        $resultado = DB::table('citas')
+            ->where('id_cita', $id_cita)
+            ->update([
+                'estado' => $data['estado']
+            ]);
+            
+        if ($resultado) {
+            error_log("✅ Estado actualizado correctamente");
+            return ResponseUtil::success(
+                ['id_cita' => $id_cita, 'nuevo_estado' => $data['estado']], 
+                "Estado de cita actualizado exitosamente"
+            );
+        } else {
+            error_log("❌ No se pudo actualizar - cita no encontrada");
+            return ResponseUtil::notFound('Cita no encontrada');
+        }
+        
+    } catch (Exception $e) {
+        error_log("❌ Error actualizando estado: " . $e->getMessage());
+        return ResponseUtil::error('Error actualizando estado de cita: ' . $e->getMessage());
+    }
+}
     
 }
 ?>
