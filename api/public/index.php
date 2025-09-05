@@ -202,6 +202,8 @@ $app->put('/citas/{id_cita}/estado', [CitasController::class, 'actualizarEstadoC
     // Obtener detalle de consulta médica
 $app->get('/consultas/detalle/{id_cita}', [CitasController::class, 'obtenerDetalleConsulta']);
     
+$app->get('/citas/informacion/{id_cita}', [CitasController::class, 'obtenerInformacionCita']);
+
  
 $app->run();
 ?>

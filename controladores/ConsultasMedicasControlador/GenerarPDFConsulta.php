@@ -215,49 +215,271 @@ class GeneradorPDFConsulta extends TCPDF {
     }
     
     // Sección: Triaje
-    private function seccionTriaje() {
-        $this->crearTituloSeccion('TRIAJE Y SIGNOS VITALES');
+    // Sección: Triaje - VERSIÓN COMPLETA Y MEJORADA
+private function seccionTriaje() {
+    $this->crearTituloSeccion('TRIAJE Y SIGNOS VITALES');
+    
+    // Solo mostrar si hay datos de triaje
+    if (empty($this->citaData['nivel_urgencia']) && empty($this->citaData['temperatura'])) {
+        $this->SetFont('helvetica', 'I', 10);
+        $this->SetTextColor(150, 150, 150);
+        $this->Cell(0, 8, 'No se realizó triaje para esta cita', 0, 1, 'C');
+        $this->Ln(8);
+        return;
+    }
+    
+    // TABLA DE SIGNOS VITALES
+    $this->SetFillColor(255, 248, 220); // Fondo amarillo claro
+    $this->SetFont('helvetica', 'B', 10);
+    $this->SetTextColor(184, 134, 11); // Texto dorado oscuro
+    // Headers de la tabla
+    $this->Cell(60, 8, 'Signo Vital / Parámetro', 1, 0, 'C', true);
+    $this->Cell(50, 8, 'Valor', 1, 0, 'C', true);
+    $this->Cell(60, 8, 'Referencia Normal', 1, 1, 'C', true);
+    
+    // Preparar datos de triaje
+    $signos_vitales = [
+        [
+            'signo' => 'Temperatura Corporal',
+            'valor' => $this->citaData['temperatura'] ? $this->citaData['temperatura'] . '°C' : 'No registrada',
+            'referencia' => '36.0 - 37.5°C'
+        ],
+        [
+            'signo' => 'Presión Arterial',
+            'valor' => $this->citaData['presion_arterial'] ?? 'No registrada',
+            'referencia' => '120/80 mmHg'
+        ],
+        [
+            'signo' => 'Frecuencia Cardíaca',
+            'valor' => $this->citaData['frecuencia_cardiaca'] ? $this->citaData['frecuencia_cardiaca'] . ' lpm' : 'No registrada',
+            'referencia' => '60 - 100 lpm'
+        ],
+        [
+            'signo' => 'Saturación de Oxígeno',
+            'valor' => isset($this->citaData['saturacion_oxigeno']) ? $this->citaData['saturacion_oxigeno'] . '%' : 'No registrada',
+            'referencia' => '≥ 95%'
+        ],
+        [
+            'signo' => 'Frecuencia Respiratoria',
+            'valor' => isset($this->citaData['frecuencia_respiratoria']) ? $this->citaData['frecuencia_respiratoria'] . ' rpm' : 'No registrada',
+            'referencia' => '12 - 20 rpm'
+        ]
+    ];
+    
+    // Mostrar signos vitales
+    $this->SetFont('helvetica', '', 9);
+    $this->SetTextColor(51, 51, 51);
+    $fill = false;
+    
+    foreach ($signos_vitales as $signo) {
+        // Determinar color según si el valor está fuera de rango
+        $esAnormal = $this->evaluarSignoVital($signo['signo'], $signo['valor']);
         
-        $this->SetFillColor(255, 248, 220);
+        if ($esAnormal && $signo['valor'] !== 'No registrada') {
+            $this->SetFillColor(255, 235, 235); // Fondo rojo claro para valores anormales
+            $this->SetTextColor(220, 38, 38); // Texto rojo
+        } else {
+            // ✅ CORRECCIÓN: Colores alternados correctos
+            if ($fill) {
+                $this->SetFillColor(248, 249, 250); // Fondo gris claro
+            } else {
+                $this->SetFillColor(255, 255, 255); // Fondo blanco
+            }
+            $this->SetTextColor(51, 51, 51); // Texto negro normal
+        }
+        
+        $this->SetFont('helvetica', 'B', 9);
+        $this->Cell(60, 7, $signo['signo'], 1, 0, 'L', true);
+        $this->SetFont('helvetica', '', 9);
+        $this->Cell(50, 7, $signo['valor'], 1, 0, 'C', true);
+        $this->SetFont('helvetica', 'I', 8);
+        $this->SetTextColor(107, 114, 128); // Color gris para referencia
+        $this->Cell(60, 7, $signo['referencia'], 1, 1, 'C', true);
+        
+        // ✅ Resetear color del texto para la siguiente fila
+        $this->SetTextColor(51, 51, 51);
+        
+        $fill = !$fill;
+    }
+    $this->Ln(5);
+    
+    // MEDIDAS ANTROPOMÉTRICAS
+    if ($this->citaData['peso'] || $this->citaData['talla']) {
+        $this->SetFont('helvetica', 'B', 11);
+        $this->SetTextColor(0, 119, 182);
+        $this->Cell(0, 8, 'MEDIDAS ANTROPOMÉTRICAS', 0, 1, 'L');
+        
+        $this->SetFillColor(240, 249, 255); // Fondo azul muy claro
         $this->SetFont('helvetica', 'B', 10);
-        $this->SetTextColor(184, 134, 11);
+        $this->SetTextColor(30, 64, 175);
         
-        // Headers
-        $this->Cell(50, 7, 'Signo Vital', 1, 0, 'C', true);
-        $this->Cell(120, 7, 'Valor', 1, 1, 'C', true);
+        $this->Cell(60, 8, 'Medida', 1, 0, 'C', true);
+        $this->Cell(50, 8, 'Valor', 1, 0, 'C', true);
+        $this->Cell(60, 8, 'Categoría/Estado', 1, 1, 'C', true);
         
-        $datos_triaje = [
-            ['Temperatura', ($this->citaData['temperatura'] ?? '-') . '°C'],
-            ['Presión Arterial', $this->citaData['presion_arterial'] ?? '-'],
-            ['Frecuencia Cardíaca', ($this->citaData['frecuencia_cardiaca'] ?? '-') . ' lpm'],
-            ['Peso', ($this->citaData['peso'] ?? '-') . ' kg'],
-            ['Talla', ($this->citaData['talla'] ?? '-') . ' cm'],
-            ['IMC', $this->citaData['imc'] ?? '-'],
-            ['Nivel de Urgencia', ($this->citaData['nivel_urgencia'] ?? '-') . '/5']
+        $medidas = [
+            [
+                'medida' => 'Peso Corporal',
+                'valor' => $this->citaData['peso'] ? $this->citaData['peso'] . ' kg' : 'No registrado',
+                'categoria' => '-'
+            ],
+            [
+                'medida' => 'Talla/Estatura',
+                'valor' => $this->citaData['talla'] ? $this->citaData['talla'] . ' cm' : 'No registrada',
+                'categoria' => '-'
+            ]
         ];
         
-        $this->SetFont('helvetica', '', 10);
+        // Calcular IMC si tenemos peso y talla
+        if ($this->citaData['peso'] && $this->citaData['talla']) {
+            $imc = round($this->citaData['peso'] / pow($this->citaData['talla'] / 100, 2), 1);
+            $categoria_imc = $this->categorizarIMC($imc);
+            
+            $medidas[] = [
+                'medida' => 'Índice de Masa Corporal (IMC)',
+                'valor' => $imc . ' kg/m²',
+                'categoria' => $categoria_imc
+            ];
+        }
+        
+        $this->SetFont('helvetica', '', 9);
         $this->SetTextColor(51, 51, 51);
         $fill = false;
         
-        foreach ($datos_triaje as $dato) {
-            $this->SetFont('helvetica', 'B', 10);
-            $this->Cell(50, 7, $dato[0], 1, 0, 'L', $fill);
-            $this->SetFont('helvetica', '', 10);
-            $this->Cell(120, 7, $dato[1], 1, 1, 'L', $fill);
+        foreach ($medidas as $medida) {
+            // ✅ CORRECCIÓN: Colores alternados correctos para medidas
+            if ($fill) {
+                $this->SetFillColor(248, 249, 250); // Fondo gris claro
+            } else {
+                $this->SetFillColor(255, 255, 255); // Fondo blanco
+            }
+            
+            $this->SetFont('helvetica', 'B', 9);
+            $this->Cell(60, 7, $medida['medida'], 1, 0, 'L', $fill);
+            $this->SetFont('helvetica', '', 9);
+            $this->Cell(50, 7, $medida['valor'], 1, 0, 'C', $fill);
+            $this->Cell(60, 7, $medida['categoria'], 1, 1, 'C', $fill);
+            
             $fill = !$fill;
         }
         
-        if (!empty($this->citaData['triaje_observaciones'])) {
-            $this->Ln(3);
-            $this->SetFont('helvetica', 'B', 10);
-            $this->Cell(0, 6, 'Observaciones del Triaje:', 0, 1, 'L');
-            $this->SetFont('helvetica', '', 10);
-            $this->MultiCell(0, 5, $this->citaData['triaje_observaciones'], 1, 'L');
-        }
-        
-        $this->Ln(8);
+        $this->Ln(5);
     }
+    
+    
+    // NIVEL DE URGENCIA
+    if ($this->citaData['nivel_urgencia']) {
+        $this->SetFont('helvetica', 'B', 11);
+        $this->SetTextColor(0, 119, 182);
+        $this->Cell(0, 8, 'CLASIFICACIÓN DE URGENCIA', 0, 1, 'L');
+        
+        $nivel = (int)$this->citaData['nivel_urgencia'];
+        $info_urgencia = $this->obtenerInfoUrgencia($nivel);
+        
+        // Frame colorido según nivel de urgencia
+        $this->SetFillColor($info_urgencia['color_r'], $info_urgencia['color_g'], $info_urgencia['color_b']);
+        $this->Rect($this->GetX(), $this->GetY(), 170, 15, 'F');
+        
+        $this->SetFont('helvetica', 'B', 12);
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell(170, 15, 
+            $info_urgencia['icono'] . ' NIVEL ' . $nivel . ' - ' . strtoupper($info_urgencia['nombre']), 
+            1, 1, 'C', false);
+        
+        $this->SetFont('helvetica', '', 10);
+        $this->SetTextColor(51, 51, 51);
+        $this->Cell(170, 8, $info_urgencia['descripcion'], 1, 1, 'C');
+        
+        $this->Ln(5);
+    }
+    
+    // OBSERVACIONES DEL TRIAJE
+    if (!empty($this->citaData['triaje_observaciones'])) {
+        $this->SetFont('helvetica', 'B', 11);
+        $this->SetTextColor(0, 119, 182);
+        $this->Cell(0, 8, 'OBSERVACIONES DEL TRIAJE', 0, 1, 'L');
+        
+        $this->SetFillColor(254, 249, 195); // Fondo amarillo muy claro
+        $this->SetFont('helvetica', '', 10);
+        $this->SetTextColor(51, 51, 51);
+        $this->MultiCell(0, 6, $this->citaData['triaje_observaciones'], 1, 'L', true);
+        $this->Ln(5);
+    }
+    
+    $this->Ln(8);
+}
+
+// Método auxiliar: Evaluar si un signo vital está fuera del rango normal
+private function evaluarSignoVital($signo, $valor) {
+    if ($valor === 'No registrada' || $valor === 'No registrado') {
+        return false;
+    }
+    
+    $numerico = (float)preg_replace('/[^0-9.]/', '', $valor);
+    
+    switch ($signo) {
+        case 'Temperatura Corporal':
+            return $numerico < 36.0 || $numerico > 37.5;
+        case 'Frecuencia Cardíaca':
+            return $numerico < 60 || $numerico > 100;
+        case 'Saturación de Oxígeno':
+            return $numerico < 95;
+        case 'Frecuencia Respiratoria':
+            return $numerico < 12 || $numerico > 20;
+        default:
+            return false;
+    }
+}
+
+// Método auxiliar: Categorizar IMC
+private function categorizarIMC($imc) {
+    if ($imc < 18.5) return 'Bajo peso';
+    if ($imc < 25) return 'Peso normal';
+    if ($imc < 30) return 'Sobrepeso';
+    return 'Obesidad';
+}
+
+// Método auxiliar: Obtener información del nivel de urgencia
+private function obtenerInfoUrgencia($nivel) {
+    return match($nivel) {
+        1 => [
+            'nombre' => 'Baja',
+            'descripcion' => 'Puede esperar - Atención programada',
+            'icono' => '🟢',
+            'color_r' => 34, 'color_g' => 197, 'color_b' => 94
+        ],
+        2 => [
+            'nombre' => 'Media',
+            'descripcion' => 'Atención en 30-60 minutos',
+            'icono' => '🟡',
+            'color_r' => 245, 'color_g' => 158, 'color_b' => 11
+        ],
+        3 => [
+            'nombre' => 'Alta',
+            'descripcion' => 'Atención en 15-30 minutos',
+            'icono' => '🟠',
+            'color_r' => 249, 'color_g' => 115, 'color_b' => 22
+        ],
+        4 => [
+            'nombre' => 'Crítica',
+            'descripcion' => 'Atención inmediata requerida',
+            'icono' => '🔴',
+            'color_r' => 239, 'color_g' => 68, 'color_b' => 68
+        ],
+        5 => [
+            'nombre' => 'Emergencia',
+            'descripcion' => 'Riesgo de vida - Atención INMEDIATA',
+            'icono' => '🚨',
+            'color_r' => 147, 'color_g' => 51, 'color_b' => 234
+        ],
+        default => [
+            'nombre' => 'No especificado',
+            'descripcion' => 'Nivel de urgencia no definido',
+            'icono' => '⚪',
+            'color_r' => 107, 'color_g' => 114, 'color_b' => 128
+        ]
+    };
+}
     
     // Sección: Consulta médica
     private function seccionConsultaMedica() {
@@ -323,7 +545,7 @@ class GeneradorPDFConsulta extends TCPDF {
     // Sección: Observaciones finales
     private function seccionObservacionesFinales() {
         if (!empty($this->citaData['consulta_observaciones'])) {
-            $this->crearTituloSeccion('OBSERVACIONES ADICIONALES');
+            $this->crearTituloSeccion('RECETA MÉDICA Y OBSERVACIONES FINALES');
             
             $this->SetFont('helvetica', '', 10);
             $this->SetTextColor(51, 51, 51);

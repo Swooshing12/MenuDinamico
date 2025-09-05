@@ -2298,7 +2298,7 @@ public function crearCita(Request $request, Response $response): Response
             'id_tipo_cita' => $data['id_tipo_cita'] ?? 1,
             'fecha_hora' => $data['fecha_hora'],
             'motivo' => trim($data['motivo']),
-            'tipo_cita' => ($data['id_tipo_cita'] ?? 1) == 2 ? 'virtual' : 'presencial',
+            'tipo_cita' => ($data['id_tipo_cita'] ?? 1) == 2 ? 'Virtual' : 'Presencial',
             'estado' => 'Confirmada',
             'notas' => $data['notas'] ?? null
         ];
@@ -2737,7 +2737,6 @@ public function obtenerCitasConsultaDoctor(Request $request, Response $response,
         $fecha = $request->getQueryParams()['fecha'] ?? date('Y-m-d');
         $estado = $request->getQueryParams()['estado'] ?? 'Confirmada';
         
-        // Log para debugging
         error_log("🔍 Iniciando obtenerCitasConsultaDoctor - Cédula: {$cedula_doctor}, Fecha: {$fecha}, Estado: {$estado}");
         
         if (empty($cedula_doctor)) {
@@ -2758,105 +2757,190 @@ public function obtenerCitasConsultaDoctor(Request $request, Response $response,
         
         error_log("✅ Doctor encontrado - ID: {$doctor->id_doctor}, Nombre: {$doctor->nombres} {$doctor->apellidos}");
         
-        // Obtener citas del doctor con información completa
-        $citas = DB::table('citas')
-            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
-            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
-            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
-            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
-            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
-            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
-            ->leftJoin('tipos_cita', 'citas.id_tipo_cita', '=', 'tipos_cita.id_tipo_cita')
-            ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
-            ->leftJoin('consultas_medicas', 'citas.id_cita', '=', 'consultas_medicas.id_cita')
-            ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
-            ->where('citas.id_doctor', $doctor->id_doctor)
-            ->whereDate('citas.fecha_hora', '=', $fecha)
-            ->where('citas.estado', $estado)
-            ->select(
-                'citas.*',
-                'u_paciente.nombres as paciente_nombres',
-                'u_paciente.apellidos as paciente_apellidos',
-                'u_paciente.cedula as paciente_cedula',
-                'u_doctor.nombres as doctor_nombres',
-                'u_doctor.apellidos as doctor_apellidos',
-                'doctores.titulo_profesional',
-                'especialidades.nombre_especialidad',
-                'sucursales.nombre_sucursal',
-                'tipos_cita.nombre_tipo as tipo_cita_nombre',
-                // Datos del triaje si existe
-                'triage.presion_arterial',
-                'triage.frecuencia_cardiaca',
-                'triage.temperatura',
-                'triage.saturacion_oxigeno',
-                'triage.peso',
-                'triage.talla',
-                'triage.nivel_urgencia',
-                'triage.observaciones', // ✅ CORREGIDO - tenías 'observaciones'
-                'triage.estado_triaje',
-                'consultas_medicas.id_consulta',
-                'consultas_medicas.diagnostico',
-                'consultas_medicas.tratamiento',
-                'historiales_clinicos.id_historial'
-            )
-            ->orderBy('citas.fecha_hora', 'asc')
+        // Consulta completa con TODOS los datos necesarios
+        $citas = DB::table('citas as c')
+            ->join('pacientes as pac', 'c.id_paciente', '=', 'pac.id_paciente')
+            ->join('usuarios as u_pac', 'pac.id_usuario', '=', 'u_pac.id_usuario')
+            ->join('doctores as d', 'c.id_doctor', '=', 'd.id_doctor')
+            ->join('usuarios as u_doc', 'd.id_usuario', '=', 'u_doc.id_usuario')
+            ->join('especialidades as e', 'd.id_especialidad', '=', 'e.id_especialidad')
+            ->join('sucursales as s', 'c.id_sucursal', '=', 's.id_sucursal')
+            ->leftJoin('tipos_cita as tc', 'c.id_tipo_cita', '=', 'tc.id_tipo_cita')
+            ->leftJoin('triage as t', 'c.id_cita', '=', 't.id_cita')
+            ->leftJoin('consultas_medicas as cm', 'c.id_cita', '=', 'cm.id_cita')
+            ->leftJoin('historiales_clinicos as hc', 'pac.id_paciente', '=', 'hc.id_paciente')
+            ->where('c.id_doctor', $doctor->id_doctor)
+            ->whereDate('c.fecha_hora', '=', $fecha)
+            ->when($estado !== 'Todas', function ($query) use ($estado) {
+                return $query->where('c.estado', $estado);
+            })
+            ->select([
+                // DATOS DE LA CITA
+                'c.id_cita', 'c.fecha_hora', 'c.motivo', 'c.estado', 'c.notas', 
+                'c.tipo_cita', 'c.enlace_virtual', 'c.sala_virtual', 'c.fecha_creacion',
+                
+                // DATOS COMPLETOS DEL PACIENTE  
+                'u_pac.nombres as paciente_nombres',
+                'u_pac.apellidos as paciente_apellidos', 
+                'u_pac.cedula as paciente_cedula',
+                'u_pac.correo as paciente_correo',
+                'u_pac.sexo as paciente_sexo',
+                'u_pac.nacionalidad as paciente_nacionalidad',
+                'pac.telefono as paciente_telefono',
+                'pac.fecha_nacimiento as paciente_fecha_nacimiento',
+                'pac.tipo_sangre as paciente_tipo_sangre',
+                'pac.alergias as paciente_alergias',
+                'pac.contacto_emergencia as paciente_contacto_emergencia',
+                'pac.telefono_emergencia as paciente_telefono_emergencia',
+                
+                // DATOS DEL DOCTOR
+                'u_doc.nombres as doctor_nombres',
+                'u_doc.apellidos as doctor_apellidos',
+                'd.titulo_profesional as doctor_titulo',
+                
+                // ESPECIALIDAD Y SUCURSAL
+                'e.nombre_especialidad',
+                'e.descripcion as especialidad_descripcion',
+                's.nombre_sucursal',
+                's.direccion as sucursal_direccion',
+                's.telefono as sucursal_telefono',
+                's.email as sucursal_email',
+                's.horario_atencion',
+                
+                // TIPO DE CITA
+                'tc.nombre_tipo as tipo_cita_nombre',
+                
+                // DATOS COMPLETOS DEL TRIAJE
+                't.id_triage',
+                't.nivel_urgencia', 
+                't.temperatura', 
+                't.presion_arterial',
+                't.frecuencia_cardiaca', 
+                't.frecuencia_respiratoria',
+                't.saturacion_oxigeno',
+                't.peso', 
+                't.talla',
+                't.imc',
+                't.observaciones as triaje_observaciones',
+                't.fecha_hora as triaje_fecha_hora',
+                
+                // DATOS DE CONSULTA MÉDICA
+                'cm.id_consulta',
+                'cm.motivo_consulta',
+                'cm.sintomatologia',
+                'cm.diagnostico',
+                'cm.tratamiento',
+                'cm.observaciones as consulta_observaciones',
+                'cm.fecha_seguimiento',
+                'cm.fecha_hora as consulta_fecha_hora',
+                
+                // HISTORIAL CLÍNICO
+                'hc.id_historial'
+            ])
+            ->orderBy('c.fecha_hora', 'asc')
             ->get();
         
         error_log("📊 Citas encontradas: " . $citas->count());
         
-        // ✅ MAPEAR LOS DATOS CORRECTAMENTE
+        // Formatear respuesta con estructura correcta
         $citas_formateadas = $citas->map(function($cita) {
             return [
-                // Datos de la cita
+                // DATOS BÁSICOS DE LA CITA
                 'id_cita' => (int)$cita->id_cita,
                 'fecha_hora' => $cita->fecha_hora,
                 'motivo' => $cita->motivo,
                 'estado' => $cita->estado,
                 'tipo_cita' => $cita->tipo_cita,
                 'notas' => $cita->notas,
+                'enlace_virtual' => $cita->enlace_virtual,
+                'sala_virtual' => $cita->sala_virtual,
+                'fecha_creacion' => $cita->fecha_creacion,
                 
-                // Datos del paciente
+                // INFORMACIÓN COMPLETA DEL PACIENTE
                 'paciente' => [
                     'nombres' => $cita->paciente_nombres,
                     'apellidos' => $cita->paciente_apellidos,
                     'cedula' => $cita->paciente_cedula,
+                    'correo' => $cita->paciente_correo,
+                    'telefono' => $cita->paciente_telefono,
+                    'fecha_nacimiento' => $cita->paciente_fecha_nacimiento,
+                    'sexo' => $cita->paciente_sexo,
+                    'nacionalidad' => $cita->paciente_nacionalidad,
+                    'tipo_sangre' => $cita->paciente_tipo_sangre,
+                    'alergias' => $cita->paciente_alergias,
+                    'contacto_emergencia' => $cita->paciente_contacto_emergencia,
+                    'telefono_emergencia' => $cita->paciente_telefono_emergencia,
                     'nombre_completo' => trim($cita->paciente_nombres . ' ' . $cita->paciente_apellidos)
                 ],
                 
-                // Datos del doctor
+                // DATOS DEL DOCTOR
                 'doctor' => [
                     'nombres' => $cita->doctor_nombres,
                     'apellidos' => $cita->doctor_apellidos,
-                    'titulo_profesional' => $cita->titulo_profesional,
-                    'especialidad' => $cita->nombre_especialidad
+                    'titulo_profesional' => $cita->doctor_titulo,
+                    'especialidad' => $cita->nombre_especialidad,
+                    'nombre_completo' => trim($cita->doctor_nombres . ' ' . $cita->doctor_apellidos)
                 ],
                 
-                // Datos de la sucursal
-                'sucursal' => $cita->nombre_sucursal,
+                // DATOS DE LA SUCURSAL
+                'sucursal' => [
+                    'nombre' => $cita->nombre_sucursal,
+                    'direccion' => $cita->sucursal_direccion,
+                    'telefono' => $cita->sucursal_telefono,
+                    'email' => $cita->sucursal_email,
+                    'horario_atencion' => $cita->horario_atencion
+                ],
                 
-                // Datos del triaje (si existe) - ✅ CORREGIDO
-                'triaje' => $cita->presion_arterial ? [
-                    'presion_arterial' => $cita->presion_arterial,
-                    'frecuencia_cardiaca' => $cita->frecuencia_cardiaca,
-                    'temperatura' => $cita->temperatura,
-                    'saturacion_oxigeno' => $cita->saturacion_oxigeno,
-                    'peso' => $cita->peso,
-                    'talla' => $cita->talla,
-                    'nivel_urgencia' => $cita->nivel_urgencia,
-                    'observaciones' => $cita->observaciones, // ✅ CORREGIDO
-                    'estado' => $cita->estado_triaje
+                // ESPECIALIDAD
+                'especialidad' => [
+                    'nombre' => $cita->nombre_especialidad,
+                    'descripcion' => $cita->especialidad_descripcion
+                ],
+                
+                // TIPO DE CITA
+                'tipo_cita_info' => [
+                    'codigo' => $cita->tipo_cita,
+                    'nombre' => $cita->tipo_cita_nombre
+                ],
+                
+                // DATOS COMPLETOS DEL TRIAJE
+                'triaje' => $cita->id_triage ? [
+                    'id_triage' => $cita->id_triage,
+                    'signos_vitales' => [
+                        'temperatura' => $cita->temperatura,
+                        'presion_arterial' => $cita->presion_arterial,
+                        'frecuencia_cardiaca' => $cita->frecuencia_cardiaca,
+                        'frecuencia_respiratoria' => $cita->frecuencia_respiratoria,
+                        'saturacion_oxigeno' => $cita->saturacion_oxigeno,
+                        'peso' => $cita->peso,
+                        'talla' => $cita->talla,
+                        'imc' => $cita->imc
+                    ],
+                    'evaluacion' => [
+                        'nivel_urgencia' => $cita->nivel_urgencia,
+                        'observaciones' => $cita->triaje_observaciones,
+                        'fecha_triaje' => $cita->triaje_fecha_hora
+                    ]
                 ] : null,
                 
-                // Estado de la consulta
+                // CONSULTA MÉDICA (si existe)
+                'consulta_medica' => $cita->id_consulta ? [
+                    'id_consulta' => $cita->id_consulta,
+                    'motivo_consulta' => $cita->motivo_consulta,
+                    'sintomatologia' => $cita->sintomatologia,
+                    'diagnostico' => $cita->diagnostico,
+                    'tratamiento' => $cita->tratamiento,
+                    'observaciones' => $cita->consulta_observaciones,
+                    'fecha_seguimiento' => $cita->fecha_seguimiento,
+                    'fecha_consulta' => $cita->consulta_fecha_hora
+                ] : null,
+                
+                // ESTADOS Y CAPACIDADES
+                'tiene_triaje' => !is_null($cita->id_triage),
                 'tiene_consulta' => !is_null($cita->id_consulta),
                 'tiene_historial' => !is_null($cita->id_historial),
-                'puede_consultar' => is_null($cita->id_consulta), // Solo si no tiene consulta
-                
-                // Preview de consulta existente
-                'consulta_preview' => $cita->id_consulta ? [
-                    'diagnostico' => $cita->diagnostico ? (strlen($cita->diagnostico) > 100 ? substr($cita->diagnostico, 0, 100) . '...' : $cita->diagnostico) : null,
-                    'tratamiento' => $cita->tratamiento ? (strlen($cita->tratamiento) > 100 ? substr($cita->tratamiento, 0, 100) . '...' : $cita->tratamiento) : null
-                ] : null
+                'puede_consultar' => is_null($cita->id_consulta) && in_array($cita->estado, ['Confirmada', 'En Proceso']),
+                'es_urgente' => $cita->nivel_urgencia >= 4
             ];
         });
         
@@ -2896,7 +2980,7 @@ public function crearActualizarConsultaMedica(Request $request, Response $respon
             ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
             ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
             ->where('citas.id_cita', $id_cita)
-            ->whereIn('citas.estado', ['Confirmada', 'En Proceso'])
+            ->whereIn('citas.estado', ['Confirmada', 'En Proceso', 'Completada'])
             ->select('citas.*', 'historiales_clinicos.id_historial')
             ->first();
             
@@ -2964,6 +3048,14 @@ public function crearActualizarConsultaMedica(Request $request, Response $respon
             
             DB::commit();
             
+            // 🔥 NUEVO: ENVIAR PDF AUTOMÁTICAMENTE
+            try {
+                $this->enviarPDFAutomatico($id_cita);
+            } catch (Exception $e) {
+                error_log("⚠️ Warning: No se pudo enviar PDF automático: " . $e->getMessage());
+                // No fallar la operación si el PDF no se puede enviar
+            }
+            
             // Retornar datos completos de la consulta creada/actualizada
             $consultaCompleta = $this->obtenerConsultaCompleta($id_consulta);
             
@@ -2979,6 +3071,115 @@ public function crearActualizarConsultaMedica(Request $request, Response $respon
     }
 }
 
+/**
+ * 🔥 NUEVO MÉTODO: Enviar PDF automático después de completar consulta
+ */
+private function enviarPDFAutomatico($id_cita)
+{
+    try {
+        // Incluir las clases necesarias
+        require_once __DIR__ . '/../../../config/Mailer.php';
+        require_once __DIR__ . '/../../../controladores/ConsultasMedicasControlador/GenerarPDFConsulta.php';
+        
+        // Obtener datos completos de la cita para el PDF
+        $cita = $this->obtenerDatosCompletosParaPDF($id_cita);
+        
+        if (!$cita || empty($cita['correo_paciente'])) {
+            error_log("❌ No se puede enviar PDF: faltan datos del paciente");
+            return false;
+        }
+        
+        // Generar PDF
+        $pdf = new \GeneradorPDFConsulta($cita);
+        $pdf->generarContenido();
+        $pdf_content = $pdf->Output('', 'S'); // Obtener como string
+        
+        if (empty($pdf_content)) {
+            error_log("❌ Error: PDF generado está vacío");
+            return false;
+        }
+        
+        // Enviar por correo
+        $mailer =  new \Mailer();
+        $correo_paciente = $cita['correo_paciente'];
+        $nombre_paciente = trim($cita['nombres_paciente'] . ' ' . $cita['apellidos_paciente']);
+        
+        $enviado = $mailer->enviarPDFCita($correo_paciente, $nombre_paciente, $cita, $pdf_content);
+        
+        if ($enviado) {
+            error_log("✅ PDF enviado automáticamente a: " . $correo_paciente);
+            return true;
+        } else {
+            error_log("❌ Error enviando PDF automático");
+            return false;
+        }
+        
+    } catch (Exception $e) {
+        error_log("❌ Error en envío automático de PDF: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Obtener datos completos para generar el PDF - VERSIÓN COMPLETA
+ */
+private function obtenerDatosCompletosParaPDF($id_cita)
+{
+    $resultado = DB::table('citas as c')
+        ->join('pacientes as pac', 'c.id_paciente', '=', 'pac.id_paciente')
+        ->join('usuarios as u_pac', 'pac.id_usuario', '=', 'u_pac.id_usuario')
+        ->join('doctores as d', 'c.id_doctor', '=', 'd.id_doctor')
+        ->join('usuarios as u_doc', 'd.id_usuario', '=', 'u_doc.id_usuario')
+        ->join('especialidades as e', 'd.id_especialidad', '=', 'e.id_especialidad')
+        ->join('sucursales as s', 'c.id_sucursal', '=', 's.id_sucursal')
+        ->leftJoin('triage as t', 'c.id_cita', '=', 't.id_cita')
+        ->leftJoin('consultas_medicas as cm', 'c.id_cita', '=', 'cm.id_cita')
+        ->where('c.id_cita', $id_cita)
+        ->select([
+            // Datos de la cita
+            'c.id_cita', 'c.fecha_hora', 'c.motivo', 'c.estado', 'c.notas', 'c.tipo_cita',
+            
+            // Datos del paciente
+            'u_pac.nombres as nombres_paciente', 'u_pac.apellidos as apellidos_paciente',
+            'u_pac.correo as correo_paciente', 'u_pac.cedula as cedula_paciente',
+            'pac.fecha_nacimiento', 'pac.tipo_sangre', 'pac.alergias', 'pac.telefono',
+            'pac.contacto_emergencia', 'pac.telefono_emergencia',
+            
+            // Datos del doctor
+            'u_doc.nombres as nombres_doctor', 'u_doc.apellidos as apellidos_doctor',
+            'u_doc.correo as doctor_correo',
+            'd.titulo_profesional',
+            
+            // Datos de especialidad y sucursal
+            'e.nombre_especialidad',
+            's.nombre_sucursal', 's.direccion as sucursal_direccion',
+            's.telefono as sucursal_telefono', 's.email as sucursal_email',
+            's.horario_atencion',
+            
+            // ✅ DATOS COMPLETOS DEL TRIAJE - ESTOS FALTABAN
+            't.id_triage', 
+            't.nivel_urgencia', 
+            't.temperatura', 
+            't.presion_arterial',
+            't.frecuencia_cardiaca', 
+            't.frecuencia_respiratoria', // ← FALTABA
+            't.saturacion_oxigeno',      // ← FALTABA
+            't.peso', 
+            't.talla',
+            't.imc',                     // ← FALTABA
+            't.observaciones as triaje_observaciones',
+            't.fecha_hora as triaje_fecha_hora', // ← FALTABA
+            
+            // Datos de la consulta médica
+            'cm.motivo_consulta', 'cm.sintomatologia', 'cm.diagnostico',
+            'cm.tratamiento', 'cm.observaciones as consulta_observaciones',
+            'cm.fecha_seguimiento', 'cm.fecha_hora as consulta_fecha_hora'
+        ])
+        ->first();
+    
+    // Convertir objeto a array
+    return $resultado ? (array) $resultado : null;
+}
 /**
  * Validar datos de consulta médica
  */
@@ -3045,83 +3246,127 @@ public function obtenerDetalleConsulta(Request $request, Response $response, arr
             return ResponseUtil::badRequest('ID de cita es requerido');
         }
         
-        $consulta = DB::table('consultas_medicas')
-            ->join('citas', 'consultas_medicas.id_cita', '=', 'citas.id_cita')
-            ->join('pacientes', 'citas.id_paciente', '=', 'pacientes.id_paciente')
-            ->join('usuarios as u_paciente', 'pacientes.id_usuario', '=', 'u_paciente.id_usuario')
-            ->join('doctores', 'citas.id_doctor', '=', 'doctores.id_doctor')
-            ->join('usuarios as u_doctor', 'doctores.id_usuario', '=', 'u_doctor.id_usuario')
-            ->join('especialidades', 'doctores.id_especialidad', '=', 'especialidades.id_especialidad')
-            ->join('sucursales', 'citas.id_sucursal', '=', 'sucursales.id_sucursal')
-            ->leftJoin('triage', 'citas.id_cita', '=', 'triage.id_cita')
-            ->where('consultas_medicas.id_cita', $id_cita)
-            ->select(
-                // Datos de la consulta
-                'consultas_medicas.*',
+        // Consulta completa con TODOS los datos
+        $consulta = DB::table('consultas_medicas as cm')
+            ->join('citas as c', 'cm.id_cita', '=', 'c.id_cita')
+            ->join('pacientes as pac', 'c.id_paciente', '=', 'pac.id_paciente')
+            ->join('usuarios as u_pac', 'pac.id_usuario', '=', 'u_pac.id_usuario')
+            ->join('doctores as d', 'c.id_doctor', '=', 'd.id_doctor')
+            ->join('usuarios as u_doc', 'd.id_usuario', '=', 'u_doc.id_usuario')
+            ->join('especialidades as e', 'd.id_especialidad', '=', 'e.id_especialidad')
+            ->join('sucursales as s', 'c.id_sucursal', '=', 's.id_sucursal')
+            ->leftJoin('tipos_cita as tc', 'c.id_tipo_cita', '=', 'tc.id_tipo_cita')
+            ->leftJoin('triage as t', 'c.id_cita', '=', 't.id_cita')
+            ->leftJoin('historiales_clinicos as hc', 'pac.id_paciente', '=', 'hc.id_paciente')
+            ->where('cm.id_cita', $id_cita)
+            ->select([
+                // DATOS DE LA CONSULTA MÉDICA
+                'cm.id_consulta', 'cm.fecha_hora as consulta_fecha',
+                'cm.motivo_consulta', 'cm.sintomatologia', 'cm.diagnostico',
+                'cm.tratamiento', 'cm.observaciones as consulta_observaciones',
+                'cm.fecha_seguimiento',
                 
-                // Datos de la cita
-                'citas.fecha_hora as fecha_cita',
-                'citas.motivo as motivo_cita',
-                'citas.estado as estado_cita',
-                'citas.tipo_cita',
+                // DATOS DE LA CITA
+                'c.id_cita', 'c.fecha_hora as cita_fecha',
+                'c.motivo as cita_motivo', 'c.estado as cita_estado',
+                'c.tipo_cita', 'c.notas as cita_notas',
+                'c.enlace_virtual', 'c.sala_virtual',
                 
-                // Datos del paciente
-                'u_paciente.nombres as paciente_nombres',
-                'u_paciente.apellidos as paciente_apellidos',
-                'u_paciente.cedula as paciente_cedula',
-                'u_paciente.email as paciente_email',
+                // DATOS COMPLETOS DEL PACIENTE
+                'u_pac.nombres as paciente_nombres',
+                'u_pac.apellidos as paciente_apellidos',
+                'u_pac.cedula as paciente_cedula',
+                'u_pac.correo as paciente_email',
+                'u_pac.sexo as paciente_sexo',
+                'u_pac.nacionalidad as paciente_nacionalidad', 
+                'pac.telefono as paciente_telefono',
+                'pac.fecha_nacimiento as paciente_fecha_nacimiento',
+                'pac.tipo_sangre as paciente_tipo_sangre',
+                'pac.alergias as paciente_alergias',
+                'pac.contacto_emergencia as paciente_contacto_emergencia',
+                'pac.telefono_emergencia as paciente_telefono_emergencia',
                 
-                // Datos del doctor
-                'u_doctor.nombres as doctor_nombres',
-                'u_doctor.apellidos as doctor_apellidos',
-                'doctores.titulo_profesional',
-                'especialidades.nombre_especialidad',
+                // DATOS DEL DOCTOR
+                'u_doc.nombres as doctor_nombres',
+                'u_doc.apellidos as doctor_apellidos',
+                'd.titulo_profesional',
                 
-                // Sucursal
-                'sucursales.nombre_sucursal',
+                // ESPECIALIDAD Y SUCURSAL
+                'e.nombre_especialidad',
+                'e.descripcion as especialidad_descripcion',
+                's.nombre_sucursal',
+                's.direccion as sucursal_direccion',
+                's.telefono as sucursal_telefono',
+                's.email as sucursal_email',
+                's.horario_atencion',
                 
-                // Triaje si existe
-                'triage.presion_arterial',
-                'triage.frecuencia_cardiaca',
-                'triage.temperatura',
-                'triage.saturacion_oxigeno',
-                'triage.peso',
-                'triage.talla',
-                'triage.nivel_urgencia',
-                'triage.observaciones'
-            )
+                // TIPO DE CITA
+                'tc.nombre_tipo as tipo_cita_nombre',
+                
+                // DATOS COMPLETOS DEL TRIAJE
+                't.id_triage',
+                't.nivel_urgencia', 
+                't.temperatura', 
+                't.presion_arterial',
+                't.frecuencia_cardiaca', 
+                't.frecuencia_respiratoria',
+                't.saturacion_oxigeno',
+                't.peso', 
+                't.talla',
+                't.imc',
+                't.observaciones as triaje_observaciones',
+                't.fecha_hora as triaje_fecha',
+                
+                // HISTORIAL CLÍNICO
+                'hc.id_historial'
+            ])
             ->first();
             
         if (!$consulta) {
             return ResponseUtil::notFound('Consulta médica no encontrada');
         }
         
-        // Formatear respuesta
+        // Formatear respuesta completa
         $resultado = [
             'consulta' => [
                 'id_consulta' => $consulta->id_consulta,
-                'fecha_hora' => $consulta->fecha_hora,
+                'fecha_hora' => $consulta->consulta_fecha,
                 'motivo_consulta' => $consulta->motivo_consulta,
                 'sintomatologia' => $consulta->sintomatologia,
                 'diagnostico' => $consulta->diagnostico,
                 'tratamiento' => $consulta->tratamiento,
-                'observaciones' => $consulta->observaciones, // Receta médica
+                'observaciones' => $consulta->consulta_observaciones,
                 'fecha_seguimiento' => $consulta->fecha_seguimiento
             ],
             
             'cita' => [
-                'id_cita' => $id_cita,
-                'fecha_hora' => $consulta->fecha_cita,
-                'motivo_original' => $consulta->motivo_cita,
-                'estado' => $consulta->estado_cita,
-                'tipo' => $consulta->tipo_cita
+                'id_cita' => $consulta->id_cita,
+                'fecha_hora' => $consulta->cita_fecha,
+                'motivo_original' => $consulta->cita_motivo,
+                'estado' => $consulta->cita_estado,
+                'tipo' => $consulta->tipo_cita,
+                'notas' => $consulta->cita_notas,
+                'modalidad' => [
+                    'tipo' => $consulta->tipo_cita,
+                    'nombre' => $consulta->tipo_cita_nombre,
+                    'enlace_virtual' => $consulta->enlace_virtual,
+                    'sala_virtual' => $consulta->sala_virtual
+                ]
             ],
             
             'paciente' => [
                 'nombres' => $consulta->paciente_nombres,
                 'apellidos' => $consulta->paciente_apellidos,
                 'cedula' => $consulta->paciente_cedula,
-                'email' => $consulta->paciente_email,
+                'correo' => $consulta->paciente_email,
+                'telefono' => $consulta->paciente_telefono,
+                'fecha_nacimiento' => $consulta->paciente_fecha_nacimiento,
+                'sexo' => $consulta->paciente_sexo,
+                'nacionalidad' => $consulta->paciente_nacionalidad,
+                'tipo_sangre' => $consulta->paciente_tipo_sangre,
+                'alergias' => $consulta->paciente_alergias,
+                'contacto_emergencia' => $consulta->paciente_contacto_emergencia,
+                'telefono_emergencia' => $consulta->paciente_telefono_emergencia,
                 'nombre_completo' => trim($consulta->paciente_nombres . ' ' . $consulta->paciente_apellidos)
             ],
             
@@ -3133,31 +3378,51 @@ public function obtenerDetalleConsulta(Request $request, Response $response, arr
                 'nombre_completo' => trim($consulta->doctor_nombres . ' ' . $consulta->doctor_apellidos)
             ],
             
-            'sucursal' => $consulta->nombre_sucursal,
+            'sucursal' => [
+                'nombre_sucursal' => $consulta->nombre_sucursal,
+                'direccion' => $consulta->sucursal_direccion,
+                'telefono' => $consulta->sucursal_telefono,
+                'email' => $consulta->sucursal_email,
+                'horario_atencion' => $consulta->horario_atencion
+            ],
             
-            'triaje' => $consulta->presion_arterial ? [
+            'especialidad' => [
+                'nombre_especialidad' => $consulta->nombre_especialidad,
+                'descripcion' => $consulta->especialidad_descripcion
+            ],
+            
+            'triaje' => $consulta->id_triage ? [
+                'id_triage' => $consulta->id_triage,
+                'fecha_triaje' => $consulta->triaje_fecha,
                 'signos_vitales' => [
+                    'temperatura' => $consulta->temperatura,
                     'presion_arterial' => $consulta->presion_arterial,
                     'frecuencia_cardiaca' => $consulta->frecuencia_cardiaca,
-                    'temperatura' => $consulta->temperatura,
+                    'frecuencia_respiratoria' => $consulta->frecuencia_respiratoria,
                     'saturacion_oxigeno' => $consulta->saturacion_oxigeno,
                     'peso' => $consulta->peso,
-                    'talla' => $consulta->talla
+                    'talla' => $consulta->talla,
+                    'imc' => $consulta->imc
                 ],
                 'evaluacion' => [
                     'nivel_urgencia' => $consulta->nivel_urgencia,
-                    'observaciones' => $consulta->observaciones
+                    'observaciones' => $consulta->triaje_observaciones
                 ]
-            ] : null
+            ] : null,
+            
+            'historial' => [
+                'tiene_historial' => !is_null($consulta->id_historial),
+                'id_historial' => $consulta->id_historial
+            ]
         ];
         
         return ResponseUtil::success($resultado, 'Detalle de consulta médica obtenido');
         
     } catch (Exception $e) {
+        error_log("❌ Error en obtenerDetalleConsulta: " . $e->getMessage());
         return ResponseUtil::error('Error obteniendo detalle de consulta: ' . $e->getMessage());
     }
 }
-
 // En CitasController.php - AGREGAR ESTE MÉTODO
 public function actualizarEstadoCita(Request $request, Response $response, array $args): Response
 {
@@ -3192,6 +3457,222 @@ public function actualizarEstadoCita(Request $request, Response $response, array
     } catch (Exception $e) {
         error_log("❌ Error actualizando estado: " . $e->getMessage());
         return ResponseUtil::error('Error actualizando estado de cita: ' . $e->getMessage());
+    }
+}
+
+
+/**
+ * Obtener información básica de una cita (paciente, doctor, etc.) 
+ * SIN requerir que exista consulta médica
+ */
+public function obtenerInformacionCita(Request $request, Response $response, array $args): Response
+{
+    try {
+        $id_cita = $args['id_cita'] ?? null;
+        
+        if (empty($id_cita)) {
+            return ResponseUtil::badRequest('ID de cita es requerido');
+        }
+        
+        // Consulta SOLO de la cita y datos relacionados
+        $cita = DB::table('citas as c')
+            ->join('pacientes as pac', 'c.id_paciente', '=', 'pac.id_paciente')
+            ->join('usuarios as u_pac', 'pac.id_usuario', '=', 'u_pac.id_usuario')
+            ->join('doctores as d', 'c.id_doctor', '=', 'd.id_doctor')
+            ->join('usuarios as u_doc', 'd.id_usuario', '=', 'u_doc.id_usuario')
+            ->join('especialidades as e', 'd.id_especialidad', '=', 'e.id_especialidad')
+            ->join('sucursales as s', 'c.id_sucursal', '=', 's.id_sucursal')
+            ->leftJoin('tipos_cita as tc', 'c.id_tipo_cita', '=', 'tc.id_tipo_cita')
+            ->leftJoin('triage as t', 'c.id_cita', '=', 't.id_cita')
+            ->leftJoin('consultas_medicas as cm', 'c.id_cita', '=', 'cm.id_cita') // LEFT JOIN para que sea opcional
+            ->leftJoin('historiales_clinicos as hc', 'pac.id_paciente', '=', 'hc.id_paciente')
+            ->where('c.id_cita', $id_cita)
+            ->select([
+                // DATOS DE LA CITA
+                'c.id_cita', 'c.fecha_hora as cita_fecha',
+                'c.motivo as cita_motivo', 'c.estado as cita_estado',
+                'c.tipo_cita', 'c.notas as cita_notas',
+                'c.enlace_virtual', 'c.sala_virtual',
+                
+                // DATOS COMPLETOS DEL PACIENTE
+                'pac.id_paciente',
+                'u_pac.nombres as paciente_nombres',
+                'u_pac.apellidos as paciente_apellidos',
+                'u_pac.cedula as paciente_cedula',
+                'u_pac.correo as paciente_email',
+                'u_pac.sexo as paciente_sexo',
+                'u_pac.nacionalidad as paciente_nacionalidad',
+                'pac.telefono as paciente_telefono',
+                'pac.fecha_nacimiento as paciente_fecha_nacimiento',
+                'pac.tipo_sangre as paciente_tipo_sangre',
+                'pac.alergias as paciente_alergias',
+                'pac.contacto_emergencia as paciente_contacto_emergencia',
+                'pac.telefono_emergencia as paciente_telefono_emergencia',
+                
+                // DATOS DEL DOCTOR
+                'u_doc.nombres as doctor_nombres',
+                'u_doc.apellidos as doctor_apellidos',
+                'd.titulo_profesional',
+                
+                // ESPECIALIDAD Y SUCURSAL
+                'e.nombre_especialidad',
+                'e.descripcion as especialidad_descripcion',
+                's.nombre_sucursal',
+                's.direccion as sucursal_direccion',
+                's.telefono as sucursal_telefono',
+                's.email as sucursal_email',
+                's.horario_atencion',
+                
+                // TIPO DE CITA
+                'tc.nombre_tipo as tipo_cita_nombre',
+                
+                // DATOS DEL TRIAJE (si existe)
+                't.id_triage',
+                't.nivel_urgencia', 
+                't.temperatura', 
+                't.presion_arterial',
+                't.frecuencia_cardiaca', 
+                't.frecuencia_respiratoria',
+                't.saturacion_oxigeno',
+                't.peso', 
+                't.talla',
+                't.imc',
+                't.observaciones as triaje_observaciones',
+                't.fecha_hora as triaje_fecha',
+                
+                // CONSULTA MÉDICA (si existe)
+                'cm.id_consulta',
+                'cm.motivo_consulta',
+                'cm.sintomatologia',
+                'cm.diagnostico',
+                'cm.tratamiento',
+                'cm.observaciones as consulta_observaciones',
+                'cm.fecha_seguimiento',
+                
+                // HISTORIAL CLÍNICO
+                'hc.id_historial'
+            ])
+            ->first();
+            
+        if (!$cita) {
+            return ResponseUtil::notFound('Cita no encontrada');
+        }
+        
+        // Calcular edad del paciente
+        $edad = null;
+        if ($cita->paciente_fecha_nacimiento) {
+            try {
+                $fechaNac = new DateTime($cita->paciente_fecha_nacimiento);
+                $hoy = new DateTime();
+                $edad = $hoy->diff($fechaNac)->y;
+            } catch (Exception $e) {
+                error_log("Error calculando edad: " . $e->getMessage());
+                $edad = null;
+            }
+        }
+        
+        // Formatear respuesta completa
+        $resultado = [
+            'cita' => [
+                'id_cita' => $cita->id_cita,
+                'fecha_hora' => $cita->cita_fecha,
+                'motivo' => $cita->cita_motivo,
+                'estado' => $cita->cita_estado,
+                'tipo' => $cita->tipo_cita,
+                'notas' => $cita->cita_notas,
+                'modalidad' => [
+                    'tipo' => $cita->tipo_cita,
+                    'nombre' => $cita->tipo_cita_nombre,
+                    'enlace_virtual' => $cita->enlace_virtual,
+                    'sala_virtual' => $cita->sala_virtual
+                ],
+                'tiene_consulta' => !is_null($cita->id_consulta)
+            ],
+            
+            'paciente' => [
+                'id_paciente' => $cita->id_paciente,
+                'nombres' => $cita->paciente_nombres,
+                'apellidos' => $cita->paciente_apellidos,
+                'cedula' => $cita->paciente_cedula,
+                'correo' => $cita->paciente_email,
+                'telefono' => $cita->paciente_telefono,
+                'fecha_nacimiento' => $cita->paciente_fecha_nacimiento,
+                'edad' => $edad,
+                'sexo' => $cita->paciente_sexo,
+                'nacionalidad' => $cita->paciente_nacionalidad,
+                'tipo_sangre' => $cita->paciente_tipo_sangre,
+                'alergias' => $cita->paciente_alergias,
+                'contacto_emergencia' => $cita->paciente_contacto_emergencia,
+                'telefono_emergencia' => $cita->paciente_telefono_emergencia,
+                'nombre_completo' => trim($cita->paciente_nombres . ' ' . $cita->paciente_apellidos)
+            ],
+            
+            'doctor' => [
+                'nombres' => $cita->doctor_nombres,
+                'apellidos' => $cita->doctor_apellidos,
+                'titulo_profesional' => $cita->titulo_profesional,
+                'especialidad' => $cita->nombre_especialidad,
+                'nombre_completo' => trim($cita->doctor_nombres . ' ' . $cita->doctor_apellidos)
+            ],
+            
+            'sucursal' => [
+                'nombre_sucursal' => $cita->nombre_sucursal,
+                'direccion' => $cita->sucursal_direccion,
+                'telefono' => $cita->sucursal_telefono,
+                'email' => $cita->sucursal_email,
+                'horario_atencion' => $cita->horario_atencion
+            ],
+            
+            'especialidad' => [
+                'nombre_especialidad' => $cita->nombre_especialidad,
+                'descripcion' => $cita->especialidad_descripcion
+            ],
+            
+            'triaje' => $cita->id_triage ? [
+                'id_triage' => $cita->id_triage,
+                'fecha_triaje' => $cita->triaje_fecha,
+                'completado' => true,
+                'signos_vitales' => [
+                    'temperatura' => $cita->temperatura,
+                    'presion_arterial' => $cita->presion_arterial,
+                    'frecuencia_cardiaca' => $cita->frecuencia_cardiaca,
+                    'frecuencia_respiratoria' => $cita->frecuencia_respiratoria,
+                    'saturacion_oxigeno' => $cita->saturacion_oxigeno,
+                    'peso' => $cita->peso,
+                    'talla' => $cita->talla,
+                    'imc' => $cita->imc
+                ],
+                'evaluacion' => [
+                    'nivel_urgencia' => $cita->nivel_urgencia,
+                    'observaciones' => $cita->triaje_observaciones
+                ]
+            ] : [
+                'completado' => false,
+                'id_triage' => null
+            ],
+            
+            'consulta_medica' => [
+                'existe' => !is_null($cita->id_consulta),
+                'id_consulta' => $cita->id_consulta,
+                'motivo_consulta' => $cita->motivo_consulta,
+                'diagnostico' => $cita->diagnostico,
+                'sintomatologia' => $cita->sintomatologia,
+                'tratamiento' => $cita->tratamiento,
+                'observaciones' => $cita->consulta_observaciones,
+                'fecha_seguimiento' => $cita->fecha_seguimiento
+            ],
+            
+            'historial' => [
+                'tiene_historial' => !is_null($cita->id_historial),
+                'id_historial' => $cita->id_historial
+            ]
+        ];
+        
+        return ResponseUtil::success($resultado, 'Información de cita obtenida exitosamente');
+        
+    } catch (Exception $e) {
+        error_log("❌ Error en obtenerInformacionCita: " . $e->getMessage());
+        return ResponseUtil::error('Error obteniendo información de cita: ' . $e->getMessage());
     }
 }
     
