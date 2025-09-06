@@ -2735,7 +2735,7 @@ public function obtenerCitasConsultaDoctor(Request $request, Response $response,
     try {
         $cedula_doctor = $args['cedula'] ?? null;
         $fecha = $request->getQueryParams()['fecha'] ?? date('Y-m-d');
-        $estado = $request->getQueryParams()['estado'] ?? 'Confirmada';
+        $estado = $request->getQueryParams()['estado'] ?? 'Confirmada' || 'En Proceso';
         
         error_log("🔍 Iniciando obtenerCitasConsultaDoctor - Cédula: {$cedula_doctor}, Fecha: {$fecha}, Estado: {$estado}");
         
@@ -3424,7 +3424,7 @@ public function obtenerDetalleConsulta(Request $request, Response $response, arr
     }
 }
 // En CitasController.php - AGREGAR ESTE MÉTODO
-public function actualizarEstadoCita(Request $request, Response $response, array $args): Response
+public function actualizarEstadoCita(Request $request, Response $response, array $args): Response 
 {
     try {
         $id_cita = $args['id_cita'] ?? null;
@@ -3434,24 +3434,48 @@ public function actualizarEstadoCita(Request $request, Response $response, array
             return ResponseUtil::badRequest('ID de cita y estado son requeridos');
         }
 
-        // Log para debug
         error_log("Actualizando estado de cita {$id_cita} a: {$data['estado']}");
         
+        // ✅ VERIFICAR QUE LA CITA EXISTE PRIMERO
+        $citaExiste = DB::table('citas')
+            ->where('id_cita', $id_cita)
+            ->first();
+            
+        if (!$citaExiste) {
+            error_log("❌ Cita {$id_cita} no existe en la base de datos");
+            return ResponseUtil::notFound('Cita no encontrada');
+        }
+        
+        // ✅ VERIFICAR SI YA TIENE EL MISMO ESTADO
+        if ($citaExiste->estado === $data['estado']) {
+            error_log("✅ Cita {$id_cita} ya tiene el estado: {$data['estado']}");
+            return ResponseUtil::success(
+                ['id_cita' => $id_cita, 'estado_actual' => $data['estado']],
+                "La cita ya tiene el estado solicitado"
+            );
+        }
+        
+        // ✅ ACTUALIZAR ESTADO
         $resultado = DB::table('citas')
             ->where('id_cita', $id_cita)
             ->update([
-                'estado' => $data['estado']
+                'estado' => $data['estado'],
             ]);
             
-        if ($resultado) {
-            error_log("✅ Estado actualizado correctamente");
+        if ($resultado > 0) {
+            error_log("✅ Estado actualizado correctamente de '{$citaExiste->estado}' a '{$data['estado']}'");
             return ResponseUtil::success(
-                ['id_cita' => $id_cita, 'nuevo_estado' => $data['estado']], 
+                [
+                    'id_cita' => $id_cita, 
+                    'estado_anterior' => $citaExiste->estado,
+                    'nuevo_estado' => $data['estado']
+                ],
                 "Estado de cita actualizado exitosamente"
             );
         } else {
-            error_log("❌ No se pudo actualizar - cita no encontrada");
-            return ResponseUtil::notFound('Cita no encontrada');
+            // Esto normalmente no debería pasar si verificamos que existe
+            error_log("❌ No se pudo actualizar - resultado: {$resultado}");
+            return ResponseUtil::error('Error inesperado actualizando la cita');
         }
         
     } catch (Exception $e) {

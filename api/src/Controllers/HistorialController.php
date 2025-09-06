@@ -11,86 +11,114 @@ use Exception;
 class HistorialController
 {
     public function buscarPacientePorCedula(Request $request, Response $response, array $args): Response
-    {
-        $cedula = $args['cedula'];
+{
+    $cedula = $args['cedula'];
+    
+   
+    
+    try {
+        // PASO 1: Verificar si existe algún usuario con esa cédula
+        $usuarioExistente = DB::table('usuarios')
+            ->join('roles', 'usuarios.id_rol', '=', 'roles.id_rol')
+            ->select(
+                'usuarios.id_usuario',
+                'usuarios.cedula',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'roles.nombre_rol'
+            )
+            ->where('usuarios.cedula', $cedula)
+            ->first();
         
-        // Validar cédula
-        $erroresCedula = CedulaValidator::validate($cedula);
-        if (!empty($erroresCedula)) {
-            return ResponseUtil::badRequest('La cédula proporcionada no es válida', $erroresCedula);
-        }
-        
-        try {
-            $paciente = DB::table('pacientes')
-                ->join('usuarios', 'pacientes.id_usuario', '=', 'usuarios.id_usuario')
-                ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
-                ->select(
-                    'pacientes.*',
-                    'usuarios.cedula',
-                    'usuarios.nombres',
-                    'usuarios.apellidos',
-                    'usuarios.correo',
-                    'usuarios.sexo',
-                    'usuarios.nacionalidad',
-                    'usuarios.username',
-                    'historiales_clinicos.id_historial',
-                    'historiales_clinicos.fecha_creacion as historial_creado',
-                    'historiales_clinicos.ultima_actualizacion as historial_actualizado'
-                )
-                ->where('usuarios.cedula', $cedula)
-                ->first();
+        if ($usuarioExistente) {
+            // PASO 2: Si existe, verificar si es paciente o no
+            $esPaciente = DB::table('pacientes')
+                ->where('id_usuario', $usuarioExistente->id_usuario)
+                ->exists();
             
-            if (!$paciente) {
-                return ResponseUtil::notFound('No se encontró ningún paciente con la cédula proporcionada: ' . $cedula);
+            if (!$esPaciente) {
+                // La cédula pertenece a otro tipo de usuario
+                $mensaje = 'La cédula ' . $cedula . ' ya está registrada como ' . 
+                          strtolower($usuarioExistente->nombre_rol) . ': ' . 
+                          $usuarioExistente->nombres . ' ' . $usuarioExistente->apellidos;
+                
+                return ResponseUtil::badRequest($mensaje);
             }
-            
-            // Contar citas del paciente
-            $totalCitas = DB::table('citas')
-                ->where('id_paciente', $paciente->id_paciente)
-                ->count();
-            
-            $pacienteData = [
-                'paciente' => [
-                    'id_paciente' => $paciente->id_paciente,
-                    'cedula' => $paciente->cedula,
-                    'nombres' => $paciente->nombres,
-                    'apellidos' => $paciente->apellidos,
-                    'nombre_completo' => $paciente->nombres . ' ' . $paciente->apellidos,
-                    'correo' => $paciente->correo,
-                    'sexo' => $paciente->sexo,
-                    'nacionalidad' => $paciente->nacionalidad,
-                    'username' => $paciente->username,
-                    'fecha_nacimiento' => $paciente->fecha_nacimiento,
-                    'edad' => $this->calcularEdad($paciente->fecha_nacimiento),
-                    'tipo_sangre' => $paciente->tipo_sangre,
-                    'alergias' => $paciente->alergias,
-                    'antecedentes_medicos' => $paciente->antecedentes_medicos,
-                    'contacto_emergencia' => $paciente->contacto_emergencia,
-                    'telefono_emergencia' => $paciente->telefono_emergencia,
-                    'numero_seguro' => $paciente->numero_seguro,
-                    'telefono' => $paciente->telefono
-                ],
-                'historial_clinico' => [
-                    'id_historial' => $paciente->id_historial,
-                    'fecha_creacion' => $paciente->historial_creado,
-                    'ultima_actualizacion' => $paciente->historial_actualizado,
-                    'existe_historial' => !is_null($paciente->id_historial)
-                ],
-                'estadisticas_rapidas' => [
-                    'total_citas' => $totalCitas,
-                    'tiene_citas' => $totalCitas > 0
-                ]
-            ];
-            
-            return ResponseUtil::success(
-                $pacienteData, 
-                'Paciente encontrado exitosamente: ' . $paciente->nombres . ' ' . $paciente->apellidos
-            );
-            
-        } catch (Exception $e) {
-            return ResponseUtil::error('Error interno del servidor al buscar el paciente: ' . $e->getMessage());
         }
+        
+        // PASO 3: Buscar paciente específicamente
+        $paciente = DB::table('pacientes')
+            ->join('usuarios', 'pacientes.id_usuario', '=', 'usuarios.id_usuario')
+            ->leftJoin('historiales_clinicos', 'pacientes.id_paciente', '=', 'historiales_clinicos.id_paciente')
+            ->select(
+                'pacientes.*',
+                'usuarios.cedula',
+                'usuarios.nombres',
+                'usuarios.apellidos',
+                'usuarios.correo',
+                'usuarios.sexo',
+                'usuarios.nacionalidad',
+                'usuarios.username',
+                'historiales_clinicos.id_historial',
+                'historiales_clinicos.fecha_creacion as historial_creado',
+                'historiales_clinicos.ultima_actualizacion as historial_actualizado'
+            )
+            ->where('usuarios.cedula', $cedula)
+            ->first();
+        
+        if (!$paciente) {
+            return ResponseUtil::notFound('No se encontró ningún paciente con la cédula proporcionada: ' . $cedula);
+        }
+        
+        // PASO 4: Contar citas del paciente
+        $totalCitas = DB::table('citas')
+            ->where('id_paciente', $paciente->id_paciente)
+            ->count();
+        
+        // PASO 5: Formatear respuesta
+        $pacienteData = [
+            'paciente' => [
+                'id_paciente' => $paciente->id_paciente,
+                'cedula' => $paciente->cedula,
+                'nombres' => $paciente->nombres,
+                'apellidos' => $paciente->apellidos,
+                'nombre_completo' => $paciente->nombres . ' ' . $paciente->apellidos,
+                'correo' => $paciente->correo,
+                'sexo' => $paciente->sexo,
+                'nacionalidad' => $paciente->nacionalidad,
+                'username' => $paciente->username,
+                'fecha_nacimiento' => $paciente->fecha_nacimiento,
+                'edad' => $this->calcularEdad($paciente->fecha_nacimiento),
+                'tipo_sangre' => $paciente->tipo_sangre,
+                'alergias' => $paciente->alergias,
+                'antecedentes_medicos' => $paciente->antecedentes_medicos,
+                'contacto_emergencia' => $paciente->contacto_emergencia,
+                'telefono_emergencia' => $paciente->telefono_emergencia,
+                'numero_seguro' => $paciente->numero_seguro,
+                'telefono' => $paciente->telefono
+            ],
+            'historial_clinico' => [
+                'id_historial' => $paciente->id_historial,
+                'fecha_creacion' => $paciente->historial_creado,
+                'ultima_actualizacion' => $paciente->historial_actualizado,
+                'existe_historial' => !is_null($paciente->id_historial)
+            ],
+            'estadisticas_rapidas' => [
+                'total_citas' => $totalCitas,
+                'tiene_citas' => $totalCitas > 0
+            ]
+        ];
+        
+        return ResponseUtil::success(
+            $pacienteData, 
+            'Paciente encontrado exitosamente: ' . $paciente->nombres . ' ' . $paciente->apellidos
+        );
+        
+    } catch (Exception $e) {
+        error_log("Error buscando paciente por cédula {$cedula}: " . $e->getMessage());
+        return ResponseUtil::error('Error interno del servidor al buscar el paciente: ' . $e->getMessage());
     }
+}
 
     public function getHistorialByCedula(Request $request, Response $response, array $args): Response
     {
@@ -310,6 +338,8 @@ class HistorialController
                     'triage.temperatura',
                     'triage.presion_arterial',
                     'triage.frecuencia_cardiaca',
+                    'triage.frecuencia_respiratoria',
+                    'triage.saturacion_oxigeno',
                     'triage.peso',
                     'triage.talla as altura',
                     'triage.imc',
@@ -401,6 +431,8 @@ class HistorialController
                             'imc' => $cita->imc,
                             'presion_arterial' => $cita->presion_arterial,
                             'temperatura' => $cita->temperatura,
+                            'frecuencia_respiratoria' => $cita->frecuencia_respiratoria,
+                            'saturacion_oxigeno' => $cita->saturacion_oxigeno,
                             'frecuencia_cardiaca' => $cita->frecuencia_cardiaca
                         ],
                         'observaciones' => $cita->triage_observaciones
