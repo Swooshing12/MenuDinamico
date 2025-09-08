@@ -204,6 +204,11 @@ $app->get('/consultas/detalle/{id_cita}', [CitasController::class, 'obtenerDetal
     
 $app->get('/citas/informacion/{id_cita}', [CitasController::class, 'obtenerInformacionCita']);
 
- 
+// Agregar esta línea
+$app->get('/especialidades/paciente/{cedula}', HistorialController::class . ':getEspecialidadesPaciente'); 
+
+// Agregar esta nueva ruta
+$app->get('/doctores/especialidad/{id_especialidad}/paciente/{cedula}', HistorialController::class . ':getDoctoresPorEspecialidadPaciente');
+
 $app->run();
 ?>
